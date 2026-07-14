@@ -40,7 +40,6 @@ SOURCE_DOMAINS = {
 }
 PRIMARY_SOURCE_DOMAINS = (
     "cricbuzz.com",
-    "espncricinfo.com",
 )
 MIN_ARTICLE_TEXT_CHARS = 300
 REQUEST_HEADERS = {
@@ -340,8 +339,6 @@ def search_primary_cricket_sites(match: dict, limit: int) -> list[dict]:
         ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/"),
         ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/cricket-news"),
         ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/cricket-match/live-scores/upcoming-matches"),
-        ("espncricinfo.com", "https://www.espncricinfo.com", "https://www.espncricinfo.com/"),
-        ("espncricinfo.com", "https://www.espncricinfo.com", "https://www.espncricinfo.com/cricket-news"),
     )
     sources = []
     seen_urls = set()
