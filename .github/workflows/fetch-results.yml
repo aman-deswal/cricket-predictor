@@ -5,6 +5,10 @@ on:
     - cron: '0 */2 * * *'  # Every 2 hours
   workflow_dispatch:
 
+permissions:
+  contents: read
+  models: read
+
 jobs:
   results:
     runs-on: ubuntu-latest

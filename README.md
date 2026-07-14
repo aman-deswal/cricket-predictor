@@ -21,7 +21,7 @@ AI-powered cricket match outcome predictor using GPT-4o-mini, historical stats, 
 
 1. **Fetch Fixtures** — Every 6 hours, pull upcoming T20I/IPL matches from CricAPI
 2. **Compute Stats** — Generate rolling team/player/venue statistics from Cricsheet data
-3. **Predict** — Daily at 6 AM UTC, generate win probabilities using GPT-4o-mini (3x ensemble, JSON mode)
+3. **Predict** — Daily at 6 AM UTC, generate win probabilities using GPT-4o via GitHub Models (5x ensemble, JSON mode)
 4. **Fetch Results** — Every 2 hours, check completed matches and score predictions
 5. **Calibrate** — After 50+ predictions, apply isotonic regression for calibration
 
@@ -50,14 +50,16 @@ npm run dev
 
 | Variable | Description |
 |----------|-------------|
-| `OPENAI_API_KEY` | OpenAI API key for GPT-4o-mini |
+| `GITHUB_TOKEN` | GitHub token for accessing GitHub Models API (free, auto-available in Actions) |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_KEY` | Supabase anon/service key |
 | `CRICAPI_KEY` | CricAPI key for fixtures/results |
 
+> **Note:** This project uses [GitHub Models](https://github.com/marketplace/models) (GPT-4o via `models.github.ai`) instead of a paid OpenAI API key. In GitHub Actions, `GITHUB_TOKEN` is automatically available. For local development, use a GitHub PAT with `models:read` scope.
+
 ## Tech Stack
 
-- **Pipeline**: Python 3.11, OpenAI SDK, Supabase client, pandas, scikit-learn
+- **Pipeline**: Python 3.11, OpenAI SDK (GitHub Models compatible), Supabase client, pandas, scikit-learn
 - **Frontend**: Next.js 14, Tailwind CSS, Recharts, Supabase JS
 - **Database**: Supabase (PostgreSQL)
 - **Deployment**: GitHub Actions + GitHub Pages

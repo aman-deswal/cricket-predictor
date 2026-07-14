@@ -1,7 +1,8 @@
-"""Generate match predictions using OpenAI GPT-4o-mini."""
+"""Generate match predictions using GitHub Models (GPT-4o)."""
 
 import json
 import logging
+import os
 from datetime import date
 
 from openai import OpenAI
@@ -50,9 +51,9 @@ Respond in JSON format:
     "reasoning": "<2-3 sentence explanation>"
 }}"""
 
-NUM_ENSEMBLE_CALLS = 3
+NUM_ENSEMBLE_CALLS = 5
 TEMPERATURE = 0.3
-MODEL = "gpt-4o-mini"
+MODEL = "openai/gpt-4o"
 
 
 def build_context(match: dict) -> dict:
@@ -91,8 +92,11 @@ def build_context(match: dict) -> dict:
 
 
 def call_openai(prompt: str) -> dict:
-    """Make a single prediction call to OpenAI."""
-    client = OpenAI()
+    """Make a single prediction call via GitHub Models API."""
+    client = OpenAI(
+        base_url="https://models.github.ai/inference",
+        api_key=os.environ["GITHUB_TOKEN"],
+    )
     response = client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
