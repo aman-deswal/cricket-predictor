@@ -9,9 +9,10 @@ interface PredictionChartProps {
   team2: string;
   team1Prob: number;
   team2Prob: number;
+  compact?: boolean;
 }
 
-export function PredictionChart({ team1, team2, team1Prob, team2Prob }: PredictionChartProps) {
+export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = false }: PredictionChartProps) {
   const team1Meta = getTeamMeta(team1);
   const team2Meta = getTeamMeta(team2);
 
@@ -23,6 +24,40 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob }: Predicti
   const COLORS = [team1Meta.primaryColor, team2Meta.primaryColor];
   const winner = team1Prob > team2Prob ? team1 : team2;
   const winnerProb = Math.max(team1Prob, team2Prob);
+
+  if (compact) {
+    return (
+      <motion.div
+        className="relative w-full h-full"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 100, delay: 0.2 }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="85%"
+              paddingAngle={3}
+              dataKey="value"
+              startAngle={90}
+              endAngle={-270}
+              strokeWidth={0}
+              animationBegin={300}
+              animationDuration={1000}
+            >
+              {data.map((_, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index]} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
