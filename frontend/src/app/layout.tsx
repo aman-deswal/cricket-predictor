@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Cricket Predictor',
-  description: 'AI-powered cricket match outcome predictions',
+  title: 'Cricket Predictor | AI-Powered Match Predictions',
+  description: 'AI-powered cricket match outcome predictions using GPT-4o',
 };
 
 export default function RootLayout({
@@ -13,29 +13,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-cricket-950 text-white min-h-screen">
-        <nav className="border-b border-cricket-800 bg-cricket-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <body className="bg-[#0a0f0d] text-white min-h-screen antialiased">
+        {/* Background gradient orbs */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-cricket-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 -left-40 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl" />
+        </div>
+
+        <nav className="relative border-b border-white/5 bg-[#0a0f0d]/80 backdrop-blur-xl sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <a href="/" className="flex items-center space-x-2">
-                <span className="text-2xl">🏏</span>
-                <span className="font-bold text-lg text-cricket-300">Cricket Predictor</span>
+              <a href="/" className="flex items-center space-x-2.5 group">
+                <span className="text-2xl group-hover:scale-110 transition-transform">🏏</span>
+                <span className="font-black text-lg bg-gradient-to-r from-cricket-300 to-emerald-400 bg-clip-text text-transparent">
+                  CricPredict
+                </span>
               </a>
-              <div className="flex space-x-6">
-                <a href="/" className="text-gray-300 hover:text-cricket-400 transition-colors">
+              <div className="flex items-center space-x-1">
+                <a href="/" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   Matches
                 </a>
-                <a href="/dashboard" className="text-gray-300 hover:text-cricket-400 transition-colors">
+                <a href="/dashboard" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   Dashboard
                 </a>
-                <a href="/history" className="text-gray-300 hover:text-cricket-400 transition-colors">
+                <a href="/history" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   History
                 </a>
               </div>
             </div>
           </div>
         </nav>
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           {children}
         </main>
       </body>

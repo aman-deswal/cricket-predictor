@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getPrediction, Match, MatchEnrichment, Prediction } from '@/lib/supabase';
+import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
 
 function getSeriesName(match: Match): string {
@@ -15,6 +17,11 @@ function getSeriesName(match: Match): string {
   }
   return match.name || match.venue || 'TBC';
 }
+
+const fadeUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+};
 
 export function PredictDetails() {
   const searchParams = useSearchParams();
@@ -52,124 +59,329 @@ export function PredictDetails() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cricket-400" />
+        <motion.div
+          className="rounded-full h-10 w-10 border-2 border-cricket-400 border-t-transparent"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        />
       </div>
     );
   }
 
   if (!matchId || !match) {
     return (
-      <div className="text-center text-gray-500 py-16">
+      <motion.div {...fadeUp} className="text-center text-gray-500 py-16">
         <p className="text-xl">Match not found</p>
-      </div>
+      </motion.div>
     );
   }
 
   const displayTeam1 = prediction?.team1 ?? match.team1;
   const displayTeam2 = prediction?.team2 ?? match.team2;
+  const team1Meta = getTeamMeta(displayTeam1);
+  const team2Meta = getTeamMeta(displayTeam2);
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
   const isModelEstimated = enrichment !== null && enrichment.source_links.length === 0;
-  const squadLabel = isModelEstimated ? 'Recent-player candidates, not confirmed squad' : 'Source-backed squad / possible XI';
+  const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-cricket-300 mb-2">
-        {displayTeam1} vs {displayTeam2}
-      </h1>
-      <p className="text-gray-400 mb-8">{match.name || 'Match details'}</p>
+    <div className="max-w-3xl mx-auto">
+      {/* Hero section with team flags */}
+      <motion.div
+        className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-8 mb-8 overflow-hidden"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Background glow */}
+        <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-cricket-500/10 blur-3xl rounded-full" />
 
-      <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
-        <h2 className="text-lg font-semibold text-cricket-200 mb-4">Fixture</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Format</p>
-            <p className="text-gray-200">{match.match_type.toUpperCase()}</p>
-          </div>
-          <div>
-            <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Start</p>
-            <p className="text-gray-200">{new Date(match.date).toLocaleString()}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Series</p>
-            <p className="text-gray-200">{getSeriesName(match)}</p>
-          </div>
+        <div className="relative flex items-center justify-between gap-4">
+          {/* Team 1 */}
+          <motion.div
+            className="flex-1 text-center"
+            initial={{ x: -30, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <motion.div
+              className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
+              style={{ ['--tw-ring-color' as string]: team1Meta.primaryColor }}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+            >
+              <img
+                src={getFlagUrl(team1Meta.countryCode, 80)}
+                srcSet={`${getFlag2xUrl(team1Meta.countryCode, 80)} 2x`}
+                alt={displayTeam1}
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+            <h2 className="text-lg font-bold text-white">{team1Meta.shortName}</h2>
+            <p className="text-xs text-gray-400">{displayTeam1}</p>
+          </motion.div>
+
+          {/* Center VS */}
+          <motion.div
+            className="flex flex-col items-center"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
+          >
+            <div className="w-12 h-12 rounded-full bg-cricket-900/80 border border-cricket-700/50 flex items-center justify-center">
+              <span className="text-xs font-black text-cricket-400 uppercase">VS</span>
+            </div>
+          </motion.div>
+
+          {/* Team 2 */}
+          <motion.div
+            className="flex-1 text-center"
+            initial={{ x: 30, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <motion.div
+              className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
+              style={{ ['--tw-ring-color' as string]: team2Meta.primaryColor }}
+              whileHover={{ scale: 1.1, rotate: -5 }}
+            >
+              <img
+                src={getFlagUrl(team2Meta.countryCode, 80)}
+                srcSet={`${getFlag2xUrl(team2Meta.countryCode, 80)} 2x`}
+                alt={displayTeam2}
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+            <h2 className="text-lg font-bold text-white">{team2Meta.shortName}</h2>
+            <p className="text-xs text-gray-400">{displayTeam2}</p>
+          </motion.div>
         </div>
-      </div>
 
-      <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <h2 className="text-lg font-semibold text-cricket-200">Squad / Player Candidates</h2>
-          {hasSquadOrXi && <span className="text-xs uppercase tracking-wide text-gray-500">{squadLabel}</span>}
+        {/* Match info */}
+        <motion.div
+          className="relative mt-6 pt-4 border-t border-gray-800/50 grid grid-cols-3 gap-4 text-center text-xs"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div>
+            <p className="text-gray-500 uppercase tracking-wider mb-1">Format</p>
+            <p className="text-white font-semibold">{match.match_type.toUpperCase()}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 uppercase tracking-wider mb-1">Date</p>
+            <p className="text-white font-semibold">{new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 uppercase tracking-wider mb-1">Series</p>
+            <p className="text-white font-semibold truncate">{getSeriesName(match)}</p>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Prediction Section */}
+      {!prediction ? (
+        <motion.div
+          {...fadeUp}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-8 border border-cricket-800/30 text-center"
+        >
+          <motion.div
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-4xl mb-4"
+          >
+            🏏
+          </motion.div>
+          <p className="text-xl font-semibold text-cricket-300">Prediction Pending</p>
+          <p className="text-gray-400 mt-2 text-sm">The prediction pipeline hasn&apos;t generated probabilities yet.</p>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-8 border border-cricket-800/30 mb-8"
+          {...fadeUp}
+          transition={{ delay: 0.3 }}
+        >
+          {/* Chart */}
+          <div className="flex justify-center mb-10">
+            <PredictionChart
+              team1={prediction.team1}
+              team2={prediction.team2}
+              team1Prob={prediction.team1_win_probability}
+              team2Prob={prediction.team2_win_probability}
+            />
+          </div>
+
+          {/* Winner call */}
+          <motion.div
+            className="text-center mb-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+          >
+            <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] mb-2">Predicted Winner</p>
+            <motion.p
+              className="text-3xl font-black text-white"
+              initial={{ scale: 0.5 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 150, delay: 1 }}
+            >
+              {prediction.predicted_winner}
+            </motion.p>
+            <motion.span
+              className={`inline-block mt-3 px-4 py-1.5 rounded-full text-xs font-semibold ${
+                prediction.confidence === 'high'
+                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
+                  : prediction.confidence === 'medium'
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30'
+                  : 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
+              }`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+            >
+              {prediction.confidence} confidence
+            </motion.span>
+          </motion.div>
+
+          {/* Reasoning */}
+          <motion.div
+            className="border-t border-gray-800/50 pt-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-3">AI Reasoning</h3>
+            <p className="text-gray-300 leading-relaxed text-sm">{prediction.reasoning}</p>
+          </motion.div>
+
+          {/* Model info */}
+          <motion.div
+            className="mt-6 pt-4 border-t border-gray-800/30 flex items-center justify-between text-[10px] text-gray-600"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2 }}
+          >
+            <span>Model: {prediction.model}</span>
+            <span>Ensemble: {prediction.ensemble_size}x calls</span>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Squad Section */}
+      <motion.div
+        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 mb-6"
+        {...fadeUp}
+        transition={{ delay: 0.5 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Squad / Players</h2>
+          {hasSquadOrXi && <span className="text-[10px] text-gray-500 uppercase">{squadLabel}</span>}
         </div>
         {hasSquadOrXi ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { team: displayTeam1, players: enrichment.possible_xi.team1 ?? [] },
-              { team: displayTeam2, players: enrichment.possible_xi.team2 ?? [] },
-            ].map(({ team, players }) => (
-              <div key={team} className="rounded-lg border border-cricket-800/70 p-4">
-                <p className="font-medium text-white mb-2">{team}</p>
+              { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
+              { team: displayTeam2, players: enrichment!.possible_xi.team2 ?? [], meta: team2Meta },
+            ].map(({ team, players, meta }) => (
+              <motion.div
+                key={team}
+                className="rounded-xl border border-gray-800/50 p-4 bg-gray-900/30"
+                whileHover={{ borderColor: meta.primaryColor }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 rounded-full overflow-hidden">
+                    <img src={getFlagUrl(meta.countryCode, 20)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <p className="font-semibold text-white text-sm">{team}</p>
+                </div>
                 {players.length > 0 ? (
-                  <ul className="space-y-1 text-sm text-gray-300">
-                    {players.map((player) => <li key={player}>{player}</li>)}
+                  <ul className="space-y-1">
+                    {players.map((player, i) => (
+                      <motion.li
+                        key={player}
+                        className="text-xs text-gray-400 pl-2 border-l border-gray-800"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.6 + i * 0.03 }}
+                      >
+                        {player}
+                      </motion.li>
+                    ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-400">No source-backed squad found yet.</p>
+                  <p className="text-xs text-gray-600">No confirmed squad yet</p>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-400">Source-backed squad or probable XI will appear here once a reputable source confirms it.</p>
+          <p className="text-xs text-gray-500">Squad information will appear once confirmed by sources.</p>
         )}
-      </div>
+      </motion.div>
 
+      {/* Research Notes */}
       {enrichment && (
-        <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <h2 className="text-lg font-semibold text-cricket-200">Research Notes</h2>
-            <span className="text-xs uppercase tracking-wide text-gray-500">{enrichment.confidence} confidence</span>
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 mb-6"
+          {...fadeUp}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Research Notes</h2>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+              enrichment.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+              enrichment.confidence === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              {enrichment.confidence}
+            </span>
           </div>
 
           {enrichment.venue_name && (
             <div className="mb-4">
-              <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Venue</p>
-              <p className="text-gray-200">{enrichment.venue_name} <span className="text-gray-500">({isModelEstimated ? 'GPT estimate' : enrichment.venue_confidence})</span></p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Venue</p>
+              <p className="text-sm text-gray-200">{enrichment.venue_name}</p>
             </div>
           )}
 
           {enrichment.expert_preview && (
             <div className="mb-4">
-              <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Expert Preview</p>
-              <p className="text-gray-300 leading-relaxed">{enrichment.expert_preview}</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Expert Preview</p>
+              <p className="text-sm text-gray-300 leading-relaxed">{enrichment.expert_preview}</p>
             </div>
           )}
 
           {enrichment.player_updates.length > 0 && (
             <div className="mb-4">
-              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">{isModelEstimated ? 'GPT Player Notes' : 'Player Updates'}</p>
-              <ul className="space-y-2 text-sm text-gray-300">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Player Updates</p>
+              <div className="space-y-2">
                 {enrichment.player_updates.map((update, index) => (
-                  <li key={`${update.player ?? 'update'}-${index}`} className="rounded-lg border border-cricket-800/70 p-3">
-                    <span className="font-medium text-white">{update.player ?? update.team ?? 'Update'}:</span> {update.status}
-                    {update.confidence && <span className="text-gray-500"> ({update.confidence})</span>}
-                  </li>
+                  <motion.div
+                    key={`${update.player ?? 'update'}-${index}`}
+                    className="rounded-lg bg-gray-800/30 border border-gray-800/50 p-3 text-xs"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.7 + index * 0.05 }}
+                  >
+                    <span className="font-medium text-white">{update.player ?? update.team ?? 'Update'}:</span>{' '}
+                    <span className="text-gray-400">{update.status}</span>
+                  </motion.div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 
           {enrichment.source_links.length > 0 && (
             <div>
-              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">Sources</p>
-              <div className="space-y-2">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Sources</p>
+              <div className="space-y-1.5">
                 {enrichment.source_links.slice(0, 5).map((source, index) => (
                   <a
                     key={`${source.url ?? source.title}-${index}`}
                     href={source.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block text-sm text-cricket-300 hover:text-cricket-200"
+                    className="block text-xs text-cricket-400 hover:text-cricket-300 transition-colors"
                   >
                     [{index + 1}] {source.source}: {source.title}
                   </a>
@@ -177,51 +389,7 @@ export function PredictDetails() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {!prediction ? (
-        <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 text-center">
-          <p className="text-xl font-semibold text-cricket-300">Prediction pending</p>
-          <p className="text-gray-400 mt-2">This fixture is loaded. The prediction pipeline has not generated probabilities for it yet.</p>
-        </div>
-      ) : (
-        <>
-
-          <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
-            <div className="flex justify-center mb-6">
-              <PredictionChart
-                team1={prediction.team1}
-                team2={prediction.team2}
-                team1Prob={prediction.team1_win_probability}
-                team2Prob={prediction.team2_win_probability}
-              />
-            </div>
-
-            <div className="text-center mb-6">
-              <p className="text-sm text-gray-400 uppercase tracking-wide">Predicted Winner</p>
-              <p className="text-2xl font-bold text-cricket-300">{prediction.predicted_winner}</p>
-              <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-                prediction.confidence === 'high'
-                  ? 'bg-green-900/50 text-green-300'
-                  : prediction.confidence === 'medium'
-                  ? 'bg-yellow-900/50 text-yellow-300'
-                  : 'bg-red-900/50 text-red-300'
-              }`}>
-                {prediction.confidence} confidence
-              </span>
-            </div>
-
-            <div className="border-t border-cricket-800 pt-4">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">Reasoning</h3>
-              <p className="text-gray-300 leading-relaxed">{prediction.reasoning}</p>
-            </div>
-          </div>
-
-          <div className="bg-cricket-900/30 rounded-lg p-4 border border-cricket-800/50 text-sm text-gray-500">
-            <p>Model: {prediction.model} | Ensemble size: {prediction.ensemble_size}</p>
-          </div>
-        </>
+        </motion.div>
       )}
     </div>
   );
