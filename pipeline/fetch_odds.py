@@ -146,12 +146,18 @@ def store_odds(odds_rows: list[dict]) -> int:
     if not odds_rows:
         return 0
     client = get_client()
+    # Deduplicate by (match_id, bookmaker) — keep last entry
+    seen = {}
+    for row in odds_rows:
+        key = (row["match_id"], row["bookmaker"])
+        seen[key] = row
+    deduped = list(seen.values())
     # Upsert by match_id + bookmaker
     client.table("match_odds").upsert(
-        odds_rows,
+        deduped,
         on_conflict="match_id,bookmaker",
     ).execute()
-    return len(odds_rows)
+    return len(deduped)
 
 
 def main(sport: Optional[str] = None) -> int:
