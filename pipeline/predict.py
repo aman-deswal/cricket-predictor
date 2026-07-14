@@ -1,14 +1,17 @@
 """Generate match predictions using GitHub Models (GPT-4o)."""
 
+import argparse
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
+from typing import Optional
 
 from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
-from utils.db import get_upcoming_matches, store_prediction
+from utils.db import get_match_enrichment, get_prediction, get_upcoming_matches, store_prediction
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -40,6 +43,9 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 - Matches at venue: {venue_matches}
 - Toss-bat-first win rate: {toss_bat_win_rate:.1%}
 
+**Source-backed Match Notes:**
+{enrichment_notes}
+
 Based on all available information, predict the winner and provide win probabilities.
 
 Respond in JSON format:
@@ -51,7 +57,7 @@ Respond in JSON format:
     "reasoning": "<2-3 sentence explanation>"
 }}"""
 
-NUM_ENSEMBLE_CALLS = 5
+NUM_ENSEMBLE_CALLS = int(os.getenv("NUM_ENSEMBLE_CALLS", "5"))
 TEMPERATURE = 0.3
 MODEL = "openai/gpt-4o"
 
@@ -88,6 +94,21 @@ def build_context(match: dict) -> dict:
         logger.warning(f"Historical stats unavailable for {cricsheet_type}: {exc}")
         team1_form, team2_form, h2h, venue_data = get_default_context_stats()
 
+    enrichment = get_match_enrichment(match["match_id"])
+    enrichment_notes = "No source-backed enrichment available."
+    if enrichment:
+        player_updates = enrichment.get("player_updates") or []
+        updates_text = "; ".join(
+            update.get("status", "") for update in player_updates if update.get("status")
+        ) or "No specific player updates found."
+        enrichment_notes = (
+            f"Venue: {enrichment.get('venue_name') or 'unknown'} "
+            f"({enrichment.get('venue_confidence', 'unknown')}).\n"
+            f"Player updates: {updates_text}\n"
+            f"Preview: {enrichment.get('expert_preview') or 'No preview available.'}\n"
+            f"Research confidence: {enrichment.get('confidence', 'low')}"
+        )
+
     return {
         "team1": team1,
         "team2": team2,
@@ -105,6 +126,7 @@ def build_context(match: dict) -> dict:
         "h2h_team2_wins": h2h["team2_wins"],
         "venue_matches": venue_data.get("matches_at_venue", 0),
         "toss_bat_win_rate": venue_data.get("toss_bat_first_win_rate", 0.5),
+        "enrichment_notes": enrichment_notes,
     }
 
 
@@ -179,17 +201,31 @@ def ensemble_predict(match: dict) -> dict:
     }
 
 
-def main() -> None:
+def parse_match_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: bool = False) -> int:
     """Generate predictions for future upcoming matches."""
     logger.info("Generating predictions for future upcoming matches...")
 
     now = datetime.now(timezone.utc)
     matches = [
         match for match in get_upcoming_matches()
-        if datetime.fromisoformat(match["date"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) > now
+        if parse_match_datetime(match["date"]) > now
     ]
+    if match_id:
+        matches = [match for match in matches if match["match_id"] == match_id]
+    if not force:
+        matches = [match for match in matches if get_prediction(match["match_id"]) is None]
+    if limit is not None:
+        matches = matches[:limit]
     logger.info(f"Found {len(matches)} future upcoming matches")
 
+    stored = 0
     for match in matches:
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
@@ -199,11 +235,18 @@ def main() -> None:
                 f"  → {prediction['predicted_winner']} "
                 f"({prediction['team1_win_probability']:.1%} / {prediction['team2_win_probability']:.1%})"
             )
+            stored += 1
         except Exception as e:
             logger.error(f"  Failed to predict {match['match_id']}: {e}")
 
-    logger.info("Prediction run complete.")
+    logger.info(f"Prediction run complete. Stored {stored} predictions.")
+    return 0 if stored > 0 or not matches else 1
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate predictions for future upcoming matches")
+    parser.add_argument("--limit", type=int, default=None, help="Maximum matches to predict")
+    parser.add_argument("--match-id", default=None, help="Predict one specific match ID")
+    parser.add_argument("--force", action="store_true", help="Regenerate predictions that already exist")
+    args = parser.parse_args()
+    sys.exit(main(limit=args.limit, match_id=args.match_id, force=args.force))

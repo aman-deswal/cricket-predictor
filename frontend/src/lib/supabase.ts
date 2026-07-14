@@ -15,6 +15,8 @@ export interface Match {
   match_type: string;
   status: 'upcoming' | 'completed';
   winner?: string;
+  team1_recent_form?: Array<'W' | 'L'>;
+  team2_recent_form?: Array<'W' | 'L'>;
 }
 
 export interface Prediction {
@@ -42,7 +44,43 @@ export interface PredictionResult {
   scored_at: string;
 }
 
+export interface MatchEnrichment {
+  match_id: string;
+  venue_name: string | null;
+  venue_confidence: 'confirmed' | 'reported' | 'unknown';
+  possible_xi: {
+    team1?: string[];
+    team2?: string[];
+  };
+  player_updates: Array<{
+    player?: string;
+    team?: string;
+    status: string;
+    confidence?: 'confirmed' | 'reported' | 'speculative';
+    source_index?: number;
+  }>;
+  expert_preview: string | null;
+  source_links: Array<{
+    title?: string;
+    url?: string;
+    source?: string;
+    published_at?: string | null;
+  }>;
+  confidence: 'high' | 'medium' | 'low';
+  generated_at: string;
+}
+
 export type MatchWithPredictions = Match & { predictions: Prediction[] };
+
+interface TeamStatsCacheRow {
+  stat_type: string;
+  match_type: string;
+  data: Array<{
+    team: string;
+    gender?: string;
+    form_last_10?: Array<'W' | 'L'>;
+  }>;
+}
 
 export type MatchSection = 'International' | 'League' | 'Other';
 
@@ -85,6 +123,21 @@ const POPULAR_LEAGUES = [
 
 function normalizeTeam(team: string): string {
   return team.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
+}
+
+function inferTeamGender(team: string): string {
+  return team.includes('Women') ? 'female' : 'male';
+}
+
+function getStatsMatchType(matchType: string): string {
+  const normalized = matchType.toLowerCase();
+  if (normalized.includes('t20')) return 't20s';
+  if (normalized.includes('odi')) return 'odis';
+  return normalized;
+}
+
+function getTeamStatsKey(team: string, gender: string, matchType: string): string {
+  return `${normalizeTeam(team)}::${gender}::${matchType}`;
 }
 
 function includesPopularLeague(match: Match): boolean {
@@ -133,14 +186,42 @@ function isFutureMatch(match: Match): boolean {
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
-  const { data, error } = await supabase
-    .from('matches')
-    .select('*, predictions(*)')
-    .eq('status', 'upcoming')
-    .order('date', { ascending: true });
+  const [{ data, error }, { data: statsData }] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('*, predictions(*)')
+      .eq('status', 'upcoming')
+      .order('date', { ascending: true }),
+    supabase
+      .from('stats_cache')
+      .select('stat_type, match_type, data')
+      .eq('stat_type', 'team_stats'),
+  ]);
 
   if (error) throw error;
-  return sortMatchesByPriority((data ?? []).filter(isFutureMatch));
+
+  const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
+  ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
+    cacheRow.data.forEach((record) => {
+      if (record.form_last_10) {
+        recentFormByTeam.set(
+          getTeamStatsKey(record.team, record.gender || 'male', cacheRow.match_type),
+          record.form_last_10,
+        );
+      }
+    });
+  });
+
+  const matchesWithForm = ((data ?? []) as MatchWithPredictions[]).map((match) => {
+    const statsMatchType = getStatsMatchType(match.match_type);
+    return {
+      ...match,
+      team1_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [],
+      team2_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [],
+    };
+  });
+
+  return sortMatchesByPriority(matchesWithForm.filter(isFutureMatch));
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
@@ -157,6 +238,17 @@ export async function getMatch(matchId: string): Promise<Match | null> {
 export async function getPrediction(matchId: string): Promise<Prediction | null> {
   const { data, error } = await supabase
     .from('predictions')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error) return null;
+  return data;
+}
+
+export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {
+  const { data, error } = await supabase
+    .from('match_enrichment')
     .select('*')
     .eq('match_id', matchId)
     .single();
