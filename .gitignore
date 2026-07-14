@@ -37,3 +37,4 @@ Thumbs.db
 *.csv
 *.parquet
 data/
+frontend/tsconfig.tsbuildinfo
