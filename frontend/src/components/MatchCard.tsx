@@ -18,19 +18,22 @@ function getMatchDescriptor(match: Match): string {
   return match.name || match.venue;
 }
 
-function FormStrip({ form }: { form?: Array<'W' | 'L'> }) {
+function FormStrip({ form, align = 'center' }: { form?: Array<'W' | 'L'>; align?: 'left' | 'center' | 'right' }) {
   if (!form || form.length === 0) return null;
+  const recent = form.slice(-5);
+  const wins = recent.filter(r => r === 'W').length;
+  const alignClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
 
   return (
-    <div className="flex justify-center gap-0.5 mb-2" aria-label={`Recent form ${form.join(' ')}`}>
-      {form.slice(-5).map((result, index) => (
+    <div className={`flex ${alignClass} gap-0.5 mb-1.5`} aria-label={`Recent form: ${wins}W ${recent.length - wins}L`}>
+      {recent.map((result, index) => (
         <motion.span
           key={`${result}-${index}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: index * 0.05 }}
-          className={`flex h-4 w-4 items-center justify-center rounded-sm text-[9px] font-bold text-white ${
-            result === 'W' ? 'bg-emerald-500' : 'bg-red-500'
+          transition={{ delay: index * 0.04 }}
+          className={`flex h-[14px] w-[14px] items-center justify-center rounded-[3px] text-[8px] font-bold text-white ${
+            result === 'W' ? 'bg-emerald-500/90' : 'bg-red-500/80'
           }`}
         >
           {result}
@@ -40,17 +43,42 @@ function FormStrip({ form }: { form?: Array<'W' | 'L'> }) {
   );
 }
 
-function ProbabilityBar({ team1Prob }: { team1Prob: number }) {
+function ProbabilityBar({ team1Prob, team1Color, team2Color }: { team1Prob: number; team1Color: string; team2Color: string }) {
   return (
-    <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+    <div className="w-full h-1.5 bg-gray-800/50 rounded-full overflow-hidden flex">
       <motion.div
-        className="h-full rounded-full bg-gradient-to-r from-cricket-400 to-emerald-400"
+        className="h-full rounded-l-full"
+        style={{ backgroundColor: team1Color }}
         initial={{ width: 0 }}
         animate={{ width: `${team1Prob * 100}%` }}
         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
       />
+      <motion.div
+        className="h-full rounded-r-full"
+        style={{ backgroundColor: team2Color }}
+        initial={{ width: 0 }}
+        animate={{ width: `${(1 - team1Prob) * 100}%` }}
+        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+      />
     </div>
   );
+}
+
+function toDecimalOdds(probability: number): string {
+  if (probability <= 0 || probability >= 1) return '-';
+  return (1 / probability).toFixed(2);
+}
+
+function getMatchTime(date: string): string {
+  const d = new Date(date);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
@@ -73,23 +101,35 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
         {/* Subtle shimmer */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
 
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-[10px] font-semibold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10">
-            {match.match_type}
-          </span>
-          <span className="text-[10px] text-gray-500 font-medium">
-            {new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-          </span>
+        {/* Header: match type + time + venue */}
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-semibold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 w-fit">
+              {match.match_type}
+            </span>
+            {match.venue && (
+              <span className="text-[9px] text-gray-500 pl-0.5 truncate max-w-[140px]">
+                📍 {match.venue.split(',')[0]}
+              </span>
+            )}
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-gray-400 font-medium block">
+              {getMatchTime(match.date)}
+            </span>
+            <span className="text-[9px] text-gray-600">
+              {new Date(match.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
         </div>
 
         {/* Teams */}
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
           {/* Team 1 */}
           <div className="flex-1 text-center">
             <FormStrip form={match.team1_recent_form} />
             <motion.div
-              className="w-10 h-10 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
+              className="w-10 h-10 mx-auto mb-1.5 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
               style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
               whileHover={{ scale: 1.15 }}
             >
@@ -123,7 +163,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
           <div className="flex-1 text-center">
             <FormStrip form={match.team2_recent_form} />
             <motion.div
-              className="w-10 h-10 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
+              className="w-10 h-10 mx-auto mb-1.5 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
               style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
               whileHover={{ scale: 1.15 }}
             >
@@ -149,27 +189,36 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
           </div>
         </div>
 
-        {/* Probability bar */}
+        {/* Probability bar - team colored */}
         {prediction && (
-          <ProbabilityBar team1Prob={prediction.team1_win_probability} />
+          <ProbabilityBar
+            team1Prob={prediction.team1_win_probability}
+            team1Color={team1Meta.primaryColor}
+            team2Color={team2Meta.primaryColor}
+          />
         )}
 
-        {/* Footer */}
-        <p className="text-[10px] text-gray-500 truncate mt-3">{getMatchDescriptor(match)}</p>
+        {/* Footer: series + odds */}
+        <div className="mt-3 pt-3 border-t border-gray-800/50">
+          <p className="text-[10px] text-gray-500 truncate">{getMatchDescriptor(match)}</p>
 
-        {prediction && (
-          <motion.div
-            className="mt-3 pt-3 border-t border-gray-800/50 flex items-center justify-between"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            <span className="text-[10px] text-gray-500 uppercase tracking-wide">Predicted</span>
-            <span className="text-xs font-bold text-cricket-300">
-              {prediction.predicted_winner}
-            </span>
-          </motion.div>
-        )}
+          {prediction && (
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Odds</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-mono font-semibold text-gray-300">
+                  {team1Meta.shortName}{' '}
+                  <span className="text-cricket-400">{toDecimalOdds(prediction.team1_win_probability)}</span>
+                </span>
+                <span className="text-gray-700">|</span>
+                <span className="text-[11px] font-mono font-semibold text-gray-300">
+                  {team2Meta.shortName}{' '}
+                  <span className="text-cricket-400">{toDecimalOdds(prediction.team2_win_probability)}</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
     </Link>

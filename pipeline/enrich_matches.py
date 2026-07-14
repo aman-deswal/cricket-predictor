@@ -145,6 +145,7 @@ Return JSON with this shape:
     "expert_preview": string,
     "possible_xi": {{"team1": string[], "team2": string[]}},
     "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "speculative"}}],
+    "key_players": [{{"name": string, "team": string, "role": "bat" | "bowl" | "all", "form_note": string}}],
     "confidence": "medium" | "low"
 }}
 
@@ -155,8 +156,9 @@ Rules:
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- Do not include players who are not listed in the relevant team pool.
-- Do not include players from unrelated teams or unrelated matches.
+- key_players: list 3-4 star performers per team based on their known current form and reputation in this format. form_note should be a short phrase like "top ODI scorer in 2026" or "leading wicket-taker this series". For key_players, you may use general cricket knowledge — they do not need to be from the player pools above.
+- Do not include players from unrelated teams or unrelated matches in possible_xi or player_updates.
+- For possible_xi, select names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - Keep the preview to 3-5 sentences.
 """
 
@@ -621,6 +623,7 @@ def build_data_backed_details(match: dict) -> dict:
             team2_player_pool,
         )
         player_updates = fallback.get("player_updates", [])
+        key_players = fallback.get("key_players", [])
         confidence = fallback.get("confidence", "low")
     except Exception as exc:
         logger.warning(f"Model fallback failed: {exc}")
@@ -628,6 +631,7 @@ def build_data_backed_details(match: dict) -> dict:
         venue_confidence = "unknown"
         possible_xi = {"team1": [], "team2": []}
         player_updates = []
+        key_players = []
         preview = (
             f"No recent reputable article-backed updates were found for this fixture. "
             f"Using stats cache: {team1} have won "
@@ -645,6 +649,7 @@ def build_data_backed_details(match: dict) -> dict:
         "venue_confidence": venue_confidence,
         "possible_xi": possible_xi,
         "player_updates": player_updates,
+        "key_players": key_players,
         "expert_preview": preview,
         "confidence": confidence,
     }
@@ -664,6 +669,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "venue_confidence": details.get("venue_confidence", "unknown"),
         "possible_xi": details.get("possible_xi", {"team1": [], "team2": []}),
         "player_updates": details.get("player_updates", []),
+        "key_players": details.get("key_players", []),
         "expert_preview": details.get("expert_preview", ""),
         "source_links": sources,
         "confidence": details.get("confidence", "low"),

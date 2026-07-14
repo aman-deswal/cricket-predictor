@@ -73,7 +73,12 @@ def get_match_enrichment(match_id: str) -> Optional[dict]:
 def store_match_enrichment(enrichment: dict) -> None:
     """Upsert match enrichment generated from web/news sources."""
     client = get_client()
-    client.table("match_enrichment").upsert(enrichment, on_conflict="match_id").execute()
+    try:
+        client.table("match_enrichment").upsert(enrichment, on_conflict="match_id").execute()
+    except Exception:
+        # If key_players column doesn't exist yet, retry without it
+        fallback = {k: v for k, v in enrichment.items() if k != "key_players"}
+        client.table("match_enrichment").upsert(fallback, on_conflict="match_id").execute()
 
 
 def get_pending_results() -> list[dict]:

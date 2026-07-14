@@ -59,6 +59,12 @@ export interface MatchEnrichment {
     confidence?: 'confirmed' | 'reported' | 'speculative';
     source_index?: number;
   }>;
+  key_players: Array<{
+    name: string;
+    team: string;
+    role: 'bat' | 'bowl' | 'all';
+    form_note: string;
+  }>;
   expert_preview: string | null;
   source_links: Array<{
     title?: string;
@@ -225,14 +231,39 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
-  const { data, error } = await supabase
-    .from('matches')
-    .select('*')
-    .eq('match_id', matchId)
-    .single();
+  const [{ data, error }, { data: statsData }] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('*')
+      .eq('match_id', matchId)
+      .single(),
+    supabase
+      .from('stats_cache')
+      .select('stat_type, match_type, data')
+      .eq('stat_type', 'team_stats'),
+  ]);
 
-  if (error) return null;
-  return data;
+  if (error || !data) return null;
+
+  const match = data as Match;
+  const statsMatchType = getStatsMatchType(match.match_type);
+
+  const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
+  ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
+    cacheRow.data.forEach((record) => {
+      if (record.form_last_10) {
+        recentFormByTeam.set(
+          getTeamStatsKey(record.team, record.gender || 'male', cacheRow.match_type),
+          record.form_last_10,
+        );
+      }
+    });
+  });
+
+  match.team1_recent_form = recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [];
+  match.team2_recent_form = recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [];
+
+  return match;
 }
 
 export async function getPrediction(matchId: string): Promise<Prediction | null> {
