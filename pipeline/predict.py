@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
-from utils.db import get_upcoming_matches, store_prediction
+from utils.db import get_match_enrichment, get_upcoming_matches, store_prediction
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -39,6 +39,9 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 **Venue Stats:**
 - Matches at venue: {venue_matches}
 - Toss-bat-first win rate: {toss_bat_win_rate:.1%}
+
+**Source-backed Match Notes:**
+{enrichment_notes}
 
 Based on all available information, predict the winner and provide win probabilities.
 
@@ -88,6 +91,21 @@ def build_context(match: dict) -> dict:
         logger.warning(f"Historical stats unavailable for {cricsheet_type}: {exc}")
         team1_form, team2_form, h2h, venue_data = get_default_context_stats()
 
+    enrichment = get_match_enrichment(match["match_id"])
+    enrichment_notes = "No source-backed enrichment available."
+    if enrichment:
+        player_updates = enrichment.get("player_updates") or []
+        updates_text = "; ".join(
+            update.get("status", "") for update in player_updates if update.get("status")
+        ) or "No specific player updates found."
+        enrichment_notes = (
+            f"Venue: {enrichment.get('venue_name') or 'unknown'} "
+            f"({enrichment.get('venue_confidence', 'unknown')}).\n"
+            f"Player updates: {updates_text}\n"
+            f"Preview: {enrichment.get('expert_preview') or 'No preview available.'}\n"
+            f"Research confidence: {enrichment.get('confidence', 'low')}"
+        )
+
     return {
         "team1": team1,
         "team2": team2,
@@ -105,6 +123,7 @@ def build_context(match: dict) -> dict:
         "h2h_team2_wins": h2h["team2_wins"],
         "venue_matches": venue_data.get("matches_at_venue", 0),
         "toss_bat_win_rate": venue_data.get("toss_bat_first_win_rate", 0.5),
+        "enrichment_notes": enrichment_notes,
     }
 
 

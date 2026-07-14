@@ -43,6 +43,18 @@ Build local Cricsheet historical CSVs for prediction context:
 python pipeline/fetch_cricsheet.py --types t20s odis
 ```
 
+Create the optional match-enrichment table in Supabase:
+
+```bash
+# Run supabase/match_enrichment.sql in the Supabase SQL editor
+```
+
+Enrich top upcoming matches with source-backed web/news research and GitHub Models:
+
+```bash
+python pipeline/enrich_matches.py --limit 5 --source-limit 8
+```
+
 ### Frontend
 
 ```bash
@@ -77,6 +89,7 @@ npm run dev
 - `predictions` — Model predictions with probabilities and reasoning
 - `prediction_results` — Scored predictions with actual outcomes
 - `stats_cache` — Precomputed team/player statistics
+- `match_enrichment` — Optional LLM-summarized match notes with source links, possible XI, venue confidence, and player updates
 
 ## License
 

@@ -42,6 +42,32 @@ export interface PredictionResult {
   scored_at: string;
 }
 
+export interface MatchEnrichment {
+  match_id: string;
+  venue_name: string | null;
+  venue_confidence: 'confirmed' | 'reported' | 'unknown';
+  possible_xi: {
+    team1?: string[];
+    team2?: string[];
+  };
+  player_updates: Array<{
+    player?: string;
+    team?: string;
+    status: string;
+    confidence?: 'confirmed' | 'reported' | 'speculative';
+    source_index?: number;
+  }>;
+  expert_preview: string | null;
+  source_links: Array<{
+    title?: string;
+    url?: string;
+    source?: string;
+    published_at?: string | null;
+  }>;
+  confidence: 'high' | 'medium' | 'low';
+  generated_at: string;
+}
+
 export type MatchWithPredictions = Match & { predictions: Prediction[] };
 
 export type MatchSection = 'International' | 'League' | 'Other';
@@ -157,6 +183,17 @@ export async function getMatch(matchId: string): Promise<Match | null> {
 export async function getPrediction(matchId: string): Promise<Prediction | null> {
   const { data, error } = await supabase
     .from('predictions')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error) return null;
+  return data;
+}
+
+export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {
+  const { data, error } = await supabase
+    .from('match_enrichment')
     .select('*')
     .eq('match_id', matchId)
     .single();

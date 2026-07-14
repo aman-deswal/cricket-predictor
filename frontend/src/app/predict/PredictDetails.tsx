@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getMatch, getPrediction, Match, Prediction } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getPrediction, Match, MatchEnrichment, Prediction } from '@/lib/supabase';
 import { PredictionChart } from '@/components/PredictionChart';
 
 export function PredictDetails() {
@@ -10,6 +10,7 @@ export function PredictDetails() {
   const matchId = searchParams.get('id');
   const [match, setMatch] = useState<Match | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,12 +21,14 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData] = await Promise.all([
+        const [matchData, predictionData, enrichmentData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
+          getMatchEnrichment(matchId),
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
+        setEnrichment(enrichmentData);
       } catch (err) {
         console.error('Failed to load match details:', err);
       } finally {
@@ -81,15 +84,84 @@ export function PredictDetails() {
 
       <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
         <h2 className="text-lg font-semibold text-cricket-200 mb-4">Possible XI</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[displayTeam1, displayTeam2].map((team) => (
-            <div key={team} className="rounded-lg border border-cricket-800/70 p-4">
-              <p className="font-medium text-white mb-2">{team}</p>
-              <p className="text-sm text-gray-400">Squad and probable XI will appear here once team/player data is connected.</p>
-            </div>
-          ))}
-        </div>
+        {enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0) ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { team: displayTeam1, players: enrichment.possible_xi.team1 ?? [] },
+              { team: displayTeam2, players: enrichment.possible_xi.team2 ?? [] },
+            ].map(({ team, players }) => (
+              <div key={team} className="rounded-lg border border-cricket-800/70 p-4">
+                <p className="font-medium text-white mb-2">{team}</p>
+                {players.length > 0 ? (
+                  <ul className="space-y-1 text-sm text-gray-300">
+                    {players.map((player) => <li key={player}>{player}</li>)}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-400">No source-backed XI found yet.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Squad and probable XI will appear here once source-backed enrichment is available.</p>
+        )}
       </div>
+
+      {enrichment && (
+        <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-cricket-200">Research Notes</h2>
+            <span className="text-xs uppercase tracking-wide text-gray-500">{enrichment.confidence} confidence</span>
+          </div>
+
+          {enrichment.venue_name && (
+            <div className="mb-4">
+              <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Venue</p>
+              <p className="text-gray-200">{enrichment.venue_name} <span className="text-gray-500">({enrichment.venue_confidence})</span></p>
+            </div>
+          )}
+
+          {enrichment.expert_preview && (
+            <div className="mb-4">
+              <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Expert Preview</p>
+              <p className="text-gray-300 leading-relaxed">{enrichment.expert_preview}</p>
+            </div>
+          )}
+
+          {enrichment.player_updates.length > 0 && (
+            <div className="mb-4">
+              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">Player Updates</p>
+              <ul className="space-y-2 text-sm text-gray-300">
+                {enrichment.player_updates.map((update, index) => (
+                  <li key={`${update.player ?? 'update'}-${index}`} className="rounded-lg border border-cricket-800/70 p-3">
+                    <span className="font-medium text-white">{update.player ?? update.team ?? 'Update'}:</span> {update.status}
+                    {update.confidence && <span className="text-gray-500"> ({update.confidence})</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {enrichment.source_links.length > 0 && (
+            <div>
+              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">Sources</p>
+              <div className="space-y-2">
+                {enrichment.source_links.slice(0, 5).map((source, index) => (
+                  <a
+                    key={`${source.url ?? source.title}-${index}`}
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-sm text-cricket-300 hover:text-cricket-200"
+                  >
+                    [{index + 1}] {source.source}: {source.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!prediction ? (
         <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 text-center">
