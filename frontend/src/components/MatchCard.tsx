@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { Match, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 
@@ -58,13 +59,12 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
   const winner = prediction?.predicted_winner;
 
   return (
-    <motion.a
-      href={`/predict?id=${encodeURIComponent(match.match_id)}`}
+    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block relative group">
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.08 }}
       whileHover={{ y: -4, scale: 1.02 }}
-      className="block relative group"
     >
       {/* Glow effect on hover */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-cricket-500/0 to-emerald-500/0 group-hover:from-cricket-500/20 group-hover:to-emerald-500/20 rounded-2xl blur-sm transition-all duration-300" />
@@ -171,6 +171,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
           </motion.div>
         )}
       </div>
-    </motion.a>
+    </motion.div>
+    </Link>
   );
 }
