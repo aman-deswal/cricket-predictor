@@ -14,7 +14,12 @@ import requests
 from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_recent_form
-from utils.db import get_upcoming_matches, store_match_enrichment
+from utils.db import (
+    get_upcoming_matches,
+    store_match_enrichment,
+    get_team_form_from_cache,
+    get_h2h_from_cache,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -546,62 +551,92 @@ def build_data_backed_details(match: dict) -> dict:
     team2 = match.get("team2", "")
     cricsheet_type = get_cricsheet_type(match.get("match_type", ""))
 
+    # Try Supabase stats_cache first, then local Cricsheet CSVs
+    team1_form = get_team_form_from_cache(team1, cricsheet_type)
+    team2_form = get_team_form_from_cache(team2, cricsheet_type)
+    h2h = get_h2h_from_cache(team1, team2, cricsheet_type)
+
+    # Fall back to local Cricsheet if cache returned defaults
+    if team1_form.get("matches_played", 0) == 0:
+        try:
+            team1_form = get_team_recent_form(team1, cricsheet_type)
+        except FileNotFoundError:
+            pass
+    if team2_form.get("matches_played", 0) == 0:
+        try:
+            team2_form = get_team_recent_form(team2, cricsheet_type)
+        except FileNotFoundError:
+            pass
+    if h2h.get("total_matches", 0) == 0:
+        try:
+            h2h = get_head_to_head(team1, team2, cricsheet_type)
+        except FileNotFoundError:
+            pass
+
+    # Get player pools from local Cricsheet (no cache equivalent yet)
     try:
-        team1_form = get_team_recent_form(team1, cricsheet_type)
-        team2_form = get_team_recent_form(team2, cricsheet_type)
-        h2h = get_head_to_head(team1, team2, cricsheet_type)
         team1_player_pool = get_recent_player_pool(team1, cricsheet_type)
         team2_player_pool = get_recent_player_pool(team2, cricsheet_type)
-        stats = {
-            "team1_win_rate": team1_form["win_rate"],
-            "team1_matches": team1_form["matches_played"],
-            "team1_wins": team1_form.get("recent_wins", 0),
-            "team2_win_rate": team2_form["win_rate"],
-            "team2_matches": team2_form["matches_played"],
-            "team2_wins": team2_form.get("recent_wins", 0),
-            "h2h_total": h2h["total_matches"],
-            "h2h_team1_wins": h2h["team1_wins"],
-            "h2h_team2_wins": h2h["team2_wins"],
-            "team1_player_pool": ", ".join(team1_player_pool) or "none",
-            "team2_player_pool": ", ".join(team2_player_pool) or "none",
-        }
-        try:
-            fallback = call_model_fallback(match, stats)
-            venue_name = fallback.get("venue_name")
-            venue_confidence = fallback.get("venue_confidence", "unknown")
-            preview = fallback.get("expert_preview", "")
-            possible_xi = filter_possible_xi_to_pools(
-                fallback.get("possible_xi", {"team1": [], "team2": []}),
-                team1_player_pool,
-                team2_player_pool,
-            )
-            player_updates = fallback.get("player_updates", [])
-            confidence = fallback.get("confidence", "low")
-        except Exception as exc:
-            logger.warning(f"Model fallback failed: {exc}")
-            venue_name = None
-            venue_confidence = "unknown"
-            possible_xi = {"team1": [], "team2": []}
-            player_updates = []
-            preview = (
-                f"No recent reputable article-backed updates were found for this fixture. "
-                f"Using Cricsheet history instead: {team1} have won "
-                f"{team1_form.get('recent_wins', 0)} of their last {team1_form.get('matches_played', 0)} "
-                f"{match.get('match_type', '').upper()} matches, while {team2} have won "
-                f"{team2_form.get('recent_wins', 0)} of their last {team2_form.get('matches_played', 0)}. "
-                f"Their historical head-to-head sample has {h2h.get('total_matches', 0)} matches, "
-                f"with {team1} winning {h2h.get('team1_wins', 0)} and {team2} winning {h2h.get('team2_wins', 0)}. "
-                f"No source-backed XI or injury update is available yet."
-            )
-            confidence = "low"
     except FileNotFoundError:
+        team1_player_pool = []
+        team2_player_pool = []
+
+    has_stats = team1_form.get("matches_played", 0) > 0 or team2_form.get("matches_played", 0) > 0
+
+    if not has_stats:
+        return {
+            "venue_name": None,
+            "venue_confidence": "unknown",
+            "possible_xi": {"team1": [], "team2": []},
+            "player_updates": [],
+            "expert_preview": (
+                "No recent reputable source-backed updates or local historical data were found for this fixture yet. "
+                "Venue, XI, and injury details should be treated as unavailable until a reliable source is found."
+            ),
+            "confidence": "low",
+        }
+
+    stats = {
+        "team1_win_rate": team1_form.get("win_rate", 0.5),
+        "team1_matches": team1_form.get("matches_played", 0),
+        "team1_wins": team1_form.get("recent_wins", 0),
+        "team2_win_rate": team2_form.get("win_rate", 0.5),
+        "team2_matches": team2_form.get("matches_played", 0),
+        "team2_wins": team2_form.get("recent_wins", 0),
+        "h2h_total": h2h.get("total_matches", 0),
+        "h2h_team1_wins": h2h.get("team1_wins", 0),
+        "h2h_team2_wins": h2h.get("team2_wins", 0),
+        "team1_player_pool": ", ".join(team1_player_pool) if team1_player_pool else "none",
+        "team2_player_pool": ", ".join(team2_player_pool) if team2_player_pool else "none",
+    }
+
+    try:
+        fallback = call_model_fallback(match, stats)
+        venue_name = fallback.get("venue_name")
+        venue_confidence = fallback.get("venue_confidence", "unknown")
+        preview = fallback.get("expert_preview", "")
+        possible_xi = filter_possible_xi_to_pools(
+            fallback.get("possible_xi", {"team1": [], "team2": []}),
+            team1_player_pool,
+            team2_player_pool,
+        )
+        player_updates = fallback.get("player_updates", [])
+        confidence = fallback.get("confidence", "low")
+    except Exception as exc:
+        logger.warning(f"Model fallback failed: {exc}")
         venue_name = None
         venue_confidence = "unknown"
         possible_xi = {"team1": [], "team2": []}
         player_updates = []
         preview = (
-            "No recent reputable source-backed updates or local historical data were found for this fixture yet. "
-            "Venue, XI, and injury details should be treated as unavailable until a reliable source is found."
+            f"No recent reputable article-backed updates were found for this fixture. "
+            f"Using stats cache: {team1} have won "
+            f"{team1_form.get('recent_wins', 0)} of their last {team1_form.get('matches_played', 0)} "
+            f"{match.get('match_type', '').upper()} matches, while {team2} have won "
+            f"{team2_form.get('recent_wins', 0)} of their last {team2_form.get('matches_played', 0)}. "
+            f"Their historical head-to-head has {h2h.get('total_matches', 0)} matches, "
+            f"with {team1} winning {h2h.get('team1_wins', 0)} and {team2} winning {h2h.get('team2_wins', 0)}. "
+            f"No source-backed XI or injury update is available yet."
         )
         confidence = "low"
 
