@@ -11,7 +11,15 @@ from typing import Optional
 from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
-from utils.db import get_match_enrichment, get_prediction, get_upcoming_matches, store_prediction
+from utils.db import (
+    get_h2h_from_cache,
+    get_match_enrichment,
+    get_prediction,
+    get_team_form_from_cache,
+    get_upcoming_matches,
+    get_venue_from_cache,
+    store_prediction,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -86,13 +94,23 @@ def build_context(match: dict) -> dict:
         cricsheet_type = match_type.lower()
 
     try:
-        team1_form = get_team_recent_form(team1, cricsheet_type)
-        team2_form = get_team_recent_form(team2, cricsheet_type)
-        h2h = get_head_to_head(team1, team2, cricsheet_type)
-        venue_data = get_venue_stats(venue, cricsheet_type)
-    except FileNotFoundError as exc:
-        logger.warning(f"Historical stats unavailable for {cricsheet_type}: {exc}")
-        team1_form, team2_form, h2h, venue_data = get_default_context_stats()
+        team1_form = get_team_form_from_cache(team1, cricsheet_type)
+        team2_form = get_team_form_from_cache(team2, cricsheet_type)
+        h2h = get_h2h_from_cache(team1, team2, cricsheet_type)
+        venue_data = get_venue_from_cache(venue, cricsheet_type)
+
+        # If cache had no data for either team, try local Cricsheet CSVs as fallback
+        if team1_form["matches_played"] == 0 and team2_form["matches_played"] == 0:
+            raise LookupError("No cached stats found, trying local CSVs")
+    except (LookupError, Exception):
+        try:
+            team1_form = get_team_recent_form(team1, cricsheet_type)
+            team2_form = get_team_recent_form(team2, cricsheet_type)
+            h2h = get_head_to_head(team1, team2, cricsheet_type)
+            venue_data = get_venue_stats(venue, cricsheet_type)
+        except FileNotFoundError as exc:
+            logger.warning(f"Historical stats unavailable for {cricsheet_type}: {exc}")
+            team1_form, team2_form, h2h, venue_data = get_default_context_stats()
 
     enrichment = get_match_enrichment(match["match_id"])
     enrichment_notes = "No source-backed enrichment available."

@@ -104,3 +104,83 @@ def get_all_predictions() -> list[dict]:
         .execute()
     )
     return response.data
+
+
+# --- Stats cache lookups (Supabase-backed) ---
+
+_stats_cache: dict[str, list[dict]] = {}
+
+
+def _load_stats_cache(stat_type: str, match_type: str) -> list[dict]:
+    """Load a stats_cache entry, with in-memory caching for the session."""
+    key = f"{stat_type}:{match_type}"
+    if key not in _stats_cache:
+        client = get_client()
+        response = (
+            client.table("stats_cache")
+            .select("data")
+            .eq("stat_type", stat_type)
+            .eq("match_type", match_type)
+            .execute()
+        )
+        _stats_cache[key] = response.data[0]["data"] if response.data else []
+    return _stats_cache[key]
+
+
+def get_team_form_from_cache(team: str, match_type: str) -> dict:
+    """Look up team form from Supabase stats_cache."""
+    records = _load_stats_cache("team_stats", match_type)
+    # Try exact match first, then case-insensitive
+    for record in records:
+        if record.get("team") == team:
+            return {
+                "win_rate": record.get("win_rate", 0.5),
+                "matches_played": record.get("matches_played", 0),
+                "recent_wins": record.get("recent_wins", 0),
+            }
+    # Try partial/case-insensitive match
+    team_lower = team.lower().replace(" women", "").replace(" men", "").strip()
+    for record in records:
+        if record.get("team", "").lower() == team_lower:
+            return {
+                "win_rate": record.get("win_rate", 0.5),
+                "matches_played": record.get("matches_played", 0),
+                "recent_wins": record.get("recent_wins", 0),
+            }
+    return {"win_rate": 0.5, "matches_played": 0, "recent_wins": 0}
+
+
+def get_h2h_from_cache(team1: str, team2: str, match_type: str) -> dict:
+    """Look up head-to-head from Supabase stats_cache."""
+    records = _load_stats_cache("h2h_stats", match_type)
+    for record in records:
+        r_team1 = record.get("team1", "")
+        r_team2 = record.get("team2", "")
+        if (r_team1 == team1 and r_team2 == team2) or (r_team1 == team2 and r_team2 == team1):
+            # Normalize direction
+            if r_team1 == team1:
+                return {
+                    "total_matches": record.get("total_matches", 0),
+                    "team1_wins": record.get("team1_wins", 0),
+                    "team2_wins": record.get("team2_wins", 0),
+                }
+            else:
+                return {
+                    "total_matches": record.get("total_matches", 0),
+                    "team1_wins": record.get("team2_wins", 0),
+                    "team2_wins": record.get("team1_wins", 0),
+                }
+    return {"total_matches": 0, "team1_wins": 0, "team2_wins": 0}
+
+
+def get_venue_from_cache(venue: str, match_type: str) -> dict:
+    """Look up venue stats from Supabase stats_cache."""
+    records = _load_stats_cache("venue_stats", match_type)
+    venue_lower = venue.lower()
+    for record in records:
+        if venue_lower in record.get("venue", "").lower() or record.get("venue", "").lower() in venue_lower:
+            return {
+                "matches_at_venue": record.get("matches_at_venue", 0),
+                "toss_bat_first_win_rate": record.get("toss_bat_first_win_rate", 0.5),
+            }
+    return {"matches_at_venue": 0, "toss_bat_first_win_rate": 0.5}
