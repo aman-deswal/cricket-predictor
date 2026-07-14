@@ -37,6 +37,12 @@ pip install -r ../requirements.txt
 cp ../.env.example ../.env  # Fill in your API keys
 ```
 
+Build local Cricsheet historical CSVs for prediction context:
+
+```bash
+python pipeline/fetch_cricsheet.py --types t20s odis
+```
+
 ### Frontend
 
 ```bash

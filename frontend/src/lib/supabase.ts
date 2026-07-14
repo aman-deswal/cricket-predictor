@@ -42,7 +42,97 @@ export interface PredictionResult {
   scored_at: string;
 }
 
-export async function getUpcomingMatches(): Promise<(Match & { predictions: Prediction[] })[]> {
+export type MatchWithPredictions = Match & { predictions: Prediction[] };
+
+export type MatchSection = 'International' | 'League' | 'Other';
+
+const TOP_INTERNATIONAL_TEAMS = new Set([
+  'India',
+  'Australia',
+  'England',
+  'South Africa',
+  'New Zealand',
+  'Pakistan',
+  'Sri Lanka',
+  'Bangladesh',
+  'West Indies',
+  'Afghanistan',
+  'Zimbabwe',
+  'Ireland',
+]);
+
+const POPULAR_LEAGUES = [
+  'indian premier league',
+  'ipl',
+  'womens premier league',
+  'women premier league',
+  'wpl',
+  'big bash league',
+  'bbl',
+  'the hundred',
+  'caribbean premier league',
+  'cpl',
+  'pakistan super league',
+  'psl',
+  'sa20',
+  'major league cricket',
+  'mlc',
+  'lanka premier league',
+  'lpl',
+  'bangladesh premier league',
+  'bpl',
+];
+
+function normalizeTeam(team: string): string {
+  return team.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
+}
+
+function includesPopularLeague(match: Match): boolean {
+  const haystack = `${match.name} ${match.venue}`.toLowerCase();
+  return POPULAR_LEAGUES.some((league) => haystack.includes(league));
+}
+
+export function getMatchSection(match: Match): MatchSection {
+  const team1 = normalizeTeam(match.team1);
+  const team2 = normalizeTeam(match.team2);
+
+  if (TOP_INTERNATIONAL_TEAMS.has(team1) && TOP_INTERNATIONAL_TEAMS.has(team2)) {
+    return 'International';
+  }
+
+  if (includesPopularLeague(match)) {
+    return 'League';
+  }
+
+  return 'Other';
+}
+
+function getMatchPriority(match: Match): number {
+  const section = getMatchSection(match);
+  if (section === 'International') return 0;
+  if (section === 'League') return 1;
+  return 2;
+}
+
+function getMatchTimestamp(match: Match): number {
+  const timestamp = new Date(match.date).getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+}
+
+function sortMatchesByPriority(matches: MatchWithPredictions[]): MatchWithPredictions[] {
+  return [...matches].sort((a, b) => {
+    const priorityDiff = getMatchPriority(a) - getMatchPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    return getMatchTimestamp(a) - getMatchTimestamp(b);
+  });
+}
+
+function isFutureMatch(match: Match): boolean {
+  return getMatchTimestamp(match) > Date.now();
+}
+
+export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   const { data, error } = await supabase
     .from('matches')
     .select('*, predictions(*)')
@@ -50,7 +140,18 @@ export async function getUpcomingMatches(): Promise<(Match & { predictions: Pred
     .order('date', { ascending: true });
 
   if (error) throw error;
-  return data ?? [];
+  return sortMatchesByPriority((data ?? []).filter(isFutureMatch));
+}
+
+export async function getMatch(matchId: string): Promise<Match | null> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error) return null;
+  return data;
 }
 
 export async function getPrediction(matchId: string): Promise<Prediction | null> {

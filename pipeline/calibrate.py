@@ -1,6 +1,7 @@
 """Calibrate prediction probabilities using isotonic regression."""
 
 import logging
+from typing import Optional
 
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 MIN_PREDICTIONS_FOR_CALIBRATION = 50
 
 
-def compute_calibration(predictions: list[dict]) -> IsotonicRegression | None:
+def compute_calibration(predictions: list[dict]) -> Optional[IsotonicRegression]:
     """
     Fit an isotonic regression model for probability calibration.
 

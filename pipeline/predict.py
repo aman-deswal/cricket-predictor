@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import date
+from datetime import datetime, timezone
 
 from openai import OpenAI
 
@@ -56,6 +56,14 @@ TEMPERATURE = 0.3
 MODEL = "openai/gpt-4o"
 
 
+def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
+    """Return neutral stats when historical data is unavailable."""
+    team_form = {"win_rate": 0.5, "matches_played": 0, "recent_wins": 0}
+    h2h = {"total_matches": 0, "team1_wins": 0, "team2_wins": 0}
+    venue = {"matches_at_venue": 0, "toss_bat_first_win_rate": 0.5}
+    return team_form, team_form, h2h, venue
+
+
 def build_context(match: dict) -> dict:
     """Build statistical context for a match prediction."""
     team1 = match["team1"]
@@ -63,13 +71,22 @@ def build_context(match: dict) -> dict:
     venue = match.get("venue", "Unknown")
     match_type = match.get("match_type", "t20")
 
-    # Map CricAPI match types to Cricsheet format
-    cricsheet_type = "t20s" if "t20" in match_type.lower() else match_type.lower()
+    # Map CricAPI match types to Cricsheet archive names.
+    if "t20" in match_type.lower():
+        cricsheet_type = "t20s"
+    elif "odi" in match_type.lower():
+        cricsheet_type = "odis"
+    else:
+        cricsheet_type = match_type.lower()
 
-    team1_form = get_team_recent_form(team1, cricsheet_type)
-    team2_form = get_team_recent_form(team2, cricsheet_type)
-    h2h = get_head_to_head(team1, team2, cricsheet_type)
-    venue_data = get_venue_stats(venue, cricsheet_type)
+    try:
+        team1_form = get_team_recent_form(team1, cricsheet_type)
+        team2_form = get_team_recent_form(team2, cricsheet_type)
+        h2h = get_head_to_head(team1, team2, cricsheet_type)
+        venue_data = get_venue_stats(venue, cricsheet_type)
+    except FileNotFoundError as exc:
+        logger.warning(f"Historical stats unavailable for {cricsheet_type}: {exc}")
+        team1_form, team2_form, h2h, venue_data = get_default_context_stats()
 
     return {
         "team1": team1,
@@ -163,12 +180,15 @@ def ensemble_predict(match: dict) -> dict:
 
 
 def main() -> None:
-    """Generate predictions for today's upcoming matches."""
-    today = date.today().isoformat()
-    logger.info(f"Generating predictions for {today}...")
+    """Generate predictions for future upcoming matches."""
+    logger.info("Generating predictions for future upcoming matches...")
 
-    matches = get_upcoming_matches(today)
-    logger.info(f"Found {len(matches)} matches for today")
+    now = datetime.now(timezone.utc)
+    matches = [
+        match for match in get_upcoming_matches()
+        if datetime.fromisoformat(match["date"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) > now
+    ]
+    logger.info(f"Found {len(matches)} future upcoming matches")
 
     for match in matches:
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
