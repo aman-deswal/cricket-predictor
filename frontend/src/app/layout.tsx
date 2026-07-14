@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -23,22 +24,22 @@ export default function RootLayout({
         <nav className="relative border-b border-white/5 bg-[#0a0f0d]/80 backdrop-blur-xl sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <a href="/" className="flex items-center space-x-2.5 group">
+              <Link href="/" className="flex items-center space-x-2.5 group">
                 <span className="text-2xl group-hover:scale-110 transition-transform">🏏</span>
                 <span className="font-black text-lg bg-gradient-to-r from-cricket-300 to-emerald-400 bg-clip-text text-transparent">
                   CricPredict
                 </span>
-              </a>
+              </Link>
               <div className="flex items-center space-x-1">
-                <a href="/" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                <Link href="/" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   Matches
-                </a>
-                <a href="/dashboard" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                </Link>
+                <Link href="/dashboard" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   Dashboard
-                </a>
-                <a href="/history" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                </Link>
+                <Link href="/history" className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                   History
-                </a>
+                </Link>
               </div>
             </div>
           </div>

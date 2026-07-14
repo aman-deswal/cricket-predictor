@@ -88,10 +88,13 @@ export function getTeamMeta(teamName: string): TeamMeta {
 }
 
 export function getFlagUrl(countryCode: string, size: number = 64): string {
-  // flagcdn.com provides free country flag images
-  return `https://flagcdn.com/w${size}/${countryCode}.png`;
+  // flagcdn.com uses {width}x{height} format for PNG flags
+  const height = Math.round(size * 0.75);
+  return `https://flagcdn.com/${size}x${height}/${countryCode}.png`;
 }
 
 export function getFlag2xUrl(countryCode: string, size: number = 64): string {
-  return `https://flagcdn.com/w${size * 2}/${countryCode}.png`;
+  const s = size * 2;
+  const height = Math.round(s * 0.75);
+  return `https://flagcdn.com/${s}x${height}/${countryCode}.png`;
 }
