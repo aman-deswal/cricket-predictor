@@ -53,6 +53,26 @@ def parse_match(match_id: str, payload: dict) -> dict:
     }
 
 
+def parse_players(match_id: str, payload: dict) -> list[dict]:
+    """Parse player appearances from one Cricsheet JSON match."""
+    info = payload.get("info", {})
+    dates = info.get("dates") or []
+    players_by_team = info.get("players") or {}
+    gender = info.get("gender", "")
+
+    records = []
+    for team, players in players_by_team.items():
+        for player in players:
+            records.append({
+                "match_id": match_id,
+                "date": dates[0] if dates else "",
+                "gender": gender,
+                "team": team,
+                "player": player,
+            })
+    return records
+
+
 def build_match_csv(match_type: str, data_dir: Path) -> int:
     """Download and convert a Cricsheet archive into a match-level CSV."""
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -61,7 +81,8 @@ def build_match_csv(match_type: str, data_dir: Path) -> int:
         archive_path = Path(temp_dir) / SUPPORTED_TYPES[match_type]
         download_archive(match_type, archive_path)
 
-        records = []
+        match_records = []
+        player_records = []
         with zipfile.ZipFile(archive_path) as archive:
             json_files = [name for name in archive.namelist() if name.endswith(".json")]
             logger.info(f"Parsing {len(json_files)} {match_type} matches...")
@@ -70,12 +91,17 @@ def build_match_csv(match_type: str, data_dir: Path) -> int:
                 match_id = Path(filename).stem
                 with archive.open(filename) as file_handle:
                     payload = json.load(file_handle)
-                records.append(parse_match(match_id, payload))
+                match_records.append(parse_match(match_id, payload))
+                player_records.extend(parse_players(match_id, payload))
 
     output_path = data_dir / f"{match_type}_matches.csv"
-    pd.DataFrame(records).sort_values("date").to_csv(output_path, index=False)
-    logger.info(f"Wrote {len(records)} rows to {output_path}")
-    return len(records)
+    pd.DataFrame(match_records).sort_values("date").to_csv(output_path, index=False)
+    logger.info(f"Wrote {len(match_records)} rows to {output_path}")
+
+    player_output_path = data_dir / f"{match_type}_players.csv"
+    pd.DataFrame(player_records).sort_values(["date", "match_id", "team", "player"]).to_csv(player_output_path, index=False)
+    logger.info(f"Wrote {len(player_records)} rows to {player_output_path}")
+    return len(match_records)
 
 
 def main(match_types: list[str], data_dir: Path) -> None:

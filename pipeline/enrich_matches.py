@@ -13,7 +13,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from openai import OpenAI
 
-from utils.cricsheet import get_head_to_head, get_team_recent_form
+from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_recent_form
 from utils.db import get_upcoming_matches, store_match_enrichment
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -129,6 +129,10 @@ Historical stats:
 - {team2} recent form: {team2_wins} wins in last {team2_matches} matches, win rate {team2_win_rate:.1%}
 - Head-to-head: {h2h_total} matches, {team1} {h2h_team1_wins} wins, {team2} {h2h_team2_wins} wins
 
+Recent Cricsheet player pools:
+- {team1}: {team1_player_pool}
+- {team2}: {team2_player_pool}
+
 Return JSON with this shape:
 {{
     "venue_name": string | null,
@@ -143,9 +147,10 @@ Rules:
 - The preview must clearly say it is based on historical data, not live team news.
 - Use general cricket knowledge and fixture context to estimate the match-detail panel.
 - venue_name may be set only if the venue is well-known from the fixture context in model knowledge; otherwise use null. venue_confidence must be "unknown".
-- possible_xi should contain model-estimated squad candidates only, not a confirmed playing XI.
+- possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
+- Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- Include only established senior players who plausibly belong to the two named teams. If unsure, use an empty array.
+- Do not include players who are not listed in the relevant team pool.
 - Do not include players from unrelated teams or unrelated matches.
 - Keep the preview to 3-5 sentences.
 """
@@ -507,6 +512,27 @@ def call_model_fallback(match: dict, stats: dict) -> dict:
     return json.loads(response.choices[0].message.content)
 
 
+def filter_players_to_pool(players: list[str], pool: list[str], limit: int = 15) -> list[str]:
+    pool_by_key = {player.casefold(): player for player in pool}
+    filtered = []
+    seen = set()
+    for player in players:
+        canonical = pool_by_key.get(str(player).casefold())
+        if canonical and canonical not in seen:
+            filtered.append(canonical)
+            seen.add(canonical)
+        if len(filtered) >= limit:
+            break
+    return filtered
+
+
+def filter_possible_xi_to_pools(possible_xi: dict, team1_pool: list[str], team2_pool: list[str]) -> dict:
+    return {
+        "team1": filter_players_to_pool(possible_xi.get("team1", []), team1_pool),
+        "team2": filter_players_to_pool(possible_xi.get("team2", []), team2_pool),
+    }
+
+
 def get_cricsheet_type(match_type: str) -> str:
     if "t20" in match_type.lower():
         return "t20s"
@@ -524,6 +550,8 @@ def build_data_backed_details(match: dict) -> dict:
         team1_form = get_team_recent_form(team1, cricsheet_type)
         team2_form = get_team_recent_form(team2, cricsheet_type)
         h2h = get_head_to_head(team1, team2, cricsheet_type)
+        team1_player_pool = get_recent_player_pool(team1, cricsheet_type)
+        team2_player_pool = get_recent_player_pool(team2, cricsheet_type)
         stats = {
             "team1_win_rate": team1_form["win_rate"],
             "team1_matches": team1_form["matches_played"],
@@ -534,13 +562,19 @@ def build_data_backed_details(match: dict) -> dict:
             "h2h_total": h2h["total_matches"],
             "h2h_team1_wins": h2h["team1_wins"],
             "h2h_team2_wins": h2h["team2_wins"],
+            "team1_player_pool": ", ".join(team1_player_pool) or "none",
+            "team2_player_pool": ", ".join(team2_player_pool) or "none",
         }
         try:
             fallback = call_model_fallback(match, stats)
             venue_name = fallback.get("venue_name")
             venue_confidence = fallback.get("venue_confidence", "unknown")
             preview = fallback.get("expert_preview", "")
-            possible_xi = fallback.get("possible_xi", {"team1": [], "team2": []})
+            possible_xi = filter_possible_xi_to_pools(
+                fallback.get("possible_xi", {"team1": [], "team2": []}),
+                team1_player_pool,
+                team2_player_pool,
+            )
             player_updates = fallback.get("player_updates", [])
             confidence = fallback.get("confidence", "low")
         except Exception as exc:

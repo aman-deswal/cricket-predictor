@@ -69,7 +69,7 @@ export function PredictDetails() {
   const displayTeam2 = prediction?.team2 ?? match.team2;
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
   const isModelEstimated = enrichment !== null && enrichment.source_links.length === 0;
-  const squadLabel = isModelEstimated ? 'GPT-estimated squad candidates' : 'Source-backed squad / possible XI';
+  const squadLabel = isModelEstimated ? 'Recent-player candidates, not confirmed squad' : 'Source-backed squad / possible XI';
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -98,7 +98,7 @@ export function PredictDetails() {
 
       <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
-          <h2 className="text-lg font-semibold text-cricket-200">Squad / Possible XI</h2>
+          <h2 className="text-lg font-semibold text-cricket-200">Squad / Player Candidates</h2>
           {hasSquadOrXi && <span className="text-xs uppercase tracking-wide text-gray-500">{squadLabel}</span>}
         </div>
         {hasSquadOrXi ? (
