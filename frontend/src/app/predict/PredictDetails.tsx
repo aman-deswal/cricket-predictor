@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getPrediction, Match, MatchEnrichment, MatchOdds, Prediction } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
 
@@ -30,6 +30,8 @@ export function PredictDetails() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [odds, setOdds] = useState<MatchOdds[]>([]);
+  const [squads, setSquads] = useState<MatchSquad[]>([]);
+  const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,16 +42,27 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData, oddsData] = await Promise.all([
+        const [matchData, predictionData, enrichmentData, oddsData, squadData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
           getMatchEnrichment(matchId),
           getMatchOdds(matchId),
+          getMatchSquads(matchId),
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
         setEnrichment(enrichmentData);
         setOdds(oddsData);
+        setSquads(squadData);
+
+        // Fetch player stats for all squad players
+        if (squadData.length > 0 && matchData) {
+          const allNames = squadData.flatMap(s => s.players.map(p => p.name));
+          const format = matchData.match_type?.toLowerCase().includes('t20') ? 't20i' :
+                         matchData.match_type?.toLowerCase().includes('odi') ? 'odi' : 't20i';
+          const stats = await getPlayerStats(allNames, format);
+          setPlayerStats(stats);
+        }
       } catch (err) {
         console.error('Failed to load match details:', err);
       } finally {
@@ -424,9 +437,64 @@ export function PredictDetails() {
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Squad / Players</h2>
-          {hasSquadOrXi && <span className="text-[10px] text-gray-500 uppercase">{squadLabel}</span>}
+          {squads.length > 0 && (
+            <span className="text-[10px] text-gray-500 uppercase">
+              {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable Squad'}
+            </span>
+          )}
         </div>
-        {hasSquadOrXi ? (
+        {squads.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {squads.map((squad) => {
+              const meta = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? team1Meta : team2Meta;
+              const teamDisplay = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? displayTeam1 : displayTeam2;
+              return (
+                <motion.div
+                  key={squad.team}
+                  className="rounded-xl border border-gray-800/50 p-4 bg-gray-900/30"
+                  whileHover={{ borderColor: meta.primaryColor }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-full overflow-hidden">
+                      <img src={getFlagUrl(meta.countryCode, 20)} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <p className="font-semibold text-white text-sm">{teamDisplay}</p>
+                    <span className="text-[10px] text-gray-500">({squad.players.length} players)</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {squad.players.map((player, i) => {
+                      const stats = playerStats.find(ps => ps.player_name === player.name);
+                      const roleIcon = player.is_keeper ? '🧤' :
+                        player.role?.includes('All') ? '⚡' :
+                        player.role?.includes('Bowl') ? '🎳' : '🏏';
+                      return (
+                        <motion.li
+                          key={player.id || player.name}
+                          className="flex items-center justify-between text-xs pl-2 border-l border-gray-800"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.6 + i * 0.02 }}
+                        >
+                          <span className="text-gray-300">
+                            <span className="mr-1">{roleIcon}</span>
+                            {player.name}
+                            {player.is_captain && <span className="ml-1 text-yellow-400 text-[9px]">(C)</span>}
+                          </span>
+                          {stats && stats.matches_played > 0 && (
+                            <span className="text-gray-500 font-mono text-[10px]">
+                              {stats.batting_avg > 0 && `avg ${stats.batting_avg.toFixed(0)}`}
+                              {stats.bowling_wickets > 0 && ` | ${stats.bowling_wickets}w`}
+                            </span>
+                          )}
+                        </motion.li>
+                      );
+                    })}
+                  </ul>
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : hasSquadOrXi ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
