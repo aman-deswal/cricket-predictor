@@ -19,9 +19,7 @@ from utils.db import (
     get_upcoming_matches,
     get_venue_from_cache,
     store_prediction,
-    store_match_enrichment,
 )
-from enrich_matches import enrich_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -260,23 +258,6 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
             logger.error(f"  Failed to predict {match['match_id']}: {e}")
 
     logger.info(f"Prediction run complete. Stored {stored} predictions.")
-
-    # Run enrichment for predicted matches (web research + LLM summary)
-    logger.info("Running match enrichment...")
-    enriched = 0
-    for match in matches:
-        try:
-            existing = get_match_enrichment(match["match_id"])
-            if existing and not force:
-                continue
-            logger.info(f"Enriching: {match['team1']} vs {match['team2']}")
-            enrichment = enrich_match(match, source_limit=8)
-            store_match_enrichment(enrichment)
-            enriched += 1
-        except Exception as e:
-            logger.error(f"  Failed to enrich {match['match_id']}: {e}")
-    logger.info(f"Enrichment complete. Enriched {enriched} matches.")
-
     return 0 if stored > 0 or not matches else 1
 
 
