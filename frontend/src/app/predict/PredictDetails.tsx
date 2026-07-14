@@ -178,6 +178,69 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
+      {/* Form & Odds Section */}
+      <motion.div
+        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 mb-8"
+        {...fadeUp}
+        transition={{ delay: 0.25 }}
+      >
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Recent Form & Odds</h2>
+        <div className="grid grid-cols-2 gap-6">
+          {[
+            { team: displayTeam1, meta: team1Meta, form: match.team1_recent_form, prob: prediction?.team1_win_probability },
+            { team: displayTeam2, meta: team2Meta, form: match.team2_recent_form, prob: prediction?.team2_win_probability },
+          ].map(({ team, meta, form, prob }) => {
+            const recent = (form ?? []).slice(-10);
+            const wins = recent.filter(r => r === 'W').length;
+            const winRate = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
+            const odds = prob && prob > 0 && prob < 1 ? (1 / prob).toFixed(2) : null;
+
+            return (
+              <div key={team} className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full overflow-hidden">
+                    <img src={getFlagUrl(meta.countryCode, 24)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="font-bold text-white text-sm">{meta.shortName}</span>
+                </div>
+
+                {/* Form dots */}
+                {recent.length > 0 && (
+                  <div className="flex justify-center gap-1 mb-2">
+                    {recent.map((result, i) => (
+                      <span
+                        key={`${result}-${i}`}
+                        className={`h-5 w-5 flex items-center justify-center rounded text-[9px] font-bold text-white ${
+                          result === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'
+                        }`}
+                      >
+                        {result}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Win rate */}
+                {winRate !== null && (
+                  <p className="text-xs text-gray-400 mb-2">
+                    Win rate: <span className={`font-semibold ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>{winRate}%</span>
+                    <span className="text-gray-600"> ({wins}W {recent.length - wins}L last {recent.length})</span>
+                  </p>
+                )}
+
+                {/* Decimal odds */}
+                {odds && (
+                  <div className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                    <span className="text-[10px] text-gray-500 uppercase">Odds</span>
+                    <span className="text-sm font-mono font-bold text-cricket-300">{odds}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+
       {/* Prediction Section */}
       {!prediction ? (
         <motion.div
@@ -264,6 +327,41 @@ export function PredictDetails() {
             <span>Model: {prediction.model}</span>
             <span>Ensemble: {prediction.ensemble_size}x calls</span>
           </motion.div>
+        </motion.div>
+      )}
+
+      {/* Key Players to Watch */}
+      {enrichment && enrichment.key_players && enrichment.key_players.length > 0 && (
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 mb-6"
+          {...fadeUp}
+          transition={{ delay: 0.45 }}
+        >
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">🔥 Key Players to Watch</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {enrichment.key_players.map((player, i) => {
+              const playerMeta = player.team === displayTeam1 ? team1Meta : team2Meta;
+              const roleIcon = player.role === 'bat' ? '🏏' : player.role === 'bowl' ? '⚾' : '⭐';
+              return (
+                <motion.div
+                  key={`${player.name}-${i}`}
+                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/30 border border-gray-800/50"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + i * 0.05 }}
+                >
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: `${playerMeta.primaryColor}20` }}>
+                    {roleIcon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{player.name}</p>
+                    <p className="text-[10px] text-gray-500 uppercase">{player.team} · {player.role === 'bat' ? 'Batter' : player.role === 'bowl' ? 'Bowler' : 'All-rounder'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{player.form_note}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </motion.div>
       )}
 
