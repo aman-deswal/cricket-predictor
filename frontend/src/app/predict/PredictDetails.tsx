@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getPrediction, Match, MatchEnrichment, Prediction } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getPrediction, Match, MatchEnrichment, MatchOdds, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
 
@@ -29,6 +29,7 @@ export function PredictDetails() {
   const [match, setMatch] = useState<Match | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
+  const [odds, setOdds] = useState<MatchOdds[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,14 +40,16 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData] = await Promise.all([
+        const [matchData, predictionData, enrichmentData, oddsData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
           getMatchEnrichment(matchId),
+          getMatchOdds(matchId),
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
         setEnrichment(enrichmentData);
+        setOdds(oddsData);
       } catch (err) {
         console.error('Failed to load match details:', err);
       } finally {
@@ -158,7 +161,7 @@ export function PredictDetails() {
 
         {/* Match info */}
         <motion.div
-          className="relative mt-6 pt-4 border-t border-gray-800/50 grid grid-cols-3 gap-4 text-center text-xs"
+          className="relative mt-6 pt-4 border-t border-gray-800/50 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-xs"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
@@ -166,6 +169,10 @@ export function PredictDetails() {
           <div>
             <p className="text-gray-500 uppercase tracking-wider mb-1">Format</p>
             <p className="text-white font-semibold">{match.match_type.toUpperCase()}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 uppercase tracking-wider mb-1">Venue</p>
+            <p className="text-white font-semibold truncate">{enrichment?.venue_name || match.venue || 'TBC'}</p>
           </div>
           <div>
             <p className="text-gray-500 uppercase tracking-wider mb-1">Date</p>
@@ -240,6 +247,50 @@ export function PredictDetails() {
           })}
         </div>
       </motion.div>
+
+      {/* Sportsbook Odds Section */}
+      {odds.length > 0 && (
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 mb-8"
+          {...fadeUp}
+          transition={{ delay: 0.28 }}
+        >
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">📊 Sportsbook Odds</h2>
+          <div className="space-y-3">
+            {odds.slice(0, 5).map((o) => {
+              const aiProb1 = prediction?.team1_win_probability;
+              const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
+              const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
+              const isValue1 = diff1 && Number(diff1) > 10;
+              const isValue2 = diff1 && Number(diff1) < -10;
+
+              return (
+                <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-800/40 border border-gray-700/30">
+                  <span className="text-xs text-gray-400 font-medium w-24 truncate">{o.bookmaker}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <span className={`text-sm font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
+                        {o.team1_odds.toFixed(2)}
+                      </span>
+                      {isValue1 && <span className="ml-1 text-[9px] text-yellow-400 font-bold">VALUE</span>}
+                    </div>
+                    <span className="text-gray-600 text-xs">vs</span>
+                    <div className="text-center">
+                      <span className={`text-sm font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
+                        {o.team2_odds.toFixed(2)}
+                      </span>
+                      {isValue2 && <span className="ml-1 text-[9px] text-yellow-400 font-bold">VALUE</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-600 mt-3 text-center">
+            &quot;VALUE&quot; = AI disagrees with market by &gt;10%. Not financial advice.
+          </p>
+        </motion.div>
+      )}
 
       {/* Prediction Section */}
       {!prediction ? (

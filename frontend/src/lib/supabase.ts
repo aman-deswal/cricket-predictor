@@ -78,6 +78,16 @@ export interface MatchEnrichment {
 
 export type MatchWithPredictions = Match & { predictions: Prediction[] };
 
+export interface MatchOdds {
+  match_id: string;
+  bookmaker: string;
+  team1_odds: number;
+  team2_odds: number;
+  draw_odds: number | null;
+  market: string;
+  fetched_at: string;
+}
+
 interface TeamStatsCacheRow {
   stat_type: string;
   match_type: string;
@@ -275,6 +285,17 @@ export async function getPrediction(matchId: string): Promise<Prediction | null>
 
   if (error) return null;
   return data;
+}
+
+export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
+  const { data, error } = await supabase
+    .from('match_odds')
+    .select('*')
+    .eq('match_id', matchId)
+    .order('fetched_at', { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
 }
 
 export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {
