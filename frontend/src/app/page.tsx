@@ -40,7 +40,7 @@ export default function HomePage() {
   return (
     <div>
       <h1 className="text-3xl font-bold text-cricket-300 mb-2">Upcoming Matches</h1>
-      <p className="text-gray-400 mb-8">AI-powered predictions for today&apos;s cricket matches</p>
+      <p className="text-gray-400 mb-8">AI-powered predictions for upcoming cricket matches</p>
 
       {matches.length === 0 ? (
         <div className="text-center text-gray-500 py-16">

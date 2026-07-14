@@ -1,15 +1,14 @@
 """Enrich upcoming matches with source-backed LLM research notes."""
 
 import argparse
-import email.utils
 import html
 import re
 import json
 import logging
 import os
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
 import requests
 from openai import OpenAI
@@ -21,8 +20,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 MODEL = "openai/gpt-4o"
-SEARCH_URL = "https://news.google.com/rss/search"
-GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 REPUTABLE_SOURCES = {
     "BBC Sport",
     "Cricbuzz",
@@ -40,6 +37,16 @@ SOURCE_DOMAINS = {
     "icc-cricket.com",
     "thecricketer.com",
     "wisden.com",
+}
+PRIMARY_SOURCE_DOMAINS = (
+    "cricbuzz.com",
+    "espncricinfo.com",
+)
+MIN_ARTICLE_TEXT_CHARS = 300
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 TOP_INTERNATIONAL_TEAMS = {
     "India",
@@ -92,7 +99,7 @@ Return JSON with this shape:
 {{
   "venue_name": string | null,
   "venue_confidence": "confirmed" | "reported" | "unknown",
-  "possible_xi": {{"team1": string[], "team2": string[]}},
+    "possible_xi": {{"team1": string[], "team2": string[]}},
   "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "confirmed" | "reported" | "speculative", "source_index": number}}],
   "expert_preview": string,
   "confidence": "high" | "medium" | "low"
@@ -104,7 +111,8 @@ Rules:
 - Keep expert_preview to 3-5 sentences and mention uncertainty when sources are thin.
 - Use source_index values from the source list for player updates.
 - Prefer article body text over headlines. Headlines alone are not enough for venue, XI, or injury claims.
-- For possible XI, include only players explicitly named in the sources.
+- For possible_xi, include only players explicitly named in source-backed squad, probable XI, or playing XI material. Do not imply they are a confirmed playing XI unless the source says so.
+- Do not discuss unrelated matches, unrelated teams, or generic cricket news.
 """
 
 MODEL_FALLBACK_PROMPT = """You are a cricket analyst. You do not have live web access in this call.
@@ -124,13 +132,22 @@ Historical stats:
 
 Return JSON with this shape:
 {{
+    "venue_name": string | null,
+    "venue_confidence": "unknown",
     "expert_preview": string,
+    "possible_xi": {{"team1": string[], "team2": string[]}},
+    "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "speculative"}}],
     "confidence": "medium" | "low"
 }}
 
 Rules:
 - The preview must clearly say it is based on historical data, not live team news.
-- Do not mention injuries, player availability, venue conditions, toss, or likely XI unless present above.
+- Use general cricket knowledge and fixture context to estimate the match-detail panel.
+- venue_name may be set only if the venue is well-known from the fixture context in model knowledge; otherwise use null. venue_confidence must be "unknown".
+- possible_xi should contain model-estimated squad candidates only, not a confirmed playing XI.
+- player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
+- Include only established senior players who plausibly belong to the two named teams. If unsure, use an empty array.
+- Do not include players from unrelated teams or unrelated matches.
 - Keep the preview to 3-5 sentences.
 """
 
@@ -178,10 +195,28 @@ def build_query(match: dict) -> str:
     return " ".join(part for part in parts if part).strip()
 
 
-def build_gdelt_query(match: dict) -> str:
-    teams = f'"{match.get("team1", "")}" "{match.get("team2", "")}"'
-    source_filter = " OR ".join(f"domain:{domain}" for domain in SOURCE_DOMAINS)
-    return f"({teams}) cricket ({source_filter})"
+def series_name(match: dict) -> str:
+    name = match.get("name", "")
+    if "," in name:
+        return name.split(",", 1)[1].strip()
+    return match.get("venue", "")
+
+
+def match_year(match: dict) -> str:
+    match_time = parse_datetime(match.get("date", ""))
+    return str(match_time.year) if match_time else ""
+
+
+def team_terms(team: str) -> list[str]:
+    normalized = normalize_team(team).lower()
+    aliases = [normalized]
+    words = [word for word in re.split(r"\W+", normalized) if len(word) >= 4]
+    aliases.extend(words)
+    return list(dict.fromkeys(alias for alias in aliases if alias))
+
+
+def mentions_team(team: str, text: str) -> bool:
+    return any(term in text for term in team_terms(team))
 
 
 def is_allowed_source(source_name: str, url: str) -> bool:
@@ -203,7 +238,7 @@ def extract_article_text(url: str, max_chars: int = 4500) -> str:
         response = requests.get(
             url,
             timeout=20,
-            headers={"User-Agent": "Mozilla/5.0 cricket-predictor research bot"},
+            headers=REQUEST_HEADERS,
         )
         response.raise_for_status()
     except requests.RequestException as exc:
@@ -216,107 +251,139 @@ def extract_article_text(url: str, max_chars: int = 4500) -> str:
 
 def source_relevance(match: dict, source: dict) -> int:
     haystack = f"{source.get('title', '')} {source.get('snippet', '')} {source.get('article_text', '')}".lower()
-    terms = [match.get("team1", ""), match.get("team2", ""), match.get("venue", "")]
     score = 0
-    for term in terms:
-        words = [word.lower() for word in re.split(r"\W+", term) if len(word) >= 4]
-        if any(word in haystack for word in words):
-            score += 1
+    if mentions_team(match.get("team1", ""), haystack):
+        score += 1
+    if mentions_team(match.get("team2", ""), haystack):
+        score += 1
+    year = match_year(match)
+    if year and year in haystack:
+        score += 1
+    series_words = [word for word in re.split(r"\W+", series_name(match).lower()) if len(word) >= 5]
+    if series_words and sum(1 for word in series_words if word in haystack) >= min(2, len(series_words)):
+        score += 1
     if "injur" in haystack or "squad" in haystack or "xi" in haystack or "venue" in haystack:
         score += 1
     return score
 
 
+def has_match_specific_heading(match: dict, source: dict) -> bool:
+    heading = f"{source.get('title', '')} {source.get('snippet', '')}".lower()
+    if mentions_team(match.get("team1", ""), heading) and mentions_team(match.get("team2", ""), heading):
+        return True
+
+    series_words = [word for word in re.split(r"\W+", series_name(match).lower()) if len(word) >= 5]
+    return bool(series_words) and sum(1 for word in series_words if word in heading) >= min(2, len(series_words))
+
+
 def normalize_source(source: dict, match: dict) -> Optional[dict]:
     source["snippet"] = strip_html(source.get("snippet", ""))
+    if not has_match_specific_heading(match, source):
+        return None
     source["article_text"] = extract_article_text(source.get("url", ""))
+    if len(source.get("article_text", "")) < MIN_ARTICLE_TEXT_CHARS:
+        return None
     if source_relevance(match, source) < 2:
+        return None
+    text = f"{source.get('title', '')} {source.get('snippet', '')} {source.get('article_text', '')}".lower()
+    if not mentions_team(match.get("team1", ""), text) or not mentions_team(match.get("team2", ""), text):
         return None
     return source
 
 
-def search_google_news(match: dict, limit: int) -> list[dict]:
-    query = build_query(match)
+def source_name_from_url(url: str) -> str:
+    domain = urlparse(url).netloc.lower()
+    if "cricbuzz.com" in domain:
+        return "Cricbuzz"
+    if "espncricinfo.com" in domain:
+        return "ESPNcricinfo"
+    return domain or "Unknown"
+
+
+def is_candidate_article_url(url: str, allowed_domain: str) -> bool:
+    parsed = urlparse(url)
+    path = parsed.path.lower().rstrip("/")
+    if allowed_domain not in parsed.netloc.lower() or not path:
+        return False
+    if any(skip in path for skip in ("/profiles/", "/authors/", "/ci/engine/player/", "/photo/")):
+        return False
+    if "cricbuzz.com" in allowed_domain:
+        return bool(re.match(r"^/cricket-news/\d+/.+", path))
+    if "espncricinfo.com" in allowed_domain:
+        return "/story/" in path or "/series/" in path and "/match-preview" in path
+    return False
+
+
+def extract_result_links(page_url: str, base_url: str, allowed_domain: str) -> list[str]:
     response = requests.get(
-        SEARCH_URL,
-        params={"q": query, "hl": "en", "gl": "US", "ceid": "US:en"},
+        page_url,
         timeout=30,
+        headers=REQUEST_HEADERS,
     )
     response.raise_for_status()
-    root = ET.fromstring(response.content)
 
-    sources = []
-    for item in root.findall("./channel/item"):
-        source_node = item.find("source")
-        source_name = source_node.text if source_node is not None else "Unknown"
-        url = item.findtext("link", "")
-        if not is_allowed_source(source_name, url):
+    links = []
+    seen = set()
+    for href in re.findall(r'href=["\']([^"\']+)["\']', response.text):
+        url = urljoin(base_url, html.unescape(href))
+        if not is_candidate_article_url(url, allowed_domain):
             continue
-
-        published = item.findtext("pubDate", "")
-        source = {
-            "title": item.findtext("title", ""),
-            "url": url,
-            "source": source_name,
-            "published_at": email.utils.parsedate_to_datetime(published).isoformat() if published else None,
-            "snippet": strip_html(item.findtext("description", "")),
-        }
-        normalized = normalize_source(source, match)
-        if normalized:
-            sources.append(normalized)
-        if len(sources) >= limit:
-            break
-
-    return sources
+        if url in seen:
+            continue
+        seen.add(url)
+        links.append(url)
+    return links
 
 
-def search_gdelt(match: dict, limit: int) -> list[dict]:
-    response = requests.get(
-        GDELT_URL,
-        params={
-            "query": build_gdelt_query(match),
-            "mode": "ArtList",
-            "format": "json",
-            "maxrecords": limit * 3,
-            "sort": "HybridRel",
-        },
-        timeout=30,
+def search_primary_cricket_sites(match: dict, limit: int) -> list[dict]:
+    site_pages = (
+        ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/"),
+        ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/cricket-news"),
+        ("cricbuzz.com", "https://www.cricbuzz.com", "https://www.cricbuzz.com/cricket-match/live-scores/upcoming-matches"),
+        ("espncricinfo.com", "https://www.espncricinfo.com", "https://www.espncricinfo.com/"),
+        ("espncricinfo.com", "https://www.espncricinfo.com", "https://www.espncricinfo.com/cricket-news"),
     )
-    response.raise_for_status()
-    articles = response.json().get("articles", [])
-
     sources = []
-    for article in articles:
-        url = article.get("url", "")
-        source_name = article.get("sourceCommonName") or article.get("domain") or "Unknown"
-        if not is_allowed_source(source_name, url):
+    seen_urls = set()
+    for domain, base_url, page_url in site_pages:
+        try:
+            result_links = extract_result_links(page_url, base_url, domain)
+        except requests.RequestException as exc:
+            logger.info(f"Direct site crawl failed for {domain}: {exc}")
             continue
 
-        source = {
-            "title": article.get("title", ""),
-            "url": url,
-            "source": source_name,
-            "published_at": article.get("seendate"),
-            "snippet": article.get("sentence", ""),
-        }
-        normalized = normalize_source(source, match)
-        if normalized:
-            sources.append(normalized)
-        if len(sources) >= limit:
-            break
-
+        for url in result_links:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            title = urlparse(url).path.rsplit("/", 1)[-1].replace("-", " ").strip()
+            source = {
+                "title": title,
+                "url": url,
+                "source": source_name_from_url(url),
+                "published_at": None,
+                "snippet": "",
+            }
+            normalized = normalize_source(source, match)
+            if normalized:
+                sources.append(normalized)
+            if len(sources) >= limit:
+                return sources
     return sources
 
 
 def search_sources(match: dict, limit: int = 8) -> list[dict]:
-    providers = (search_google_news, search_gdelt)
+    if limit <= 0:
+        return []
+
+    providers = (search_primary_cricket_sites,)
     sources = []
     seen_urls = set()
 
     for provider in providers:
         try:
             provider_sources = provider(match, limit)
-        except (requests.RequestException, ET.ParseError, ValueError) as exc:
+        except (requests.RequestException, ValueError) as exc:
             logger.info(f"Source provider {provider.__name__} failed: {exc}")
             continue
 
@@ -360,8 +427,8 @@ def text_mentions(value: str, text: str) -> bool:
     return bool(words) and all(word in text for word in words)
 
 
-def has_xi_context(text: str) -> bool:
-    return any(token in text for token in ("playing xi", "probable xi", "possible xi", "squad", "line-up", "lineup"))
+def has_squad_or_xi_context(text: str) -> bool:
+    return any(token in text for token in ("playing xi", "probable xi", "possible xi", "squad", "line-up", "lineup", "team news", "named", "announced"))
 
 
 def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
@@ -373,7 +440,7 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
         details["venue_name"] = None
         details["venue_confidence"] = "unknown"
 
-    if has_xi_context(corpus):
+    if has_squad_or_xi_context(corpus):
         possible_xi = details.get("possible_xi") or {"team1": [], "team2": []}
         details["possible_xi"] = {
             "team1": [player for player in possible_xi.get("team1", []) if text_mentions(player, corpus)],
@@ -473,10 +540,18 @@ def build_data_backed_details(match: dict) -> dict:
         }
         try:
             fallback = call_model_fallback(match, stats)
+            venue_name = fallback.get("venue_name")
+            venue_confidence = fallback.get("venue_confidence", "unknown")
             preview = fallback.get("expert_preview", "")
+            possible_xi = fallback.get("possible_xi", {"team1": [], "team2": []})
+            player_updates = fallback.get("player_updates", [])
             confidence = fallback.get("confidence", "low")
         except Exception as exc:
             logger.warning(f"Model fallback failed: {exc}")
+            venue_name = None
+            venue_confidence = "unknown"
+            possible_xi = {"team1": [], "team2": []}
+            player_updates = []
             preview = (
                 f"No recent reputable article-backed updates were found for this fixture. "
                 f"Using Cricsheet history instead: {team1} have won "
@@ -489,6 +564,10 @@ def build_data_backed_details(match: dict) -> dict:
             )
             confidence = "low"
     except FileNotFoundError:
+        venue_name = None
+        venue_confidence = "unknown"
+        possible_xi = {"team1": [], "team2": []}
+        player_updates = []
         preview = (
             "No recent reputable source-backed updates or local historical data were found for this fixture yet. "
             "Venue, XI, and injury details should be treated as unavailable until a reliable source is found."
@@ -496,10 +575,10 @@ def build_data_backed_details(match: dict) -> dict:
         confidence = "low"
 
     return {
-        "venue_name": None,
-        "venue_confidence": "unknown",
-        "possible_xi": {"team1": [], "team2": []},
-        "player_updates": [],
+        "venue_name": venue_name,
+        "venue_confidence": venue_confidence,
+        "possible_xi": possible_xi,
+        "player_updates": player_updates,
         "expert_preview": preview,
         "confidence": confidence,
     }
@@ -526,8 +605,10 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     }
 
 
-def main(limit: int, source_limit: int) -> None:
+def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
     matches = [match for match in get_upcoming_matches() if is_future_match(match)]
+    if match_id is not None:
+        matches = [match for match in matches if match.get("match_id") == match_id]
     matches = sorted(matches, key=match_priority)
     matches = matches[:limit]
     logger.info(f"Enriching {len(matches)} upcoming matches")
@@ -544,5 +625,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Enrich upcoming cricket matches from reputable web/news sources")
     parser.add_argument("--limit", type=int, default=5, help="Maximum matches to enrich")
     parser.add_argument("--source-limit", type=int, default=8, help="Maximum reputable sources per match")
+    parser.add_argument("--match-id", help="Enrich one specific match ID")
     args = parser.parse_args()
-    main(limit=args.limit, source_limit=args.source_limit)
+    main(limit=args.limit, source_limit=args.source_limit, match_id=args.match_id)

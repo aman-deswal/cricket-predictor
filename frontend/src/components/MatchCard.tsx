@@ -5,6 +5,13 @@ interface MatchCardProps {
   prediction: Prediction | null;
 }
 
+function getMatchDescriptor(match: Match): string {
+  if (match.name?.includes(',')) {
+    return match.name.split(',').slice(1).join(',').trim();
+  }
+  return match.name || match.venue;
+}
+
 export function MatchCard({ match, prediction }: MatchCardProps) {
   return (
     <a
@@ -40,7 +47,7 @@ export function MatchCard({ match, prediction }: MatchCardProps) {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 truncate">{match.venue}</p>
+      <p className="text-xs text-gray-500 truncate">{getMatchDescriptor(match)}</p>
 
       {prediction && (
         <div className="mt-4 pt-3 border-t border-cricket-800/50">

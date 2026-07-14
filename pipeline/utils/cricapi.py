@@ -106,7 +106,7 @@ def _to_match_record(match: dict) -> dict:
         "team1": _clean_team_name(team1),
         "team2": _clean_team_name(team2),
         "date": match.get("dateTimeGMT") or match.get("date", ""),
-        "venue": match.get("venue") or series,
+        "venue": match.get("venue", ""),
         "match_type": match.get("matchType", ""),
         "status": "upcoming",
     }

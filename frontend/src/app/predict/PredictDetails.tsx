@@ -5,6 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { getMatch, getMatchEnrichment, getPrediction, Match, MatchEnrichment, Prediction } from '@/lib/supabase';
 import { PredictionChart } from '@/components/PredictionChart';
 
+function getSeriesName(match: Match): string {
+  const prefix = `${match.team1} vs ${match.team2}, `;
+  if (match.name?.startsWith(prefix)) {
+    return match.name.slice(prefix.length);
+  }
+  if (match.name?.includes(',')) {
+    return match.name.split(',').slice(1).join(',').trim();
+  }
+  return match.name || match.venue || 'TBC';
+}
+
 export function PredictDetails() {
   const searchParams = useSearchParams();
   const matchId = searchParams.get('id');
@@ -56,6 +67,9 @@ export function PredictDetails() {
 
   const displayTeam1 = prediction?.team1 ?? match.team1;
   const displayTeam2 = prediction?.team2 ?? match.team2;
+  const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
+  const isModelEstimated = enrichment !== null && enrichment.source_links.length === 0;
+  const squadLabel = isModelEstimated ? 'GPT-estimated squad candidates' : 'Source-backed squad / possible XI';
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -76,15 +90,18 @@ export function PredictDetails() {
             <p className="text-gray-200">{new Date(match.date).toLocaleString()}</p>
           </div>
           <div className="sm:col-span-2">
-            <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Series / Venue</p>
-            <p className="text-gray-200">{match.venue || 'TBC'}</p>
+            <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Series</p>
+            <p className="text-gray-200">{getSeriesName(match)}</p>
           </div>
         </div>
       </div>
 
       <div className="bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 mb-6">
-        <h2 className="text-lg font-semibold text-cricket-200 mb-4">Possible XI</h2>
-        {enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0) ? (
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold text-cricket-200">Squad / Possible XI</h2>
+          {hasSquadOrXi && <span className="text-xs uppercase tracking-wide text-gray-500">{squadLabel}</span>}
+        </div>
+        {hasSquadOrXi ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { team: displayTeam1, players: enrichment.possible_xi.team1 ?? [] },
@@ -97,13 +114,13 @@ export function PredictDetails() {
                     {players.map((player) => <li key={player}>{player}</li>)}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-400">No source-backed XI found yet.</p>
+                  <p className="text-sm text-gray-400">No source-backed squad found yet.</p>
                 )}
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-400">Squad and probable XI will appear here once source-backed enrichment is available.</p>
+          <p className="text-sm text-gray-400">Source-backed squad or probable XI will appear here once a reputable source confirms it.</p>
         )}
       </div>
 
@@ -117,7 +134,7 @@ export function PredictDetails() {
           {enrichment.venue_name && (
             <div className="mb-4">
               <p className="text-gray-500 uppercase tracking-wide text-xs mb-1">Venue</p>
-              <p className="text-gray-200">{enrichment.venue_name} <span className="text-gray-500">({enrichment.venue_confidence})</span></p>
+              <p className="text-gray-200">{enrichment.venue_name} <span className="text-gray-500">({isModelEstimated ? 'GPT estimate' : enrichment.venue_confidence})</span></p>
             </div>
           )}
 
@@ -130,7 +147,7 @@ export function PredictDetails() {
 
           {enrichment.player_updates.length > 0 && (
             <div className="mb-4">
-              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">Player Updates</p>
+              <p className="text-gray-500 uppercase tracking-wide text-xs mb-2">{isModelEstimated ? 'GPT Player Notes' : 'Player Updates'}</p>
               <ul className="space-y-2 text-sm text-gray-300">
                 {enrichment.player_updates.map((update, index) => (
                   <li key={`${update.player ?? 'update'}-${index}`} className="rounded-lg border border-cricket-800/70 p-3">
