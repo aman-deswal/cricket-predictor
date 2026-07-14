@@ -64,9 +64,13 @@ function ProbabilityBar({ team1Prob, team1Color, team2Color }: { team1Prob: numb
   );
 }
 
-function toDecimalOdds(probability: number): string {
+function toAmericanOdds(probability: number): string {
   if (probability <= 0 || probability >= 1) return '-';
-  return (1 / probability).toFixed(2);
+  if (probability >= 0.5) {
+    return Math.round(-100 * probability / (1 - probability)).toString();
+  } else {
+    return '+' + Math.round(100 * (1 - probability) / probability).toString();
+  }
 }
 
 function getMatchTime(date: string): string {
@@ -204,16 +208,16 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
 
           {prediction && (
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Odds</span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wide">AI Odds</span>
               <div className="flex items-center gap-3">
                 <span className="text-[11px] font-mono font-semibold text-gray-300">
                   {team1Meta.shortName}{' '}
-                  <span className="text-cricket-400">{toDecimalOdds(prediction.team1_win_probability)}</span>
+                  <span className="text-cricket-400">{toAmericanOdds(prediction.team1_win_probability)}</span>
                 </span>
                 <span className="text-gray-700">|</span>
                 <span className="text-[11px] font-mono font-semibold text-gray-300">
                   {team2Meta.shortName}{' '}
-                  <span className="text-cricket-400">{toDecimalOdds(prediction.team2_win_probability)}</span>
+                  <span className="text-cricket-400">{toAmericanOdds(prediction.team2_win_probability)}</span>
                 </span>
               </div>
             </div>
