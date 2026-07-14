@@ -46,6 +46,18 @@ def store_prediction(prediction: dict) -> None:
     client.table("predictions").upsert(prediction, on_conflict="match_id").execute()
 
 
+def get_prediction(match_id: str) -> Optional[dict]:
+    """Fetch one prediction, if present."""
+    client = get_client()
+    response = (
+        client.table("predictions")
+        .select("*")
+        .eq("match_id", match_id)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
 def get_match_enrichment(match_id: str) -> Optional[dict]:
     """Fetch enrichment for one match, if present."""
     client = get_client()
