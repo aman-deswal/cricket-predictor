@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+from typing import Optional
 
 import pandas as pd
 
@@ -111,7 +112,7 @@ def cache_stats(match_type: str = "t20s") -> None:
     logger.info("Stats cached successfully.")
 
 
-def main(match_types: list[str] | None = None) -> None:
+def main(match_types: Optional[list[str]] = None) -> None:
     if match_types is None:
         match_types = ["t20s", "ipl"]
 

@@ -8,7 +8,7 @@ interface MatchCardProps {
 export function MatchCard({ match, prediction }: MatchCardProps) {
   return (
     <a
-      href={`/predict/${match.match_id}`}
+      href={`/predict?id=${encodeURIComponent(match.match_id)}`}
       className="block bg-cricket-900/50 rounded-xl p-6 border border-cricket-800 hover:border-cricket-600 transition-colors"
     >
       <div className="flex justify-between items-start mb-4">

@@ -1,6 +1,8 @@
 """Supabase database client wrapper."""
 
 import os
+from typing import Optional
+
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -20,16 +22,21 @@ def upsert_matches(matches: list[dict]) -> None:
     client.table("matches").upsert(matches, on_conflict="match_id").execute()
 
 
-def get_upcoming_matches(date: str) -> list[dict]:
-    """Fetch upcoming matches for a given date."""
+def replace_upcoming_matches(matches: list[dict]) -> None:
+    """Replace currently displayed upcoming/current match fixtures."""
     client = get_client()
-    response = (
-        client.table("matches")
-        .select("*")
-        .eq("date", date)
-        .eq("status", "upcoming")
-        .execute()
-    )
+    client.table("matches").delete().eq("status", "upcoming").execute()
+    if matches:
+        client.table("matches").upsert(matches, on_conflict="match_id").execute()
+
+
+def get_upcoming_matches(date: Optional[str] = None) -> list[dict]:
+    """Fetch upcoming matches, optionally constrained to a single date."""
+    client = get_client()
+    query = client.table("matches").select("*").eq("status", "upcoming")
+    if date is not None:
+        query = query.eq("date", date)
+    response = query.order("date", desc=False).execute()
     return response.data
 
 

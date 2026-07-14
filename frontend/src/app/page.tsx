@@ -1,14 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getUpcomingMatches, Match, Prediction } from '@/lib/supabase';
+import { getMatchSection, getUpcomingMatches, MatchSection, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 
-type MatchWithPrediction = Match & { predictions: Prediction[] };
+const SECTIONS: MatchSection[] = ['International', 'League', 'Other'];
 
 export default function HomePage() {
-  const [matches, setMatches] = useState<MatchWithPrediction[]>([]);
+  const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const matchesBySection = SECTIONS.map((section) => ({
+    section,
+    matches: matches.filter((match) => getMatchSection(match) === section),
+  })).filter(({ matches }) => matches.length > 0);
 
   useEffect(() => {
     async function load() {
@@ -39,17 +44,24 @@ export default function HomePage() {
 
       {matches.length === 0 ? (
         <div className="text-center text-gray-500 py-16">
-          <p className="text-xl">No upcoming matches with predictions</p>
-          <p className="mt-2">Check back later for new predictions</p>
+          <p className="text-xl">No upcoming matches</p>
+          <p className="mt-2">Check back later for new fixtures</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {matches.map((match) => (
-            <MatchCard
-              key={match.match_id}
-              match={match}
-              prediction={match.predictions?.[0] ?? null}
-            />
+        <div className="space-y-10">
+          {matchesBySection.map(({ section, matches }) => (
+            <section key={section}>
+              <h2 className="text-xl font-semibold text-cricket-200 mb-4">{section}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {matches.map((match) => (
+                  <MatchCard
+                    key={match.match_id}
+                    match={match}
+                    prediction={match.predictions?.[0] ?? null}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
