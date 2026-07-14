@@ -1,6 +1,7 @@
 """Compute rolling statistics from Cricsheet historical data."""
 
 import argparse
+import json
 import logging
 from typing import Optional
 
@@ -26,15 +27,21 @@ def compute_team_stats(match_type: str = "t20s") -> pd.DataFrame:
     """
     df = load_match_data(match_type)
     teams = set(df["team1"].unique()) | set(df["team2"].unique())
+    genders = sorted(df["gender"].dropna().unique()) if "gender" in df.columns else [""]
 
     stats = []
     for team in teams:
-        form = get_team_recent_form(team, match_type)
-        stats.append({
-            "team": team,
-            "match_type": match_type,
-            **form,
-        })
+        for gender in genders:
+            display_team = f"{team} Women" if gender == "female" else team
+            form = get_team_recent_form(display_team, match_type)
+            if form["matches_played"] == 0:
+                continue
+            stats.append({
+                "team": team,
+                "gender": gender,
+                "match_type": match_type,
+                **form,
+            })
 
     return pd.DataFrame(stats)
 
@@ -82,6 +89,12 @@ def compute_h2h_stats(match_type: str = "t20s") -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def to_json_records(df: pd.DataFrame) -> list[dict]:
+    """Convert a DataFrame to JSON-safe records for Supabase jsonb storage."""
+    cleaned = df.replace([float("inf"), float("-inf")], pd.NA)
+    return json.loads(cleaned.to_json(orient="records"))
+
+
 def cache_stats(match_type: str = "t20s") -> None:
     """Compute all stats and cache to Supabase."""
     logger.info(f"Computing team stats for {match_type}...")
@@ -97,9 +110,9 @@ def cache_stats(match_type: str = "t20s") -> None:
 
     # Store in stats_cache table
     all_stats = {
-        "team_stats": team_stats.to_dict(orient="records"),
-        "venue_stats": venue_stats.to_dict(orient="records"),
-        "h2h_stats": h2h_stats.to_dict(orient="records"),
+        "team_stats": to_json_records(team_stats),
+        "venue_stats": to_json_records(venue_stats),
+        "h2h_stats": to_json_records(h2h_stats),
     }
 
     for stat_type, records in all_stats.items():

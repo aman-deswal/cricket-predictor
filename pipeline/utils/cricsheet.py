@@ -79,6 +79,15 @@ def get_recent_player_pool(team: str, match_type: str = "t20s", n_matches: int =
     return player_counts.head(max_players).index.tolist()
 
 
+def team_match_filter(df: pd.DataFrame, team: str) -> pd.Series:
+    """Build a team/gender-aware filter for Cricsheet match rows."""
+    team_name = normalize_team_name(team)
+    team_matches = (df["team1"] == team_name) | (df["team2"] == team_name)
+    if "gender" in df.columns:
+        team_matches = team_matches & (df["gender"] == infer_team_gender(team))
+    return team_matches
+
+
 def get_team_recent_form(team: str, match_type: str = "t20s", n_matches: int = 10) -> dict:
     """
     Get team's recent form statistics.
@@ -92,18 +101,21 @@ def get_team_recent_form(team: str, match_type: str = "t20s", n_matches: int = 1
         Dict with win_rate, avg_score, avg_wickets_lost
     """
     df = load_match_data(match_type)
-    team_matches = df[(df["team1"] == team) | (df["team2"] == team)].tail(n_matches)
+    team_name = normalize_team_name(team)
+    team_matches = df[team_match_filter(df, team)].tail(n_matches)
 
     if team_matches.empty:
-        return {"win_rate": 0.5, "matches_played": 0, "avg_score": 0}
+        return {"win_rate": 0.5, "matches_played": 0, "avg_score": 0, "form_last_10": []}
 
-    wins = (team_matches["winner"] == team).sum()
+    form_last_10 = ["W" if winner == team_name else "L" for winner in team_matches["winner"]]
+    wins = form_last_10.count("W")
     total = len(team_matches)
 
     return {
         "win_rate": wins / total if total > 0 else 0.5,
         "matches_played": total,
         "recent_wins": int(wins),
+        "form_last_10": form_last_10,
     }
 
 

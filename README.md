@@ -47,6 +47,7 @@ Create the optional match-enrichment table in Supabase:
 
 ```bash
 # Run supabase/match_enrichment.sql in the Supabase SQL editor
+# Run supabase/stats_cache.sql in the Supabase SQL editor
 ```
 
 Enrich top upcoming matches with source-backed web/news research and GitHub Models:

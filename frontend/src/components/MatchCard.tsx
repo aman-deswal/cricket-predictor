@@ -12,6 +12,25 @@ function getMatchDescriptor(match: Match): string {
   return match.name || match.venue;
 }
 
+function FormStrip({ form }: { form?: Array<'W' | 'L'> }) {
+  if (!form || form.length === 0) return null;
+
+  return (
+    <div className="flex justify-center gap-1 mb-2" aria-label={`Recent form ${form.join(' ')}`}>
+      {form.slice(-10).map((result, index) => (
+        <span
+          key={`${result}-${index}`}
+          className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold text-white ${
+            result === 'W' ? 'bg-green-600' : 'bg-red-600'
+          }`}
+        >
+          {result}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function MatchCard({ match, prediction }: MatchCardProps) {
   return (
     <a
@@ -29,6 +48,7 @@ export function MatchCard({ match, prediction }: MatchCardProps) {
 
       <div className="flex items-center justify-between mb-4">
         <div className="text-center flex-1">
+          <FormStrip form={match.team1_recent_form} />
           <p className="font-semibold text-white">{match.team1}</p>
           {prediction && (
             <p className="text-sm text-cricket-400 mt-1">
@@ -38,6 +58,7 @@ export function MatchCard({ match, prediction }: MatchCardProps) {
         </div>
         <span className="text-gray-600 font-bold mx-4">vs</span>
         <div className="text-center flex-1">
+          <FormStrip form={match.team2_recent_form} />
           <p className="font-semibold text-white">{match.team2}</p>
           {prediction && (
             <p className="text-sm text-cricket-400 mt-1">

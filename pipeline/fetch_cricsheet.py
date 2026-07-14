@@ -44,6 +44,7 @@ def parse_match(match_id: str, payload: dict) -> dict:
     return {
         "match_id": match_id,
         "date": dates[0] if dates else "",
+        "gender": info.get("gender", ""),
         "team1": teams[0] if teams else "",
         "team2": teams[1] if len(teams) > 1 else "",
         "winner": outcome.get("winner", ""),
