@@ -78,6 +78,55 @@ export interface MatchEnrichment {
 
 export type MatchWithPredictions = Match & { predictions: Prediction[] };
 
+export interface MatchOdds {
+  match_id: string;
+  bookmaker: string;
+  team1_odds: number;
+  team2_odds: number;
+  draw_odds: number | null;
+  market: string;
+  fetched_at: string;
+}
+
+export interface SquadPlayer {
+  id: string;
+  name: string;
+  role: string;
+  batting_style?: string;
+  bowling_style?: string;
+  is_captain?: boolean;
+  is_keeper?: boolean;
+}
+
+export interface MatchSquad {
+  match_id: string;
+  team: string;
+  players: SquadPlayer[];
+  is_confirmed: boolean;
+  source: string;
+  fetched_at: string;
+}
+
+export interface PlayerStats {
+  player_name: string;
+  team: string;
+  format: string;
+  role: string;
+  batting_avg: number;
+  batting_sr: number;
+  batting_runs: number;
+  batting_innings: number;
+  batting_highest: string;
+  batting_fifties: number;
+  batting_hundreds: number;
+  bowling_avg: number;
+  bowling_economy: number;
+  bowling_wickets: number;
+  bowling_innings: number;
+  bowling_best: string;
+  matches_played: number;
+}
+
 interface TeamStatsCacheRow {
   stat_type: string;
   match_type: string;
@@ -277,6 +326,17 @@ export async function getPrediction(matchId: string): Promise<Prediction | null>
   return data;
 }
 
+export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
+  const { data, error } = await supabase
+    .from('match_odds')
+    .select('*')
+    .eq('match_id', matchId)
+    .order('fetched_at', { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
+}
+
 export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {
   const { data, error } = await supabase
     .from('match_enrichment')
@@ -286,6 +346,28 @@ export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichme
 
   if (error) return null;
   return data;
+}
+
+export async function getMatchSquads(matchId: string): Promise<MatchSquad[]> {
+  const { data, error } = await supabase
+    .from('match_squads')
+    .select('*')
+    .eq('match_id', matchId);
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getPlayerStats(playerNames: string[], format: string): Promise<PlayerStats[]> {
+  if (!playerNames.length) return [];
+  const { data, error } = await supabase
+    .from('player_stats')
+    .select('*')
+    .in('player_name', playerNames)
+    .eq('format', format);
+
+  if (error) return [];
+  return data ?? [];
 }
 
 export async function getPredictionHistory(): Promise<PredictionResult[]> {
