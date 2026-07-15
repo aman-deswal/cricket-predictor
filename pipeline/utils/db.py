@@ -23,9 +23,13 @@ def upsert_matches(matches: list[dict]) -> None:
 
 
 def replace_upcoming_matches(matches: list[dict]) -> None:
-    """Replace currently displayed upcoming/current match fixtures."""
+    """Upsert upcoming/current match fixtures.
+
+    Uses upsert (not delete+insert) to preserve match_id stability,
+    keeping linked data in match_odds, match_squads, and predictions intact.
+    Stale matches are left in place — they'll naturally age out by date.
+    """
     client = get_client()
-    client.table("matches").delete().eq("status", "upcoming").execute()
     if matches:
         client.table("matches").upsert(matches, on_conflict="match_id").execute()
 

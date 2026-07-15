@@ -35,13 +35,22 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
       >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
+            <defs>
+              <filter id="compact-glow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius="55%"
+              innerRadius="50%"
               outerRadius="85%"
-              paddingAngle={3}
+              paddingAngle={4}
               dataKey="value"
               startAngle={90}
               endAngle={-270}
@@ -50,11 +59,21 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
               animationDuration={1000}
             >
               {data.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index]}
+                  style={{ filter: 'url(#compact-glow)' }}
+                />
               ))}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
+        {/* Center percentage */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs sm:text-sm font-black text-white drop-shadow-lg">
+            {(winnerProb * 100).toFixed(0)}%
+          </span>
+        </div>
       </motion.div>
     );
   }
