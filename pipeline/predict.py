@@ -34,12 +34,12 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 - Venue: {venue}
 - Date: {date}
 
-**Team 1 ({team1}) Recent Form:**
+**Team 1 ({team1}) Recent Form (VERIFIED DATA — use these exact numbers):**
 - Win rate (last 10): {team1_win_rate:.1%}
 - Recent matches played: {team1_matches}
 - Recent wins: {team1_wins}
 
-**Team 2 ({team2}) Recent Form:**
+**Team 2 ({team2}) Recent Form (VERIFIED DATA — use these exact numbers):**
 - Win rate (last 10): {team2_win_rate:.1%}
 - Recent matches played: {team2_matches}
 - Recent wins: {team2_wins}
@@ -57,6 +57,7 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 {enrichment_notes}
 
 Based on all available information, predict the winner and provide win probabilities.
+IMPORTANT: When referencing win rates in your reasoning, use the EXACT percentages provided above. Do not estimate or round differently.
 
 Respond in JSON format:
 {{
@@ -64,7 +65,7 @@ Respond in JSON format:
     "team1_win_probability": <float 0-1>,
     "team2_win_probability": <float 0-1>,
     "confidence": "<low|medium|high>",
-    "reasoning": "<2-3 sentence explanation>"
+    "reasoning": "<2-3 sentence explanation referencing actual form stats>"
 }}"""
 
 NUM_ENSEMBLE_CALLS = int(os.getenv("NUM_ENSEMBLE_CALLS", "5"))

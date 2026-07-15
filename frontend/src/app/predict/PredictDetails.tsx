@@ -187,7 +187,7 @@ export function PredictDetails() {
                 <span className="text-xs font-black text-cricket-400 uppercase">VS</span>
               </div>
             )}
-            <span className="text-[9px] text-gray-500 mt-1 uppercase tracking-wider">AI Prediction</span>
+            <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">AI Prediction</span>
           </motion.div>
 
           {/* Team 2 */}
@@ -247,7 +247,7 @@ export function PredictDetails() {
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">Recent Form</h2>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cricket-500/10 text-cricket-400 font-medium">AI Odds</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cricket-500/20 text-cricket-300 font-semibold border border-cricket-500/30">AI Odds</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
@@ -374,6 +374,29 @@ export function PredictDetails() {
               </motion.span>
             </div>
             <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
+
+            {/* Form-based context (ground truth from stats_cache) */}
+            {((match.team1_recent_form?.length ?? 0) > 0 || (match.team2_recent_form?.length ?? 0) > 0) && (
+              <div className="mb-3 p-2 rounded-lg bg-gray-800/30 border border-gray-700/40">
+                <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">📊 Actual Form (last 10)</p>
+                <div className="flex gap-4 text-[10px]">
+                  {[
+                    { team: displayTeam1, form: match.team1_recent_form },
+                    { team: displayTeam2, form: match.team2_recent_form },
+                  ].map(({ team, form }) => {
+                    const recent = (form ?? []).slice(-10);
+                    const wins = recent.filter(r => r === 'W').length;
+                    const pct = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
+                    return pct !== null ? (
+                      <span key={team} className="text-gray-400">
+                        <span className="font-medium text-white">{getTeamMeta(team).shortName}:</span> {pct}% ({wins}W/{recent.length - wins}L)
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
               <span>Model: {prediction.model}</span>
               <span>Ensemble: {prediction.ensemble_size}x</span>
