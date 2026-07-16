@@ -1,15 +1,16 @@
-name: Fetch Results
+name: Enrich Matches
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours (backup scorer — primary scoring in fetch-fixtures)
+    - cron: '0 7,19 * * *'  # Twice daily: 7 AM and 7 PM UTC
   workflow_dispatch:
 
 permissions:
   contents: read
+  models: read
 
 jobs:
-  results:
+  enrich:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +24,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch results and score predictions
+      - name: Enrich matches
         env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_results.py
+        run: python pipeline/enrich_matches.py

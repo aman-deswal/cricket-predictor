@@ -1,13 +1,21 @@
-"""Fetch completed match results and score predictions."""
+"""Fetch completed match results and score predictions.
+
+This is a *backup* scorer. Primary scoring now happens inside
+``fetch_fixtures.py`` using the cricScore response data, which avoids
+extra CricAPI calls.  This script only calls ``match_info`` for a small
+batch (max 3) of still-unscored predictions whose match date has passed.
+"""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from utils.cricapi import fetch_match_result
 from utils.db import get_client, get_pending_results, store_result
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+MAX_API_CALLS = 3
 
 
 def score_prediction(prediction: dict, actual_winner: str) -> dict:
@@ -54,11 +62,25 @@ def update_match_status(match_id: str, winner: str) -> None:
     }).eq("match_id", match_id).execute()
 
 
-def main() -> None:
-    """Check for completed matches and score predictions."""
-    logger.info("Checking for completed matches...")
+def _is_match_in_past(prediction: dict) -> bool:
+    """Return True if the match date is in the past (worth checking for results)."""
+    date_str = prediction.get("date") or prediction.get("match_date", "")
+    if not date_str:
+        # No date info — assume it could be finished
+        return True
+    try:
+        match_time = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        if match_time.tzinfo is None:
+            match_time = match_time.replace(tzinfo=timezone.utc)
+        return match_time < datetime.now(timezone.utc)
+    except (ValueError, TypeError):
+        return True
 
-    # Get matches with predictions that haven't been scored
+
+def main() -> None:
+    """Check for completed matches and score predictions (backup, max 3 API calls)."""
+    logger.info("Backup result scorer — checking for completed matches...")
+
     client = get_client()
     response = (
         client.table("predictions")
@@ -70,8 +92,18 @@ def main() -> None:
 
     logger.info(f"Found {len(pending_predictions)} unscored predictions")
 
+    # Filter to only past matches, then cap at MAX_API_CALLS
+    past_predictions = [p for p in pending_predictions if _is_match_in_past(p)]
+    batch = past_predictions[:MAX_API_CALLS]
+
+    if len(past_predictions) > MAX_API_CALLS:
+        logger.info(
+            f"Rate-limiting: checking {MAX_API_CALLS} of {len(past_predictions)} "
+            f"past-date predictions (skipped {len(pending_predictions) - len(past_predictions)} future)"
+        )
+
     scored = 0
-    for prediction in pending_predictions:
+    for prediction in batch:
         match_id = prediction["match_id"]
         result = fetch_match_result(match_id)
 
@@ -97,7 +129,7 @@ def main() -> None:
         logger.info(f"  Prediction: {prediction['predicted_winner']} {correct_str}")
         scored += 1
 
-    logger.info(f"Scored {scored} predictions.")
+    logger.info(f"Scored {scored} predictions (API calls used: {len(batch)}/{MAX_API_CALLS}).")
 
 
 if __name__ == "__main__":
