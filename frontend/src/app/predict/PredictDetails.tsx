@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
+import { TossImpact } from '@/components/TossImpact';
 
 function toAmericanOdds(probability: number): string {
   if (probability <= 0 || probability >= 1) return '-';
@@ -236,6 +237,16 @@ export function PredictDetails() {
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
+
+      {/* Toss Impact Simulator */}
+      {prediction && (
+        <TossImpact
+          team1={displayTeam1}
+          team2={displayTeam2}
+          team1Prob={prediction.team1_win_probability}
+          team2Prob={prediction.team2_win_probability}
+        />
+      )}
 
       {/* Form + Odds + Key Players — side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

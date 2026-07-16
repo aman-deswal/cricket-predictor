@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Logo } from '@/components/Logo';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -25,8 +26,10 @@ export default function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <Link href="/" className="flex items-center space-x-2.5 group">
-                <span className="text-2xl group-hover:scale-110 transition-transform">🏏</span>
-                <span className="font-black text-lg bg-gradient-to-r from-cricket-300 to-emerald-400 bg-clip-text text-transparent">
+                <div className="group-hover:scale-110 transition-transform">
+                  <Logo size={36} />
+                </div>
+                <span className="font-black text-lg bg-gradient-to-r from-amber-300 to-yellow-500 bg-clip-text text-transparent">
                   CricPredict
                 </span>
               </Link>
