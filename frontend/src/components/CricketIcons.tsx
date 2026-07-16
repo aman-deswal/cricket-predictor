@@ -2,11 +2,11 @@ interface IconProps {
   className?: string;
 }
 
-/** Bat icon — angled cricket bat silhouette */
+/** Bat icon — batsman silhouette in playing stance */
 export function BatIcon({ className = 'w-4 h-4' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M5.5 18.5L2 22l1.5.5L7 19l-1.5-0.5zM14.5 3c-1.5 0-3 .8-4 2L6 11l1 1 2-1 3 3-1 2 1 1 6-4.5c1.2-1 2-2.5 2-4C20 5.5 17.5 3 14.5 3z" />
+      <path d="M15.5 2.5l1.2 1.2-4.5 4.5-1.5 1c-.3.2-.5.5-.5.8v1.5L7 14.7l-.7-.7-1.4 1.4L7 17.5l1.4-1.4-.7-.7 3.2-3.2h1.5c.3 0 .7-.2.8-.5l1-1.5 4.5-4.5 1.2 1.2 1.4-1.4-3-3-1.4 1.4zM5.5 18l-2 2c-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0l2-2c.4-.4.4-1 0-1.4-.4-.4-1-.4-1.4 0z" />
     </svg>
   );
 }
