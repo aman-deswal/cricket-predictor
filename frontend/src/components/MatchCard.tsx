@@ -99,7 +99,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
       whileHover={{ y: -4, scale: 1.02 }}
     >
       {/* Glow effect on hover */}
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-cricket-500/0 to-emerald-500/0 group-hover:from-cricket-500/20 group-hover:to-emerald-500/20 rounded-2xl blur-sm transition-all duration-300" />
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-cricket-500/0 to-amber-500/0 group-hover:from-cricket-500/20 group-hover:to-amber-500/20 rounded-2xl blur-sm transition-all duration-300" />
 
       <div className="relative bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/50 group-hover:border-cricket-600/50 transition-all duration-300 overflow-hidden">
         {/* Subtle shimmer */}
