@@ -28,6 +28,7 @@ export interface Prediction {
   team2_win_probability: number;
   confidence: 'low' | 'medium' | 'high';
   reasoning: string;
+  toss_insight?: string;
   model: string;
   ensemble_size: number;
   scored_at?: string;
@@ -60,12 +61,19 @@ export interface MatchEnrichment {
     source_index?: number;
   }>;
   key_players: Array<{
-    name: string;
-    team: string;
-    role: 'bat' | 'bowl' | 'all';
-    form_note: string;
+    name?: string;
+    team?: string;
+    role?: 'bat' | 'bowl' | 'all';
+    form_note?: string;
+    // Key battles format
+    batter?: string;
+    batter_team?: string;
+    bowler?: string;
+    bowler_team?: string;
+    insight?: string;
   }>;
   expert_preview: string | null;
+  toss_insight?: string | null;
   source_links: Array<{
     title?: string;
     url?: string;
@@ -242,7 +250,7 @@ function isFutureMatch(match: Match): boolean {
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
-  const [{ data, error }, { data: statsData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: enrichmentData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
@@ -252,9 +260,18 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .from('stats_cache')
       .select('stat_type, match_type, data')
       .eq('stat_type', 'team_stats'),
+    supabase
+      .from('match_enrichment')
+      .select('match_id, venue_name'),
   ]);
 
   if (error) throw error;
+
+  // Build venue lookup from enrichment
+  const enrichmentVenue = new Map<string, string>();
+  (enrichmentData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
+    if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
+  });
 
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
   ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
@@ -272,6 +289,8 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     const statsMatchType = getStatsMatchType(match.match_type);
     return {
       ...match,
+      // Backfill venue from enrichment if the match has none
+      venue: match.venue || enrichmentVenue.get(match.match_id) || '',
       team1_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [],
       team2_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [],
     };

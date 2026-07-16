@@ -59,13 +59,19 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 Based on all available information, predict the winner and provide win probabilities.
 IMPORTANT: When referencing win rates in your reasoning, use the EXACT percentages provided above. Do not estimate or round differently.
 
+Also analyze the toss factor for this specific match. Consider:
+- Historical toss impact at this venue (pitch type, dew factor, day/night)
+- Each team's preference and record when batting/bowling first
+- Format-specific toss tendencies
+
 Respond in JSON format:
 {{
     "predicted_winner": "<team name>",
     "team1_win_probability": <float 0-1>,
     "team2_win_probability": <float 0-1>,
     "confidence": "<low|medium|high>",
-    "reasoning": "<2-3 sentence explanation referencing actual form stats>"
+    "reasoning": "<2-3 sentence explanation referencing actual form stats>",
+    "toss_insight": "<single sentence: which team benefits more from winning the toss and what they should choose, with a percentage edge if possible>"
 }}"""
 
 NUM_ENSEMBLE_CALLS = int(os.getenv("NUM_ENSEMBLE_CALLS", "5"))
@@ -208,6 +214,10 @@ def ensemble_predict(match: dict) -> dict:
     reasonings = [p.get("reasoning", "") for p in predictions if p.get("reasoning")]
     combined_reasoning = reasonings[0] if reasonings else "No reasoning available."
 
+    # Pick the longest (most detailed) toss insight
+    toss_insights = [p.get("toss_insight", "") for p in predictions if p.get("toss_insight")]
+    toss_insight = max(toss_insights, key=len) if toss_insights else None
+
     return {
         "match_id": match["match_id"],
         "team1": context["team1"],
@@ -217,6 +227,7 @@ def ensemble_predict(match: dict) -> dict:
         "team2_win_probability": round(avg_team2_prob, 4),
         "confidence": predictions[0].get("confidence", "medium"),
         "reasoning": combined_reasoning,
+        "toss_insight": toss_insight,
         "model": MODEL,
         "ensemble_size": len(predictions),
     }

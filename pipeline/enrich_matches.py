@@ -15,7 +15,9 @@ from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_recent_form
 from utils.db import (
+    get_client,
     get_upcoming_matches,
+    get_match_squad_names,
     store_match_enrichment,
     get_team_form_from_cache,
     get_h2h_from_cache,
@@ -106,11 +108,14 @@ Return JSON with this shape:
     "possible_xi": {{"team1": string[], "team2": string[]}},
   "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "confirmed" | "reported" | "speculative", "source_index": number}}],
   "expert_preview": string,
+  "toss_insight": string,
   "confidence": "high" | "medium" | "low"
 }}
 
 Rules:
-- Do not invent injuries, availability, venue, squads, or playing XIs.
+- Do not invent injuries, availability, squads, or playing XIs.
+- For venue_name: use the venue from sources if mentioned. If not in sources but you know the venue from general cricket knowledge (e.g. a well-known series schedule), provide it with confidence "reported". Only use null if you truly cannot determine the venue.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions.
 - If sources do not support a field, use null, empty arrays, or say that no reliable update was found.
 - Keep expert_preview to 3-5 sentences and mention uncertainty when sources are thin.
 - Use source_index values from the source list for player updates.
@@ -121,7 +126,7 @@ Rules:
 
 MODEL_FALLBACK_PROMPT = """You are a cricket analyst. You do not have live web access in this call.
 
-Use only the fixture details and historical Cricsheet stats below. Do not invent venue, injuries, squads, or playing XIs.
+Use the fixture details, historical Cricsheet stats, and your general cricket knowledge below.
 
 Match:
 - {team1} vs {team2}
@@ -138,27 +143,32 @@ Recent Cricsheet player pools:
 - {team1}: {team1_player_pool}
 - {team2}: {team2_player_pool}
 
+Confirmed squads (ONLY use these players for key_battles):
+- {team1}: {team1_squad}
+- {team2}: {team2_squad}
+
 Return JSON with this shape:
 {{
     "venue_name": string | null,
     "venue_confidence": "unknown",
     "expert_preview": string,
+    "toss_insight": string,
     "possible_xi": {{"team1": string[], "team2": string[]}},
     "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "speculative"}}],
-    "key_players": [{{"name": string, "team": string, "role": "bat" | "bowl" | "all", "form_note": string}}],
+    "key_battles": [{{"batter": string, "batter_team": string, "bowler": string, "bowler_team": string, "insight": string}}],
     "confidence": "medium" | "low"
 }}
 
 Rules:
 - The preview must clearly say it is based on historical data, not live team news.
-- Use general cricket knowledge and fixture context to estimate the match-detail panel.
-- venue_name may be set only if the venue is well-known from the fixture context in model knowledge; otherwise use null. venue_confidence must be "unknown".
+- Use general cricket knowledge and fixture context to fill in details.
+- venue_name: use your cricket knowledge to determine the likely venue for this match based on the series, teams, date, and any venue hint from the fixture API. Most international series have well-known schedules. Only use null if you truly cannot determine the venue.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format.
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- key_players: list 3-4 star performers per team based on their known current form and reputation in this format. form_note should be a short phrase like "top ODI scorer in 2026" or "leading wicket-taker this series". For key_players, you may use general cricket knowledge — they do not need to be from the player pools above.
-- Do not include players from unrelated teams or unrelated matches in possible_xi or player_updates.
-- For possible_xi, select names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
+- key_battles: list 3-4 batter vs bowler matchups between opposing teams. **CRITICAL: Every player in key_battles MUST be from the confirmed squads listed above.** Do not use players who are not in the squad. insight should explain why the battle matters.
+- Do not include players from unrelated teams or unrelated matches.
 - Keep the preview to 3-5 sentences.
 """
 
@@ -445,9 +455,12 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
     corpus = source_corpus(sources)
 
     venue_name = details.get("venue_name")
-    if not venue_name or not text_mentions(venue_name, corpus):
-        details["venue_name"] = None
-        details["venue_confidence"] = "unknown"
+    if venue_name and text_mentions(venue_name, corpus):
+        details["venue_confidence"] = "confirmed"
+    elif venue_name:
+        # AI inferred it from knowledge — keep it but mark as inferred
+        if details.get("venue_confidence") not in ("confirmed", "reported"):
+            details["venue_confidence"] = "reported"
 
     if has_squad_or_xi_context(corpus):
         possible_xi = details.get("possible_xi") or {"team1": [], "team2": []}
@@ -598,6 +611,10 @@ def build_data_backed_details(match: dict) -> dict:
             "confidence": "low",
         }
 
+    # Fetch confirmed squads for key battles
+    match_id = match.get("match_id", "")
+    team1_squad, team2_squad = get_match_squad_names(match_id) if match_id else ([], [])
+
     stats = {
         "team1_win_rate": team1_form.get("win_rate", 0.5),
         "team1_matches": team1_form.get("matches_played", 0),
@@ -610,6 +627,8 @@ def build_data_backed_details(match: dict) -> dict:
         "h2h_team2_wins": h2h.get("team2_wins", 0),
         "team1_player_pool": ", ".join(team1_player_pool) if team1_player_pool else "none",
         "team2_player_pool": ", ".join(team2_player_pool) if team2_player_pool else "none",
+        "team1_squad": ", ".join(team1_squad) if team1_squad else "not available",
+        "team2_squad": ", ".join(team2_squad) if team2_squad else "not available",
     }
 
     try:
@@ -617,18 +636,31 @@ def build_data_backed_details(match: dict) -> dict:
         venue_name = fallback.get("venue_name")
         venue_confidence = fallback.get("venue_confidence", "unknown")
         preview = fallback.get("expert_preview", "")
+        toss_insight = fallback.get("toss_insight")
         possible_xi = filter_possible_xi_to_pools(
             fallback.get("possible_xi", {"team1": [], "team2": []}),
             team1_player_pool,
             team2_player_pool,
         )
         player_updates = fallback.get("player_updates", [])
-        key_players = fallback.get("key_players", [])
+        key_players = fallback.get("key_battles", fallback.get("key_players", []))
+        # Filter battles to only include players from confirmed squads
+        if team1_squad or team2_squad:
+            all_squad = set(n.lower() for n in team1_squad + team2_squad)
+            key_players = [
+                b for b in key_players
+                if (b.get("batter", b.get("name", "")).lower() in all_squad
+                    or not all_squad)
+                and (b.get("bowler", "").lower() in all_squad
+                     or not b.get("bowler")
+                     or not all_squad)
+            ]
         confidence = fallback.get("confidence", "low")
     except Exception as exc:
         logger.warning(f"Model fallback failed: {exc}")
         venue_name = None
         venue_confidence = "unknown"
+        toss_insight = None
         possible_xi = {"team1": [], "team2": []}
         player_updates = []
         key_players = []
@@ -647,6 +679,7 @@ def build_data_backed_details(match: dict) -> dict:
     return {
         "venue_name": venue_name,
         "venue_confidence": venue_confidence,
+        "toss_insight": toss_insight,
         "possible_xi": possible_xi,
         "player_updates": player_updates,
         "key_players": key_players,
@@ -667,9 +700,10 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "match_id": match["match_id"],
         "venue_name": details.get("venue_name"),
         "venue_confidence": details.get("venue_confidence", "unknown"),
+        "toss_insight": details.get("toss_insight"),
         "possible_xi": details.get("possible_xi", {"team1": [], "team2": []}),
         "player_updates": details.get("player_updates", []),
-        "key_players": details.get("key_players", []),
+        "key_players": details.get("key_battles", details.get("key_players", [])),
         "expert_preview": details.get("expert_preview", ""),
         "source_links": sources,
         "confidence": details.get("confidence", "low"),
@@ -689,6 +723,18 @@ def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
         logger.info(f"Enriching {match['team1']} vs {match['team2']}")
         enrichment = enrich_match(match, source_limit=source_limit)
         store_match_enrichment(enrichment)
+
+        # Backfill venue on the matches table if enrichment found one
+        venue_name = enrichment.get("venue_name")
+        if venue_name and not match.get("venue"):
+            try:
+                client = get_client()
+                client.table("matches").update({"venue": venue_name}).eq(
+                    "match_id", match["match_id"]
+                ).execute()
+                logger.info(f"  Backfilled venue: {venue_name}")
+            except Exception as e:
+                logger.warning(f"  Failed to backfill venue: {e}")
 
     logger.info("Enrichment run complete")
 
