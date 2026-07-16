@@ -122,6 +122,20 @@ def fetch_current_matches(match_types: list[str]) -> list[dict]:
     Returns:
         List of match dicts with keys: match_id, name, team1, team2, date, venue, match_type
     """
+    upcoming, _ = fetch_all_current_matches(match_types)
+    return upcoming
+
+
+def fetch_all_current_matches(
+    match_types: list[str],
+) -> tuple[list[dict], list[dict]]:
+    """
+    Fetch current matches from CricAPI, split into upcoming and completed.
+
+    Returns:
+        (upcoming_records, completed_raw) — upcoming are clean match records
+        for upsert; completed are raw CricAPI dicts for result processing.
+    """
     response = requests.get(
         f"{BASE_URL}/cricScore",
         params={"apikey": _get_api_key(), "offset": 0},
@@ -134,12 +148,21 @@ def fetch_current_matches(match_types: list[str]) -> list[dict]:
         raise RuntimeError(f"CricAPI error: {data.get('status')}")
 
     requested_types = {match_type.lower() for match_type in match_types}
-    matches = []
-    for match in data.get("data", []):
-        if _matches_type(match, requested_types) and _is_upcoming_fixture(match):
-            matches.append(_to_match_record(match))
+    upcoming: list[dict] = []
+    completed: list[dict] = []
 
-    return matches
+    for match in data.get("data", []):
+        if not _matches_type(match, requested_types):
+            continue
+        if not _is_international_match(match):
+            continue
+
+        if match.get("matchEnded", False):
+            completed.append(match)
+        elif _is_upcoming_fixture(match):
+            upcoming.append(_to_match_record(match))
+
+    return upcoming, completed
 
 
 def fetch_upcoming_matches(match_type: str = "t20") -> list[dict]:

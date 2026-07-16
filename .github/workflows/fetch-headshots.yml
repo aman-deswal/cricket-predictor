@@ -1,15 +1,15 @@
-name: Fetch Results
+name: Fetch Headshots
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours (backup scorer — primary scoring in fetch-fixtures)
+    - cron: '0 5 * * *'  # Daily at 5 AM UTC
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  results:
+  headshots:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +23,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch results and score predictions
+      - name: Fetch headshots
         env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_results.py
+        run: python pipeline/fetch_headshots.py
