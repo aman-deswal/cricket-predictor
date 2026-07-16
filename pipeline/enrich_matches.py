@@ -17,6 +17,7 @@ from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_r
 from utils.db import (
     get_client,
     get_upcoming_matches,
+    get_match_squad_names,
     store_match_enrichment,
     get_team_form_from_cache,
     get_h2h_from_cache,
@@ -142,6 +143,10 @@ Recent Cricsheet player pools:
 - {team1}: {team1_player_pool}
 - {team2}: {team2_player_pool}
 
+Confirmed squads (ONLY use these players for key_battles):
+- {team1}: {team1_squad}
+- {team2}: {team2_squad}
+
 Return JSON with this shape:
 {{
     "venue_name": string | null,
@@ -162,9 +167,8 @@ Rules:
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- key_battles: list 3-4 head-to-head batter vs bowler matchups between opposing teams that could decide the game. Use players likely to be in the playing XI based on the player pools and general cricket knowledge. insight should explain why the battle matters (e.g. "Bumrah has dismissed Buttler 4 times in ODIs" or "Gill averages 55+ against left-arm pace").
-- Do not include players from unrelated teams or unrelated matches in possible_xi or player_updates.
-- For possible_xi, select names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
+- key_battles: list 3-4 batter vs bowler matchups between opposing teams. **CRITICAL: Every player in key_battles MUST be from the confirmed squads listed above.** Do not use players who are not in the squad. insight should explain why the battle matters.
+- Do not include players from unrelated teams or unrelated matches.
 - Keep the preview to 3-5 sentences.
 """
 
@@ -607,6 +611,10 @@ def build_data_backed_details(match: dict) -> dict:
             "confidence": "low",
         }
 
+    # Fetch confirmed squads for key battles
+    match_id = match.get("match_id", "")
+    team1_squad, team2_squad = get_match_squad_names(match_id) if match_id else ([], [])
+
     stats = {
         "team1_win_rate": team1_form.get("win_rate", 0.5),
         "team1_matches": team1_form.get("matches_played", 0),
@@ -619,6 +627,8 @@ def build_data_backed_details(match: dict) -> dict:
         "h2h_team2_wins": h2h.get("team2_wins", 0),
         "team1_player_pool": ", ".join(team1_player_pool) if team1_player_pool else "none",
         "team2_player_pool": ", ".join(team2_player_pool) if team2_player_pool else "none",
+        "team1_squad": ", ".join(team1_squad) if team1_squad else "not available",
+        "team2_squad": ", ".join(team2_squad) if team2_squad else "not available",
     }
 
     try:
@@ -634,6 +644,17 @@ def build_data_backed_details(match: dict) -> dict:
         )
         player_updates = fallback.get("player_updates", [])
         key_players = fallback.get("key_battles", fallback.get("key_players", []))
+        # Filter battles to only include players from confirmed squads
+        if team1_squad or team2_squad:
+            all_squad = set(n.lower() for n in team1_squad + team2_squad)
+            key_players = [
+                b for b in key_players
+                if (b.get("batter", b.get("name", "")).lower() in all_squad
+                    or not all_squad)
+                and (b.get("bowler", "").lower() in all_squad
+                     or not b.get("bowler")
+                     or not all_squad)
+            ]
         confidence = fallback.get("confidence", "low")
     except Exception as exc:
         logger.warning(f"Model fallback failed: {exc}")

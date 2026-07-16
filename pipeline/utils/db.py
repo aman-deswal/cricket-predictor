@@ -98,6 +98,23 @@ def get_pending_results() -> list[dict]:
     return response.data
 
 
+def get_match_squad_names(match_id: str) -> tuple[list[str], list[str]]:
+    """Return (team1_names, team2_names) from match_squads table."""
+    client = get_client()
+    response = (
+        client.table("match_squads")
+        .select("team, players")
+        .eq("match_id", match_id)
+        .execute()
+    )
+    if not response.data:
+        return [], []
+    squads = sorted(response.data, key=lambda s: s.get("team", ""))
+    team1_names = [p["name"] for p in squads[0].get("players", [])] if len(squads) > 0 else []
+    team2_names = [p["name"] for p in squads[1].get("players", [])] if len(squads) > 1 else []
+    return team1_names, team2_names
+
+
 def store_result(result: dict) -> None:
     """Store a prediction result with scoring."""
     client = get_client()
