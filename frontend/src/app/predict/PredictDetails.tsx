@@ -154,6 +154,14 @@ export function PredictDetails() {
               />
             </motion.div>
             <h2 className="text-base sm:text-lg font-bold text-white">{team1Meta.shortName}</h2>
+            {/* Form strip — last 5 */}
+            {(match.team1_recent_form?.length ?? 0) > 0 && (
+              <div className="flex justify-center gap-0.5 mt-1">
+                {(match.team1_recent_form ?? []).slice(-5).map((r, i) => (
+                  <span key={`t1f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
+                ))}
+              </div>
+            )}
             {prediction && (
               <p className="text-lg sm:text-2xl font-black text-cricket-300 mt-1">
                 {(prediction.team1_win_probability * 100).toFixed(0)}%
@@ -211,6 +219,14 @@ export function PredictDetails() {
               />
             </motion.div>
             <h2 className="text-base sm:text-lg font-bold text-white">{team2Meta.shortName}</h2>
+            {/* Form strip — last 5 */}
+            {(match.team2_recent_form?.length ?? 0) > 0 && (
+              <div className="flex justify-center gap-0.5 mt-1">
+                {(match.team2_recent_form ?? []).slice(-5).map((r, i) => (
+                  <span key={`t2f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
+                ))}
+              </div>
+            )}
             {prediction && (
               <p className="text-lg sm:text-2xl font-black text-cricket-300 mt-1">
                 {(prediction.team2_win_probability * 100).toFixed(0)}%
@@ -238,156 +254,59 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
-      {/* Toss Scenarios — full width, important context */}
-      {prediction && (
-        <motion.div className="mb-4" {...fadeUp} transition={{ delay: 0.22 }}>
-          <TossImpact
-            team1={displayTeam1}
-            team2={displayTeam2}
-            team1Prob={prediction.team1_win_probability}
-            team2Prob={prediction.team2_win_probability}
-          />
-        </motion.div>
-      )}
-
-      {/* Reasoning — full width center, most important after hero */}
-      {prediction ? (
-        <motion.div
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
-          {...fadeUp}
-          transition={{ delay: 0.25 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
-            <motion.span
-              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                prediction.confidence === 'high'
-                  ? 'bg-emerald-500/20 text-emerald-300'
-                  : prediction.confidence === 'medium'
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : 'bg-red-500/20 text-red-300'
-              }`}
-            >
-              {prediction.confidence} confidence
-            </motion.span>
-          </div>
-          <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
-
-          {/* Form-based context (ground truth from stats_cache) */}
-          {((match.team1_recent_form?.length ?? 0) > 0 || (match.team2_recent_form?.length ?? 0) > 0) && (
-            <div className="mb-3 p-2 rounded-lg bg-gray-800/30 border border-gray-700/40">
-              <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">📊 Actual Form (last 10)</p>
-              <div className="flex flex-wrap gap-4 text-[10px]">
-                {[
-                  { team: displayTeam1, form: match.team1_recent_form },
-                  { team: displayTeam2, form: match.team2_recent_form },
-                ].map(({ team, form }) => {
-                  const recent = (form ?? []).slice(-10);
-                  const wins = recent.filter(r => r === 'W').length;
-                  const pct = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
-                  return pct !== null ? (
-                    <span key={team} className="text-gray-400">
-                      <span className="font-medium text-white">{getTeamMeta(team).shortName}:</span> {pct}% ({wins}W/{recent.length - wins}L)
-                    </span>
-                  ) : null;
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
-            <span>Model: {prediction.model}</span>
-            <span>Ensemble: {prediction.ensemble_size}x</span>
-          </div>
-        </motion.div>
-      ) : (
-        <motion.div
-          {...fadeUp}
-          transition={{ delay: 0.25 }}
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex flex-col items-center justify-center text-center mb-4"
-        >
-          <span className="text-3xl mb-2">🏏</span>
-          <p className="text-sm font-semibold text-cricket-300">Prediction Pending</p>
-          <p className="text-gray-500 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
-        </motion.div>
-      )}
-
-      {/* Form + Sportsbook Odds — side by side on desktop, stacked on mobile */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Form & Our Odds */}
-        <motion.div
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-          {...fadeUp}
-          transition={{ delay: 0.28 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Recent Form</h2>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cricket-500/20 text-cricket-300 font-semibold border border-cricket-500/30">Our Odds</span>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { team: displayTeam1, meta: team1Meta, form: match.team1_recent_form, prob: prediction?.team1_win_probability },
-              { team: displayTeam2, meta: team2Meta, form: match.team2_recent_form, prob: prediction?.team2_win_probability },
-            ].map(({ team, meta, form, prob }) => {
-              const recent = (form ?? []).slice(-10);
-              const wins = recent.filter(r => r === 'W').length;
-              const winRate = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
-              const americanOdds = prob ? toAmericanOdds(prob) : null;
+      {/* 1. Sportsbook Odds — full width, right below hero */}
+      <motion.div
+        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
+        {...fadeUp}
+        transition={{ delay: 0.22 }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">📊 Sportsbook Odds</h2>
+          {odds.length > 0 && <span className="text-[9px] text-gray-500">{odds.length} bookmakers</span>}
+        </div>
+        {odds.length > 0 ? (
+          <div className="space-y-2">
+            {odds.slice(0, 4).map((o) => {
+              const aiProb1 = prediction?.team1_win_probability;
+              const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
+              const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
+              const isValue1 = diff1 && Number(diff1) > 10;
+              const isValue2 = diff1 && Number(diff1) < -10;
 
               return (
-                <div key={team} className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 mb-2">
-                    <div className="w-5 h-5 rounded-full overflow-hidden">
-                      <img src={getFlagUrl(meta.countryCode, 20)} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <span className="font-bold text-white text-xs">{meta.shortName}</span>
+                <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30">
+                  <span className="text-[10px] text-gray-400 font-medium w-20 truncate">{o.bookmaker}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
+                      {decimalToAmerican(o.team1_odds)}
+                      {isValue1 && <span className="ml-1 text-[8px]">🔥</span>}
+                    </span>
+                    <span className="text-gray-700 text-[10px]">|</span>
+                    <span className={`text-xs font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
+                      {decimalToAmerican(o.team2_odds)}
+                      {isValue2 && <span className="ml-1 text-[8px]">🔥</span>}
+                    </span>
                   </div>
-
-                  {/* Form dots */}
-                  {recent.length > 0 && (
-                    <div className="flex justify-center gap-0.5 mb-1.5">
-                      {recent.map((result, i) => (
-                        <span
-                          key={`${result}-${i}`}
-                          className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${
-                            result === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'
-                          }`}
-                        >
-                          {result}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Win rate */}
-                  {winRate !== null && (
-                    <p className="text-[10px] text-gray-400 mb-1.5">
-                      <span className={`font-semibold ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>{winRate}%</span>
-                      <span className="text-gray-600"> ({wins}W {recent.length - wins}L)</span>
-                    </p>
-                  )}
-
-                  {/* American odds */}
-                  {americanOdds && (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800/50 border border-gray-700/50">
-                      <span className="text-xs font-mono font-bold text-cricket-300">{americanOdds}</span>
-                    </div>
-                  )}
                 </div>
               );
             })}
+            <p className="text-[9px] text-gray-600 text-center mt-1">
+              🔥 = Disagrees with market &gt;10%
+            </p>
           </div>
-        </motion.div>
-      </div>
+        ) : (
+          <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
+        )}
+      </motion.div>
 
-      {/* Key Players + Sportsbook Odds — side by side */}
+      {/* 2. Key Players | Reasoning — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Key Players */}
         {enrichment && enrichment.key_players && enrichment.key_players.length > 0 ? (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
             {...fadeUp}
-            transition={{ delay: 0.32 }}
+            transition={{ delay: 0.28 }}
           >
             <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">🔥 Key Players</h2>
             <div className="space-y-2">
@@ -412,139 +331,60 @@ export function PredictDetails() {
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
             {...fadeUp}
-            transition={{ delay: 0.32 }}
+            transition={{ delay: 0.28 }}
           >
             <p className="text-xs text-gray-500">Key player data loading...</p>
           </motion.div>
         )}
 
-        {/* Sportsbook Odds */}
-        <motion.div
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-          {...fadeUp}
-          transition={{ delay: 0.35 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">📊 Sportsbook Odds</h2>
-            {odds.length > 0 && <span className="text-[9px] text-gray-500">{odds.length} bookmakers</span>}
-          </div>
-          {odds.length > 0 ? (
-            <div className="space-y-2">
-              {odds.slice(0, 4).map((o) => {
-                const aiProb1 = prediction?.team1_win_probability;
-                const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
-                const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
-                const isValue1 = diff1 && Number(diff1) > 10;
-                const isValue2 = diff1 && Number(diff1) < -10;
-
-                return (
-                  <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30">
-                    <span className="text-[10px] text-gray-400 font-medium w-20 truncate">{o.bookmaker}</span>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
-                        {decimalToAmerican(o.team1_odds)}
-                        {isValue1 && <span className="ml-1 text-[8px]">🔥</span>}
-                      </span>
-                      <span className="text-gray-700 text-[10px]">|</span>
-                      <span className={`text-xs font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
-                        {decimalToAmerican(o.team2_odds)}
-                        {isValue2 && <span className="ml-1 text-[8px]">🔥</span>}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-              <p className="text-[9px] text-gray-600 text-center mt-1">
-                🔥 = Disagrees with market &gt;10%
-              </p>
+        {/* Reasoning */}
+        {prediction ? (
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
+            {...fadeUp}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
+              <motion.span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  prediction.confidence === 'high'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : prediction.confidence === 'medium'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-red-500/20 text-red-300'
+                }`}
+              >
+                {prediction.confidence} confidence
+              </motion.span>
             </div>
-          ) : (
-            <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
-          )}
-        </motion.div>
+            <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
+            <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
+              <span>Model: {prediction.model}</span>
+              <span>Ensemble: {prediction.ensemble_size}x</span>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            {...fadeUp}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex flex-col items-center justify-center text-center"
+          >
+            <span className="text-3xl mb-2">🏏</span>
+            <p className="text-sm font-semibold text-cricket-300">Prediction Pending</p>
+            <p className="text-gray-500 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
+          </motion.div>
+        )}
       </div>
 
-      {/* Squad + Research Notes — side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Squad */}
-        <motion.div
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-          {...fadeUp}
-          transition={{ delay: 0.4 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Squad</h2>
-            {squads.length > 0 && (
-              <span className="text-[9px] text-gray-500 uppercase">
-                {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
-              </span>
-            )}
-          </div>
-          {squads.length > 0 ? (
-            <div className="space-y-3">
-              {squads.map((squad) => {
-                const meta = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? team1Meta : team2Meta;
-                const teamDisplay = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? displayTeam1 : displayTeam2;
-                return (
-                  <div key={squad.team}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="w-4 h-4 rounded-full overflow-hidden">
-                        <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
-                      <span className="text-[9px] text-gray-600">({squad.players.length})</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {squad.players.slice(0, 11).map((player) => {
-                        const roleIcon = player.is_keeper ? '🧤' :
-                          player.role?.includes('All') ? '⚡' :
-                          player.role?.includes('Bowl') ? '🎳' : '🏏';
-                        return (
-                          <span key={player.id || player.name} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30">
-                            {roleIcon} {player.name.split(' ').pop()}
-                            {player.is_captain && <span className="text-yellow-400">(C)</span>}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : hasSquadOrXi ? (
-            <div className="space-y-3">
-              {[
-                { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
-                { team: displayTeam2, players: enrichment!.possible_xi.team2 ?? [], meta: team2Meta },
-              ].map(({ team, players, meta }) => (
-                <div key={team}>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-4 h-4 rounded-full overflow-hidden">
-                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <span className="text-[10px] font-semibold text-white">{team}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {players.map((p) => (
-                      <span key={p} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30">
-                        {p.split(' ').pop()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[10px] text-gray-500">Squad not available yet</p>
-          )}
-        </motion.div>
-
+      {/* 3. Research Notes | Toss Scenarios — side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Research Notes */}
         {enrichment ? (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
             {...fadeUp}
-            transition={{ delay: 0.45 }}
+            transition={{ delay: 0.35 }}
           >
             <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Research Notes</h2>
 
@@ -586,12 +426,97 @@ export function PredictDetails() {
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
             {...fadeUp}
-            transition={{ delay: 0.45 }}
+            transition={{ delay: 0.35 }}
           >
             <p className="text-[10px] text-gray-500">Research data loading...</p>
           </motion.div>
         )}
+
+        {/* Toss Scenarios */}
+        {prediction && (
+          <motion.div {...fadeUp} transition={{ delay: 0.38 }}>
+            <TossImpact
+              team1={displayTeam1}
+              team2={displayTeam2}
+              team1Prob={prediction.team1_win_probability}
+              team2Prob={prediction.team2_win_probability}
+            />
+          </motion.div>
+        )}
       </div>
+
+      {/* 4. Squad — full width at bottom */}
+      <motion.div
+        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-6"
+        {...fadeUp}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">Squad</h2>
+          {squads.length > 0 && (
+            <span className="text-[9px] text-gray-500 uppercase">
+              {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
+            </span>
+          )}
+        </div>
+        {squads.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {squads.map((squad) => {
+              const meta = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? team1Meta : team2Meta;
+              const teamDisplay = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? displayTeam1 : displayTeam2;
+              return (
+                <div key={squad.team}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="w-4 h-4 rounded-full overflow-hidden">
+                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
+                    <span className="text-[9px] text-gray-600">({squad.players.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {squad.players.slice(0, 11).map((player) => {
+                      const roleIcon = player.is_keeper ? '🧤' :
+                        player.role?.includes('All') ? '⚡' :
+                        player.role?.includes('Bowl') ? '🎳' : '🏏';
+                      return (
+                        <span key={player.id || player.name} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30">
+                          {roleIcon} {player.name.split(' ').pop()}
+                          {player.is_captain && <span className="text-yellow-400">(C)</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : hasSquadOrXi ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
+              { team: displayTeam2, players: enrichment!.possible_xi.team2 ?? [], meta: team2Meta },
+            ].map(({ team, players, meta }) => (
+              <div key={team}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="w-4 h-4 rounded-full overflow-hidden">
+                    <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[10px] font-semibold text-white">{team}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {players.map((p) => (
+                    <span key={p} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30">
+                      {p.split(' ').pop()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-500">Squad not available yet</p>
+        )}
+      </motion.div>
     </div>
   );
 }
