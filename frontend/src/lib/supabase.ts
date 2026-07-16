@@ -67,6 +67,7 @@ export interface MatchEnrichment {
     form_note: string;
   }>;
   expert_preview: string | null;
+  toss_insight?: string | null;
   source_links: Array<{
     title?: string;
     url?: string;

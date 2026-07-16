@@ -80,8 +80,8 @@ def store_match_enrichment(enrichment: dict) -> None:
     try:
         client.table("match_enrichment").upsert(enrichment, on_conflict="match_id").execute()
     except Exception:
-        # If key_players column doesn't exist yet, retry without it
-        fallback = {k: v for k, v in enrichment.items() if k != "key_players"}
+        # If newer columns don't exist yet, retry without them
+        fallback = {k: v for k, v in enrichment.items() if k not in ("key_players", "toss_insight")}
         client.table("match_enrichment").upsert(fallback, on_conflict="match_id").execute()
 
 

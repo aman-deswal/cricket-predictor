@@ -107,11 +107,14 @@ Return JSON with this shape:
     "possible_xi": {{"team1": string[], "team2": string[]}},
   "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "confirmed" | "reported" | "speculative", "source_index": number}}],
   "expert_preview": string,
+  "toss_insight": string,
   "confidence": "high" | "medium" | "low"
 }}
 
 Rules:
-- Do not invent injuries, availability, venue, squads, or playing XIs.
+- Do not invent injuries, availability, squads, or playing XIs.
+- For venue_name: use the venue from sources if mentioned. If not in sources but you know the venue from general cricket knowledge (e.g. a well-known series schedule), provide it with confidence "reported". Only use null if you truly cannot determine the venue.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions.
 - If sources do not support a field, use null, empty arrays, or say that no reliable update was found.
 - Keep expert_preview to 3-5 sentences and mention uncertainty when sources are thin.
 - Use source_index values from the source list for player updates.
@@ -122,7 +125,7 @@ Rules:
 
 MODEL_FALLBACK_PROMPT = """You are a cricket analyst. You do not have live web access in this call.
 
-Use only the fixture details and historical Cricsheet stats below. Do not invent venue, injuries, squads, or playing XIs.
+Use the fixture details, historical Cricsheet stats, and your general cricket knowledge below.
 
 Match:
 - {team1} vs {team2}
@@ -144,6 +147,7 @@ Return JSON with this shape:
     "venue_name": string | null,
     "venue_confidence": "unknown",
     "expert_preview": string,
+    "toss_insight": string,
     "possible_xi": {{"team1": string[], "team2": string[]}},
     "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "speculative"}}],
     "key_players": [{{"name": string, "team": string, "role": "bat" | "bowl" | "all", "form_note": string}}],
@@ -152,8 +156,9 @@ Return JSON with this shape:
 
 Rules:
 - The preview must clearly say it is based on historical data, not live team news.
-- Use general cricket knowledge and fixture context to estimate the match-detail panel.
-- venue_name may be set only if the venue is well-known from the fixture context in model knowledge; otherwise use null. venue_confidence must be "unknown".
+- Use general cricket knowledge and fixture context to fill in details.
+- venue_name: use your cricket knowledge to determine the likely venue for this match based on the series, teams, date, and any venue hint from the fixture API. Most international series have well-known schedules. Only use null if you truly cannot determine the venue.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format.
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
@@ -446,9 +451,12 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
     corpus = source_corpus(sources)
 
     venue_name = details.get("venue_name")
-    if not venue_name or not text_mentions(venue_name, corpus):
-        details["venue_name"] = None
-        details["venue_confidence"] = "unknown"
+    if venue_name and text_mentions(venue_name, corpus):
+        details["venue_confidence"] = "confirmed"
+    elif venue_name:
+        # AI inferred it from knowledge — keep it but mark as inferred
+        if details.get("venue_confidence") not in ("confirmed", "reported"):
+            details["venue_confidence"] = "reported"
 
     if has_squad_or_xi_context(corpus):
         possible_xi = details.get("possible_xi") or {"team1": [], "team2": []}
@@ -668,6 +676,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "match_id": match["match_id"],
         "venue_name": details.get("venue_name"),
         "venue_confidence": details.get("venue_confidence", "unknown"),
+        "toss_insight": details.get("toss_insight"),
         "possible_xi": details.get("possible_xi", {"team1": [], "team2": []}),
         "player_updates": details.get("player_updates", []),
         "key_players": details.get("key_players", []),

@@ -470,7 +470,7 @@ export function PredictDetails() {
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider">Toss Factor</h2>
               </div>
               <p className="text-sm text-gray-300 leading-relaxed">
-                {prediction.toss_insight || 'Toss analysis not available for this match.'}
+                {prediction.toss_insight || enrichment?.toss_insight || 'Toss analysis not available for this match.'}
               </p>
               <p className="text-[9px] text-gray-600 mt-2">AI analysis of venue, format & team toss tendencies</p>
             </motion.div>
