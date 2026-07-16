@@ -15,6 +15,7 @@ from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_recent_form
 from utils.db import (
+    get_client,
     get_upcoming_matches,
     store_match_enrichment,
     get_team_form_from_cache,
@@ -689,6 +690,18 @@ def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
         logger.info(f"Enriching {match['team1']} vs {match['team2']}")
         enrichment = enrich_match(match, source_limit=source_limit)
         store_match_enrichment(enrichment)
+
+        # Backfill venue on the matches table if enrichment found one
+        venue_name = enrichment.get("venue_name")
+        if venue_name and not match.get("venue"):
+            try:
+                client = get_client()
+                client.table("matches").update({"venue": venue_name}).eq(
+                    "match_id", match["match_id"]
+                ).execute()
+                logger.info(f"  Backfilled venue: {venue_name}")
+            except Exception as e:
+                logger.warning(f"  Failed to backfill venue: {e}")
 
     logger.info("Enrichment run complete")
 
