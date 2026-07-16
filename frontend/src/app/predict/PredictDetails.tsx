@@ -265,7 +265,6 @@ export function PredictDetails() {
           <span className="uppercase font-semibold text-cricket-400">{match.match_type}</span>
           <span>{espnData?.venue_name || enrichment?.venue_name || match.venue || 'TBC'}{espnData?.venue_city ? `, ${espnData.venue_city}` : ''}</span>
           <span>{new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          {espnData?.match_number && <span className="text-cricket-400/80">{espnData.match_number}</span>}
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
@@ -510,7 +509,7 @@ export function PredictDetails() {
               <p className="text-sm text-gray-300 leading-relaxed">
                 {prediction.toss_insight || enrichment?.toss_insight || 'Toss analysis not available for this match.'}
               </p>
-              <p className="text-[9px] text-gray-600 mt-2">AI analysis of venue, format & team toss tendencies</p>
+              <p className="text-[9px] text-gray-600 mt-2">AI analysis of {espnData?.venue_name || enrichment?.venue_name || match.venue || 'venue'}, format & team toss tendencies</p>
             </motion.div>
           ) : (
             <motion.div
@@ -620,7 +619,7 @@ export function PredictDetails() {
       </div>
 
       {/* 4. Venue & Match Info + Head to Head (ESPN data) */}
-      {espnData && (espnData.venue_name || espnData.officials.length > 0 || espnData.head_to_head.length > 0 || espnData.toss_winner || espnData.hours_of_play) && (
+      {espnData && (espnData.venue_name || espnData.head_to_head.length > 0 || espnData.toss_winner || espnData.series_note) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           {/* Venue Details */}
           {espnData.venue_name && (
@@ -632,7 +631,6 @@ export function PredictDetails() {
               <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1C4.5 5 2 7.5 2 10.5a6 6 0 0012 0C14 7.5 11.5 5 8 1z" /></svg>
                 Venue
-                <span className="ml-auto text-[8px] text-cricket-400/60 font-normal normal-case">ESPN Cricinfo</span>
               </h2>
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-white">{espnData.venue_name}</p>
@@ -651,9 +649,6 @@ export function PredictDetails() {
                     </span>
                   )}
                 </div>
-                {espnData.hours_of_play && (
-                  <p className="text-[9px] text-gray-500 mt-1">⏰ {espnData.hours_of_play}</p>
-                )}
                 {espnData.series_note && (
                   <p className="text-[9px] text-cricket-400/80 mt-1 italic">{espnData.series_note}</p>
                 )}
@@ -661,50 +656,58 @@ export function PredictDetails() {
             </motion.div>
           )}
 
-          {/* Match Officials */}
-          {espnData.officials.length > 0 && (
-            <motion.div
-              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
-              {...fadeUp}
-              transition={{ delay: 0.5 }}
-            >
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
-                Match Officials
-              </h2>
-              <div className="space-y-1.5">
-                {espnData.officials.map((official, i) => (
-                  <div key={i} className="flex items-center justify-between text-[10px]">
-                    <span className="text-white font-medium">{official.name}</span>
-                    <span className="text-gray-500 capitalize">{official.role}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+          {/* Series News & Recent Results */}
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
+            {...fadeUp}
+            transition={{ delay: 0.5 }}
+          >
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h12v10H2z" /><path d="M2 6h12" /><path d="M5 3v3" /></svg>
+              Series
+            </h2>
+            <div className="space-y-2">
+              {espnData.series_note && (
+                <p className="text-xs text-cricket-400 font-medium">{espnData.series_note}</p>
+              )}
+              {/* Show recent match results from ESPN scorecards */}
+              {espnData.standings.length > 0 && (
+                <div className="space-y-1 mt-1">
+                  {espnData.standings.slice(0, 4).map((team, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px] py-0.5 px-1.5 rounded bg-gray-800/30">
+                      <span className="text-white font-medium">{team.team_name}</span>
+                      <div className="flex gap-2 text-gray-400">
+                        {team.stats.matchesPlayed && <span>P:{team.stats.matchesPlayed}</span>}
+                        {team.stats.matchesWon && <span className="text-green-400">W:{team.stats.matchesWon}</span>}
+                        {team.stats.matchesLost && <span className="text-red-400">L:{team.stats.matchesLost}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Toss result if available */}
+              {espnData.toss_winner && (
+                <div className="pt-1 border-t border-gray-800/50">
+                  <p className="text-[10px] text-gray-300">
+                    <span className="text-gray-500">Toss:</span>{' '}
+                    <span className="font-medium text-white">{espnData.toss_winner}</span>
+                    {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
+                  </p>
+                </div>
+              )}
+              {!espnData.series_note && espnData.standings.length === 0 && !espnData.toss_winner && (
+                <p className="text-[10px] text-gray-500">No series data available yet</p>
+              )}
+            </div>
+          </motion.div>
 
-          {/* Toss Result (completed) + H2H */}
+          {/* Head to Head */}
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
             {...fadeUp}
             transition={{ delay: 0.55 }}
           >
-            {/* Toss Result */}
-            {espnData.toss_winner && (
-              <div className="mb-3">
-                <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
-                  Toss
-                </h2>
-                <p className="text-xs text-gray-300">
-                  <span className="font-semibold text-white">{espnData.toss_winner}</span>
-                  {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
-                </p>
-              </div>
-            )}
-
-            {/* Head to Head */}
-            {espnData.head_to_head.length > 0 && (
+            {espnData.head_to_head.length > 0 ? (
               <div>
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
@@ -729,22 +732,13 @@ export function PredictDetails() {
                   })}
                 </div>
               </div>
-            )}
-
-            {/* If neither toss nor H2H, show standings */}
-            {!espnData.toss_winner && espnData.head_to_head.length === 0 && espnData.standings.length > 0 && (
+            ) : (
               <div>
-                <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Standings</h2>
-                <div className="space-y-1">
-                  {espnData.standings.slice(0, 6).map((team, i) => (
-                    <div key={i} className="flex items-center justify-between text-[10px]">
-                      <span className="text-white font-medium">{team.team_name}</span>
-                      <span className="text-gray-400">
-                        {team.stats.matchesWon && `W:${team.stats.matchesWon}`} {team.stats.matchesLost && `L:${team.stats.matchesLost}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
+                  Head to Head
+                </h2>
+                <p className="text-[10px] text-gray-500 py-2">No recent head-to-head data available</p>
               </div>
             )}
           </motion.div>
