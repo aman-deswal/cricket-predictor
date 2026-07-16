@@ -372,26 +372,26 @@ export function PredictDetails() {
             Key Players
           </h2>
           {enrichment?.key_players?.length ? (
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-1.5">
               {enrichment.key_players.map((player, i) => {
                 const imgUrl = playerImageMap.get(player.name.toLowerCase()) || playerImageMap.get(player.name.split(' ').pop()?.toLowerCase() ?? '');
                 return (
                   <div
                     key={`${player.name}-${i}`}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50"
+                    className="flex items-center gap-1.5 p-1.5 rounded-lg bg-gray-800/30 border border-gray-800/50"
                   >
                     {imgUrl ? (
-                      <img src={imgUrl} alt={player.name} className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-700" />
+                      <img src={imgUrl} alt={player.name} className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
                     ) : (
-                      <span className="w-7 h-7 rounded-full bg-cricket-500/15 flex items-center justify-center text-cricket-400">
+                      <span className="w-7 h-7 rounded-full bg-cricket-500/15 flex items-center justify-center text-cricket-400 flex-shrink-0">
                         {player.role === 'bat' ? <BatIcon className="w-3.5 h-3.5" /> :
                          player.role === 'bowl' ? <BowlIcon className="w-3.5 h-3.5" /> :
                          <AllRounderIcon className="w-3.5 h-3.5" />}
                       </span>
                     )}
                    <div className="min-w-0 flex-1">
-                     <p className="text-xs font-semibold text-white truncate">{player.name}</p>
-                     <p className="text-[9px] text-gray-500">{player.team} · {player.form_note}</p>
+                     <p className="text-[10px] font-semibold text-white truncate">{player.name}</p>
+                     <p className="text-[8px] text-gray-500 truncate">{player.team} · {player.form_note}</p>
                    </div>
                   </div>
                 );
@@ -456,74 +456,98 @@ export function PredictDetails() {
         </motion.div>
       </div>
 
-      {/* 3. Toss Scenarios — full width */}
-      {prediction && (
-        <motion.div className="mb-4" {...fadeUp} transition={{ delay: 0.35 }}>
-          <TossImpact
-            team1={displayTeam1}
-            team2={displayTeam2}
-            team1Prob={prediction.team1_win_probability}
-            team2Prob={prediction.team2_win_probability}
-          />
-        </motion.div>
-      )}
-
-      {/* 4. Squad — full width at bottom */}
-      <motion.div
-        className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all mb-6 ${
-          squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
-        }`}
-        {...fadeUp}
-        transition={{ delay: 0.4 }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="4" r="2.5" /><circle cx="11" cy="4" r="2.5" /><path d="M1 13c0-2.2 1.8-4 4-4s4 1.8 4 4" /><path d="M8 13c0-2.2 1.3-4 3-4s3 1.8 3 4" /></svg>
-            Squad
-          </h2>
-          {squads.length > 0 && (
-            <span className="text-[9px] text-gray-500 uppercase">
-              {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
-            </span>
+      {/* 3. Toss Scenarios | Squad — side by side on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+        {/* Toss — narrower (2/5) */}
+        <div className="lg:col-span-2">
+          {prediction ? (
+            <motion.div {...fadeUp} transition={{ delay: 0.35 }}>
+              <TossImpact
+                team1={displayTeam1}
+                team2={displayTeam2}
+                team1Prob={prediction.team1_win_probability}
+                team2Prob={prediction.team2_win_probability}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 h-full"
+              {...fadeUp}
+              transition={{ delay: 0.35 }}
+            >
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Toss Scenarios</h2>
+              <p className="text-xs text-gray-500 text-center py-4">Prediction pending</p>
+            </motion.div>
           )}
         </div>
-        {squads.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {squads.map((squad) => {
-              const meta = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? team1Meta : team2Meta;
-              const teamDisplay = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? displayTeam1 : displayTeam2;
-              return (
-                <div key={squad.team}>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-4 h-4 rounded-full overflow-hidden">
-                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
-                    <span className="text-[9px] text-gray-600">({squad.players.length})</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {squad.players.slice(0, 11).map((player) => {
-                      const RoleIcon = player.is_keeper ? KeeperIcon :
-                        player.role?.includes('All') ? AllRounderIcon :
-                        player.role?.includes('Bowl') ? BowlIcon : BatIcon;
-                      return (
-                        <span key={player.id || player.name} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30 inline-flex items-center gap-1">
-                          {player.image_url ? (
-                            <img src={player.image_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                          ) : (
-                            <RoleIcon className="w-3 h-3 text-gray-500" />
-                          )}
-                          {player.name.split(' ').pop()}
-                          {player.is_captain && <CaptainIcon className="w-2.5 h-2.5 text-yellow-400" />}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+
+        {/* Squad — wider (3/5), prominent player cards */}
+        <motion.div
+          className={`lg:col-span-3 bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border transition-all ${
+            squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+          }`}
+          {...fadeUp}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="4" r="2.5" /><circle cx="11" cy="4" r="2.5" /><path d="M1 13c0-2.2 1.8-4 4-4s4 1.8 4 4" /><path d="M8 13c0-2.2 1.3-4 3-4s3 1.8 3 4" /></svg>
+              Squad
+            </h2>
+            {squads.length > 0 && (
+              <span className="text-[9px] text-gray-500 uppercase">
+                {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
+              </span>
+            )}
           </div>
-        ) : hasSquadOrXi ? (
+          {squads.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {squads.map((squad) => {
+                const meta = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? team1Meta : team2Meta;
+                const teamDisplay = squad.team.toLowerCase().includes(displayTeam1.toLowerCase()) ? displayTeam1 : displayTeam2;
+                return (
+                  <div key={squad.team}>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <div className="w-4 h-4 rounded-full overflow-hidden">
+                        <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
+                      <span className="text-[8px] text-gray-600">({squad.players.length})</span>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-1">
+                      {squad.players.slice(0, 11).map((player) => {
+                        const RoleIcon = player.is_keeper ? KeeperIcon :
+                          player.role?.includes('All') ? AllRounderIcon :
+                          player.role?.includes('Bowl') ? BowlIcon : BatIcon;
+                        return (
+                          <div
+                            key={player.id || player.name}
+                            className="flex flex-col items-center gap-0.5 p-1 rounded-md bg-gray-800/40 border border-gray-800/30"
+                          >
+                            {player.image_url ? (
+                              <img
+                                src={player.image_url}
+                                alt={player.name}
+                                className="w-8 h-8 rounded-full object-cover ring-1 ring-gray-700"
+                              />
+                            ) : (
+                              <span className="w-8 h-8 rounded-full bg-cricket-500/10 flex items-center justify-center">
+                                <RoleIcon className="w-4 h-4 text-gray-500" />
+                              </span>
+                            )}
+                            <span className="text-[8px] text-gray-300 text-center leading-tight truncate w-full">
+                              {player.name.split(' ').pop()}
+                              {player.is_captain && <CaptainIcon className="w-2 h-2 text-yellow-400 inline ml-0.5" />}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : hasSquadOrXi ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
@@ -549,7 +573,8 @@ export function PredictDetails() {
         ) : (
           <p className="text-[10px] text-gray-500 text-center py-4">Squad not available yet</p>
         )}
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }
