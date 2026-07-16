@@ -125,14 +125,14 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
               </span>
               {hot && (
                 <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30">
-                  <span className="text-[9px]">🔥</span>
+                  <svg className="w-2.5 h-2.5 text-orange-400" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0C4.5 2.5 2 4 2 7a4 4 0 108 0c0-3-2.5-4.5-4-7z" /></svg>
                   <span className="text-[9px] font-bold text-orange-300 uppercase">Hot</span>
                 </span>
               )}
             </div>
             {match.venue && (
               <span className="text-[9px] text-gray-500 pl-0.5 truncate max-w-[140px]">
-                📍 {match.venue.split(',')[0]}
+                {match.venue.split(',')[0]}
               </span>
             )}
           </div>

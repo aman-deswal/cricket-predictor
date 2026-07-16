@@ -72,7 +72,7 @@ export default function HomePage() {
             animate={{ rotate: [0, -10, 10, 0] }}
             transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
           >
-            🏏
+            —
           </motion.p>
           <p className="text-lg font-medium text-gray-400">No upcoming matches</p>
           <p className="mt-1 text-sm">Check back later for new fixtures</p>

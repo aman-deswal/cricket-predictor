@@ -248,105 +248,77 @@ export function PredictDetails() {
           transition={{ delay: 0.4 }}
         >
           <span className="uppercase font-semibold text-cricket-400">{match.match_type}</span>
-          <span>📍 {enrichment?.venue_name || match.venue || 'TBC'}</span>
+          <span>{enrichment?.venue_name || match.venue || 'TBC'}</span>
           <span>{new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
 
-      {/* 1. Sportsbook Odds — full width, right below hero */}
-      <motion.div
-        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
-        {...fadeUp}
-        transition={{ delay: 0.22 }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider">📊 Sportsbook Odds</h2>
-          {odds.length > 0 && <span className="text-[9px] text-gray-500">{odds.length} bookmakers</span>}
-        </div>
-        {odds.length > 0 ? (
-          <div className="space-y-2">
-            {odds.slice(0, 4).map((o) => {
-              const aiProb1 = prediction?.team1_win_probability;
-              const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
-              const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
-              const isValue1 = diff1 && Number(diff1) > 10;
-              const isValue2 = diff1 && Number(diff1) < -10;
-
-              return (
-                <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30">
-                  <span className="text-[10px] text-gray-400 font-medium w-20 truncate">{o.bookmaker}</span>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
-                      {decimalToAmerican(o.team1_odds)}
-                      {isValue1 && <span className="ml-1 text-[8px]">🔥</span>}
-                    </span>
-                    <span className="text-gray-700 text-[10px]">|</span>
-                    <span className={`text-xs font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
-                      {decimalToAmerican(o.team2_odds)}
-                      {isValue2 && <span className="ml-1 text-[8px]">🔥</span>}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-            <p className="text-[9px] text-gray-600 text-center mt-1">
-              🔥 = Disagrees with market &gt;10%
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
-        )}
-      </motion.div>
-
-      {/* 2. Key Players | Reasoning — side by side */}
+      {/* 1. Sportsbook Odds | Reasoning — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Key Players */}
-        {enrichment && enrichment.key_players && enrichment.key_players.length > 0 ? (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.28 }}
-          >
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">🔥 Key Players</h2>
+        {/* Sportsbook Odds */}
+        <motion.div
+          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
+            odds.length > 0 ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+          }`}
+          {...fadeUp}
+          transition={{ delay: 0.22 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
+              Sportsbook Odds
+            </h2>
+            {odds.length > 0 && <span className="text-[9px] text-gray-500">{odds.length} bookmakers</span>}
+          </div>
+          {odds.length > 0 ? (
             <div className="space-y-2">
-              {enrichment.key_players.map((player, i) => {
-                const roleIcon = player.role === 'bat' ? '🏏' : player.role === 'bowl' ? '🎳' : '⭐';
+              {odds.slice(0, 4).map((o) => {
+                const aiProb1 = prediction?.team1_win_probability;
+                const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
+                const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
+                const isValue1 = diff1 && Number(diff1) > 10;
+                const isValue2 = diff1 && Number(diff1) < -10;
+
                 return (
-                  <div
-                    key={`${player.name}-${i}`}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50"
-                  >
-                    <span className="text-sm">{roleIcon}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">{player.name}</p>
-                      <p className="text-[9px] text-gray-500">{player.team} · {player.form_note}</p>
+                  <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30">
+                    <span className="text-[10px] text-gray-400 font-medium w-20 truncate">{o.bookmaker}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
+                        {decimalToAmerican(o.team1_odds)}
+                        {isValue1 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
+                      </span>
+                      <span className="text-gray-700 text-[10px]">|</span>
+                      <span className={`text-xs font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
+                        {decimalToAmerican(o.team2_odds)}
+                        {isValue2 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
+                      </span>
                     </div>
                   </div>
                 );
               })}
+              <p className="text-[9px] text-gray-600 text-center mt-1">
+                ↑ Value — diverges from market &gt;10%
+              </p>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
-            {...fadeUp}
-            transition={{ delay: 0.28 }}
-          >
-            <p className="text-xs text-gray-500">Key player data loading...</p>
-          </motion.div>
-        )}
+          ) : (
+            <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
+          )}
+        </motion.div>
 
         {/* Reasoning */}
         {prediction ? (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
             {...fadeUp}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.25 }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
-              <motion.span
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
+                Reasoning
+              </h2>
+              <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                   prediction.confidence === 'high'
                     ? 'bg-emerald-500/20 text-emerald-300'
@@ -356,7 +328,7 @@ export function PredictDetails() {
                 }`}
               >
                 {prediction.confidence} confidence
-              </motion.span>
+              </span>
             </div>
             <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
             <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
@@ -367,92 +339,130 @@ export function PredictDetails() {
         ) : (
           <motion.div
             {...fadeUp}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex flex-col items-center justify-center text-center"
+            transition={{ delay: 0.25 }}
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 flex flex-col items-center justify-center text-center"
           >
-            <span className="text-3xl mb-2">🏏</span>
-            <p className="text-sm font-semibold text-cricket-300">Prediction Pending</p>
-            <p className="text-gray-500 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
+            <p className="text-sm font-semibold text-gray-500">Prediction Pending</p>
+            <p className="text-gray-600 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
           </motion.div>
         )}
       </div>
 
-      {/* 3. Research Notes | Toss Scenarios — side by side */}
+      {/* 2. Key Players | Research Notes — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Research Notes */}
-        {enrichment ? (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.35 }}
-          >
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Research Notes</h2>
-
-            {enrichment.expert_preview && (
-              <p className="text-xs text-gray-300 leading-relaxed mb-3">{enrichment.expert_preview}</p>
-            )}
-
-            {enrichment.player_updates.length > 0 && (
-              <div className="space-y-1.5 mb-3">
-                {enrichment.player_updates.slice(0, 4).map((update, index) => (
-                  <div
-                    key={`${update.player ?? 'update'}-${index}`}
-                    className="rounded-md bg-gray-800/30 border border-gray-800/50 px-2 py-1.5 text-[10px]"
-                  >
-                    <span className="font-medium text-white">{update.player ?? update.team ?? 'Update'}:</span>{' '}
-                    <span className="text-gray-400">{update.status}</span>
+        {/* Key Players */}
+        <motion.div
+          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
+            enrichment?.key_players?.length ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+          }`}
+          {...fadeUp}
+          transition={{ delay: 0.28 }}
+        >
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
+            Key Players
+          </h2>
+          {enrichment?.key_players?.length ? (
+            <div className="space-y-2">
+              {enrichment.key_players.map((player, i) => (
+                <div
+                  key={`${player.name}-${i}`}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50"
+                >
+                  <span className="w-5 h-5 rounded-full bg-cricket-500/20 flex items-center justify-center text-[9px] font-bold text-cricket-300">
+                    {player.role === 'bat' ? 'B' : player.role === 'bowl' ? 'W' : 'A'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white truncate">{player.name}</p>
+                    <p className="text-[9px] text-gray-500">{player.team} · {player.form_note}</p>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 text-center py-4">Key player data not available</p>
+          )}
+        </motion.div>
 
-            {enrichment.source_links.length > 0 && (
-              <div className="space-y-1">
-                {enrichment.source_links.slice(0, 3).map((source, index) => (
-                  <a
-                    key={`${source.url ?? source.title}-${index}`}
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block text-[10px] text-cricket-400 hover:text-cricket-300 truncate"
-                  >
-                    [{index + 1}] {source.source}: {source.title}
-                  </a>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
-            {...fadeUp}
-            transition={{ delay: 0.35 }}
-          >
-            <p className="text-[10px] text-gray-500">Research data loading...</p>
-          </motion.div>
-        )}
+        {/* Research Notes */}
+        <motion.div
+          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
+            enrichment ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+          }`}
+          {...fadeUp}
+          transition={{ delay: 0.3 }}
+        >
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="1" width="10" height="14" rx="1" /><line x1="5" y1="5" x2="11" y2="5" /><line x1="5" y1="8" x2="11" y2="8" /><line x1="5" y1="11" x2="9" y2="11" /></svg>
+            Research Notes
+          </h2>
+          {enrichment ? (
+            <>
+              {enrichment.expert_preview && (
+                <p className="text-xs text-gray-300 leading-relaxed mb-3">{enrichment.expert_preview}</p>
+              )}
 
-        {/* Toss Scenarios */}
-        {prediction && (
-          <motion.div {...fadeUp} transition={{ delay: 0.38 }}>
-            <TossImpact
-              team1={displayTeam1}
-              team2={displayTeam2}
-              team1Prob={prediction.team1_win_probability}
-              team2Prob={prediction.team2_win_probability}
-            />
-          </motion.div>
-        )}
+              {enrichment.player_updates.length > 0 && (
+                <div className="space-y-1.5 mb-3">
+                  {enrichment.player_updates.slice(0, 4).map((update, index) => (
+                    <div
+                      key={`${update.player ?? 'update'}-${index}`}
+                      className="rounded-md bg-gray-800/30 border border-gray-800/50 px-2 py-1.5 text-[10px]"
+                    >
+                      <span className="font-medium text-white">{update.player ?? update.team ?? 'Update'}:</span>{' '}
+                      <span className="text-gray-400">{update.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {enrichment.source_links.length > 0 && (
+                <div className="space-y-1">
+                  {enrichment.source_links.slice(0, 3).map((source, index) => (
+                    <a
+                      key={`${source.url ?? source.title}-${index}`}
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-[10px] text-cricket-400 hover:text-cricket-300 truncate"
+                    >
+                      [{index + 1}] {source.source}: {source.title}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-gray-500 text-center py-4">Research data not available</p>
+          )}
+        </motion.div>
       </div>
+
+      {/* 3. Toss Scenarios — full width */}
+      {prediction && (
+        <motion.div className="mb-4" {...fadeUp} transition={{ delay: 0.35 }}>
+          <TossImpact
+            team1={displayTeam1}
+            team2={displayTeam2}
+            team1Prob={prediction.team1_win_probability}
+            team2Prob={prediction.team2_win_probability}
+          />
+        </motion.div>
+      )}
 
       {/* 4. Squad — full width at bottom */}
       <motion.div
-        className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-6"
+        className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all mb-6 ${
+          squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+        }`}
         {...fadeUp}
         transition={{ delay: 0.4 }}
       >
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider">Squad</h2>
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="4" r="2.5" /><circle cx="11" cy="4" r="2.5" /><path d="M1 13c0-2.2 1.8-4 4-4s4 1.8 4 4" /><path d="M8 13c0-2.2 1.3-4 3-4s3 1.8 3 4" /></svg>
+            Squad
+          </h2>
           {squads.length > 0 && (
             <span className="text-[9px] text-gray-500 uppercase">
               {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
@@ -475,13 +485,13 @@ export function PredictDetails() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {squad.players.slice(0, 11).map((player) => {
-                      const roleIcon = player.is_keeper ? '🧤' :
-                        player.role?.includes('All') ? '⚡' :
-                        player.role?.includes('Bowl') ? '🎳' : '🏏';
+                      const roleLabel = player.is_keeper ? 'WK' :
+                        player.role?.includes('All') ? 'AR' :
+                        player.role?.includes('Bowl') ? 'BWL' : 'BAT';
                       return (
                         <span key={player.id || player.name} className="text-[9px] text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30">
-                          {roleIcon} {player.name.split(' ').pop()}
-                          {player.is_captain && <span className="text-yellow-400">(C)</span>}
+                          <span className="text-[7px] text-gray-600 mr-0.5">{roleLabel}</span> {player.name.split(' ').pop()}
+                          {player.is_captain && <span className="text-yellow-400 ml-0.5">(C)</span>}
                         </span>
                       );
                     })}
@@ -514,7 +524,7 @@ export function PredictDetails() {
             ))}
           </div>
         ) : (
-          <p className="text-[10px] text-gray-500">Squad not available yet</p>
+          <p className="text-[10px] text-gray-500 text-center py-4">Squad not available yet</p>
         )}
       </motion.div>
     </div>
