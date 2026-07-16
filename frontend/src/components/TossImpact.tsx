@@ -28,22 +28,22 @@ export function TossImpact({ team1, team2, team1Prob, team2Prob }: TossImpactPro
   const scenarios = [
     {
       label: `${team1Meta.shortName} wins toss → Bat`,
-      icon: '🏏',
+      icon: 'BAT',
       p1: adjust(team1Prob, TOSS_MODIFIERS.bat_first),
     },
     {
       label: `${team1Meta.shortName} wins toss → Bowl`,
-      icon: '🎳',
+      icon: 'BWL',
       p1: adjust(team1Prob, TOSS_MODIFIERS.bowl_first),
     },
     {
       label: `${team2Meta.shortName} wins toss → Bat`,
-      icon: '🏏',
+      icon: 'BAT',
       p1: adjust(team1Prob, -TOSS_MODIFIERS.bat_first),
     },
     {
       label: `${team2Meta.shortName} wins toss → Bowl`,
-      icon: '🎳',
+      icon: 'BWL',
       p1: adjust(team1Prob, -TOSS_MODIFIERS.bowl_first),
     },
   ].map(s => ({ ...s, p2: Math.max(0.05, Math.min(0.95, 1 - s.p1)) }));
@@ -56,7 +56,7 @@ export function TossImpact({ team1, team2, team1Prob, team2Prob }: TossImpactPro
       transition={{ delay: 0.2 }}
     >
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm">🪙</span>
+        <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
         <h2 className="text-xs font-bold text-white uppercase tracking-wider">Toss Scenarios</h2>
       </div>
 
@@ -71,7 +71,7 @@ export function TossImpact({ team1, team2, team1Prob, team2Prob }: TossImpactPro
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 + i * 0.05 }}
             >
-              <span className="text-xs">{s.icon}</span>
+              <span className="text-[9px] font-bold text-gray-500 w-6">{s.icon}</span>
               <span className="text-[10px] text-gray-400 flex-1 min-w-0 truncate">{s.label}</span>
 
               {/* Probability bar */}

@@ -96,6 +96,7 @@ export interface SquadPlayer {
   bowling_style?: string;
   is_captain?: boolean;
   is_keeper?: boolean;
+  image_url?: string;
 }
 
 export interface MatchSquad {
