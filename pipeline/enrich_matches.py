@@ -114,7 +114,7 @@ Return JSON with this shape:
 
 Rules:
 - Do not invent injuries, availability, squads, or playing XIs.
-- For venue_name: use the venue from sources if mentioned. If not in sources but you know the venue from general cricket knowledge (e.g. a well-known series schedule), provide it with confidence "reported". Only use null if you truly cannot determine the venue.
+- For venue_name: use the venue from sources if mentioned. Do NOT guess venues from general knowledge — venue data comes from ESPN Cricinfo separately. Only use a venue that is explicitly stated in the source text. Use null if no source mentions the venue.
 - toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions.
 - If sources do not support a field, use null, empty arrays, or say that no reliable update was found.
 - Keep expert_preview to 3-5 sentences and mention uncertainty when sources are thin.
@@ -162,7 +162,7 @@ Return JSON with this shape:
 Rules:
 - The preview must clearly say it is based on historical data, not live team news.
 - Use general cricket knowledge and fixture context to fill in details.
-- venue_name: use your cricket knowledge to determine the likely venue for this match based on the series, teams, date, and any venue hint from the fixture API. Most international series have well-known schedules. Only use null if you truly cannot determine the venue.
+- venue_name: ONLY use a venue if the fixture API field already contains one. Do NOT guess or infer venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if the fixture API field is empty.
 - toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format.
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
@@ -458,9 +458,9 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
     if venue_name and text_mentions(venue_name, corpus):
         details["venue_confidence"] = "confirmed"
     elif venue_name:
-        # AI inferred it from knowledge — keep it but mark as inferred
-        if details.get("venue_confidence") not in ("confirmed", "reported"):
-            details["venue_confidence"] = "reported"
+        # AI inferred it without source backing — null it out
+        details["venue_name"] = None
+        details["venue_confidence"] = "unknown"
 
     if has_squad_or_xi_context(corpus):
         possible_xi = details.get("possible_xi") or {"team1": [], "team2": []}
@@ -696,6 +696,12 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     else:
         details = build_data_backed_details(match)
 
+    # Overlay ESPN-verified venue if available (never trust AI for venues)
+    espn_venue = _get_espn_venue(match.get("match_id", ""))
+    if espn_venue:
+        details["venue_name"] = espn_venue
+        details["venue_confidence"] = "confirmed"
+
     return {
         "match_id": match["match_id"],
         "venue_name": details.get("venue_name"),
@@ -709,6 +715,20 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "confidence": details.get("confidence", "low"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _get_espn_venue(match_id: str) -> Optional[str]:
+    """Look up ESPN-verified venue for a match from espn_match_data table."""
+    if not match_id:
+        return None
+    try:
+        client = get_client()
+        r = client.table("espn_match_data").select("venue_name").eq("match_id", match_id).execute()
+        if r.data and r.data[0].get("venue_name"):
+            return r.data[0]["venue_name"]
+    except Exception:
+        pass
+    return None
 
 
 def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
