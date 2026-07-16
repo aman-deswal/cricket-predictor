@@ -21,7 +21,17 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
     { name: team2, value: team2Prob * 100 },
   ];
 
-  const COLORS = [team1Meta.primaryColor, team2Meta.primaryColor];
+  // Ensure chart colors are visually distinct — if primary colors are too similar, use secondary
+  const colorDistance = (c1: string, c2: string) => {
+    const hex = (s: string) => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+    const [r1,g1,b1] = hex(c1);
+    const [r2,g2,b2] = hex(c2);
+    return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+  };
+  const c1 = team1Meta.primaryColor;
+  const c2raw = team2Meta.primaryColor;
+  const c2 = colorDistance(c1, c2raw) < 80 ? team2Meta.secondaryColor : c2raw;
+  const COLORS = [c1, c2];
   const winner = team1Prob > team2Prob ? team1 : team2;
   const winnerProb = Math.max(team1Prob, team2Prob);
 
