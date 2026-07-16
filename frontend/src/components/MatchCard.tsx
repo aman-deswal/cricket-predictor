@@ -111,22 +111,23 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
           ? 'border-amber-500/60 group-hover:border-amber-400/80'
           : 'border-cricket-800/50 group-hover:border-cricket-600/50'
       }`}>
-        {/* Hot badge */}
-        {hot && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30">
-            <span className="text-[9px]">🔥</span>
-            <span className="text-[9px] font-bold text-orange-300 uppercase">Hot</span>
-          </div>
-        )}
         {/* Subtle shimmer */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
 
         {/* Header: match type + time + venue */}
         <div className="flex justify-between items-start mb-3">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-semibold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 w-fit">
-              {match.match_type}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-semibold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 w-fit">
+                {match.match_type}
+              </span>
+              {hot && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30">
+                  <span className="text-[9px]">🔥</span>
+                  <span className="text-[9px] font-bold text-orange-300 uppercase">Hot</span>
+                </span>
+              )}
+            </div>
             {match.venue && (
               <span className="text-[9px] text-gray-500 pl-0.5 truncate max-w-[140px]">
                 📍 {match.venue.split(',')[0]}
