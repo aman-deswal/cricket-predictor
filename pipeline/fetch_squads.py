@@ -62,6 +62,7 @@ def normalize_player(player: dict) -> dict:
         "bowling_style": player.get("bowlingStyle", ""),
         "is_captain": player.get("isCaptain", False),
         "is_keeper": player.get("isKeeper", False),
+        "image_url": player.get("playerImg", ""),
     }
 
 
