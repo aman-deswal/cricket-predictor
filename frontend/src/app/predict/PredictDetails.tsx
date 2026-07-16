@@ -122,10 +122,10 @@ export function PredictDetails() {
   const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <motion.div
-        className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 mb-6 overflow-hidden"
+        className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -133,7 +133,7 @@ export function PredictDetails() {
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-cricket-500/10 blur-3xl rounded-full" />
 
-        <div className="relative flex items-center justify-between gap-2">
+        <div className="relative flex items-center justify-between gap-4 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
           <motion.div
             className="flex-1 text-center"
@@ -142,7 +142,7 @@ export function PredictDetails() {
             transition={{ delay: 0.2 }}
           >
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
+              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
               style={{ ['--tw-ring-color' as string]: team1Meta.primaryColor }}
               whileHover={{ scale: 1.1 }}
             >
@@ -153,7 +153,7 @@ export function PredictDetails() {
                 className="w-full h-full object-cover"
               />
             </motion.div>
-            <h2 className="text-base sm:text-lg font-bold text-white">{team1Meta.shortName}</h2>
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team1Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {(match.team1_recent_form?.length ?? 0) > 0 && (
               <div className="flex justify-center gap-0.5 mt-1">
@@ -163,7 +163,7 @@ export function PredictDetails() {
               </div>
             )}
             {prediction && (
-              <p className="text-lg sm:text-2xl font-black text-cricket-300 mt-1">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-black text-cricket-300 mt-1">
                 {(prediction.team1_win_probability * 100).toFixed(0)}%
               </p>
             )}
@@ -182,7 +182,7 @@ export function PredictDetails() {
             transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
           >
             {prediction ? (
-              <div className="w-20 h-20 sm:w-28 sm:h-28">
+              <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36">
                 <PredictionChart
                   team1={prediction.team1}
                   team2={prediction.team2}
@@ -207,7 +207,7 @@ export function PredictDetails() {
             transition={{ delay: 0.2 }}
           >
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
+              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
               style={{ ['--tw-ring-color' as string]: team2Meta.primaryColor }}
               whileHover={{ scale: 1.1 }}
             >
@@ -218,7 +218,7 @@ export function PredictDetails() {
                 className="w-full h-full object-cover"
               />
             </motion.div>
-            <h2 className="text-base sm:text-lg font-bold text-white">{team2Meta.shortName}</h2>
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team2Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {(match.team2_recent_form?.length ?? 0) > 0 && (
               <div className="flex justify-center gap-0.5 mt-1">
@@ -228,7 +228,7 @@ export function PredictDetails() {
               </div>
             )}
             {prediction && (
-              <p className="text-lg sm:text-2xl font-black text-cricket-300 mt-1">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-black text-cricket-300 mt-1">
                 {(prediction.team2_win_probability * 100).toFixed(0)}%
               </p>
             )}
