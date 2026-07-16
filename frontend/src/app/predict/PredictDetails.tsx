@@ -238,23 +238,87 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
-      {/* Toss Impact Simulator */}
+      {/* Toss Scenarios — full width, important context */}
       {prediction && (
-        <TossImpact
-          team1={displayTeam1}
-          team2={displayTeam2}
-          team1Prob={prediction.team1_win_probability}
-          team2Prob={prediction.team2_win_probability}
-        />
+        <motion.div className="mb-4" {...fadeUp} transition={{ delay: 0.22 }}>
+          <TossImpact
+            team1={displayTeam1}
+            team2={displayTeam2}
+            team1Prob={prediction.team1_win_probability}
+            team2Prob={prediction.team2_win_probability}
+          />
+        </motion.div>
       )}
 
-      {/* Form + Odds + Key Players — side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      {/* Reasoning — full width center, most important after hero */}
+      {prediction ? (
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
+          {...fadeUp}
+          transition={{ delay: 0.25 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
+            <motion.span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                prediction.confidence === 'high'
+                  ? 'bg-emerald-500/20 text-emerald-300'
+                  : prediction.confidence === 'medium'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-red-500/20 text-red-300'
+              }`}
+            >
+              {prediction.confidence} confidence
+            </motion.span>
+          </div>
+          <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
+
+          {/* Form-based context (ground truth from stats_cache) */}
+          {((match.team1_recent_form?.length ?? 0) > 0 || (match.team2_recent_form?.length ?? 0) > 0) && (
+            <div className="mb-3 p-2 rounded-lg bg-gray-800/30 border border-gray-700/40">
+              <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">📊 Actual Form (last 10)</p>
+              <div className="flex flex-wrap gap-4 text-[10px]">
+                {[
+                  { team: displayTeam1, form: match.team1_recent_form },
+                  { team: displayTeam2, form: match.team2_recent_form },
+                ].map(({ team, form }) => {
+                  const recent = (form ?? []).slice(-10);
+                  const wins = recent.filter(r => r === 'W').length;
+                  const pct = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
+                  return pct !== null ? (
+                    <span key={team} className="text-gray-400">
+                      <span className="font-medium text-white">{getTeamMeta(team).shortName}:</span> {pct}% ({wins}W/{recent.length - wins}L)
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
+            <span>Model: {prediction.model}</span>
+            <span>Ensemble: {prediction.ensemble_size}x</span>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          {...fadeUp}
+          transition={{ delay: 0.25 }}
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex flex-col items-center justify-center text-center mb-4"
+        >
+          <span className="text-3xl mb-2">🏏</span>
+          <p className="text-sm font-semibold text-cricket-300">Prediction Pending</p>
+          <p className="text-gray-500 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
+        </motion.div>
+      )}
+
+      {/* Form + Sportsbook Odds — side by side on desktop, stacked on mobile */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Form & Our Odds */}
         <motion.div
           className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
           {...fadeUp}
-          transition={{ delay: 0.25 }}
+          transition={{ delay: 0.28 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">Recent Form</h2>
@@ -314,12 +378,51 @@ export function PredictDetails() {
             })}
           </div>
         </motion.div>
+      </div>
+
+      {/* Key Players + Sportsbook Odds — side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Key Players */}
+        {enrichment && enrichment.key_players && enrichment.key_players.length > 0 ? (
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
+            {...fadeUp}
+            transition={{ delay: 0.32 }}
+          >
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">🔥 Key Players</h2>
+            <div className="space-y-2">
+              {enrichment.key_players.map((player, i) => {
+                const roleIcon = player.role === 'bat' ? '🏏' : player.role === 'bowl' ? '🎳' : '⭐';
+                return (
+                  <div
+                    key={`${player.name}-${i}`}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50"
+                  >
+                    <span className="text-sm">{roleIcon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-white truncate">{player.name}</p>
+                      <p className="text-[9px] text-gray-500">{player.team} · {player.form_note}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
+            {...fadeUp}
+            transition={{ delay: 0.32 }}
+          >
+            <p className="text-xs text-gray-500">Key player data loading...</p>
+          </motion.div>
+        )}
 
         {/* Sportsbook Odds */}
         <motion.div
           className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
           {...fadeUp}
-          transition={{ delay: 0.28 }}
+          transition={{ delay: 0.35 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">📊 Sportsbook Odds</h2>
@@ -361,110 +464,8 @@ export function PredictDetails() {
         </motion.div>
       </div>
 
-      {/* Prediction reasoning + Key Players — side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Reasoning */}
-        {prediction ? (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.3 }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
-              <motion.span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                  prediction.confidence === 'high'
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : prediction.confidence === 'medium'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'bg-red-500/20 text-red-300'
-                }`}
-              >
-                {prediction.confidence} confidence
-              </motion.span>
-            </div>
-            <p className="text-sm text-gray-300 leading-relaxed mb-3">{prediction.reasoning}</p>
-
-            {/* Form-based context (ground truth from stats_cache) */}
-            {((match.team1_recent_form?.length ?? 0) > 0 || (match.team2_recent_form?.length ?? 0) > 0) && (
-              <div className="mb-3 p-2 rounded-lg bg-gray-800/30 border border-gray-700/40">
-                <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">📊 Actual Form (last 10)</p>
-                <div className="flex gap-4 text-[10px]">
-                  {[
-                    { team: displayTeam1, form: match.team1_recent_form },
-                    { team: displayTeam2, form: match.team2_recent_form },
-                  ].map(({ team, form }) => {
-                    const recent = (form ?? []).slice(-10);
-                    const wins = recent.filter(r => r === 'W').length;
-                    const pct = recent.length > 0 ? Math.round((wins / recent.length) * 100) : null;
-                    return pct !== null ? (
-                      <span key={team} className="text-gray-400">
-                        <span className="font-medium text-white">{getTeamMeta(team).shortName}:</span> {pct}% ({wins}W/{recent.length - wins}L)
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between text-[9px] text-gray-600 pt-2 border-t border-gray-800/30">
-              <span>Model: {prediction.model}</span>
-              <span>Ensemble: {prediction.ensemble_size}x</span>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            {...fadeUp}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex flex-col items-center justify-center text-center"
-          >
-            <span className="text-3xl mb-2">🏏</span>
-            <p className="text-sm font-semibold text-cricket-300">Prediction Pending</p>
-            <p className="text-gray-500 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
-          </motion.div>
-        )}
-
-        {/* Key Players */}
-        {enrichment && enrichment.key_players && enrichment.key_players.length > 0 ? (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.35 }}
-          >
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">🔥 Key Players</h2>
-            <div className="space-y-2">
-              {enrichment.key_players.map((player, i) => {
-                const playerMeta = player.team === displayTeam1 ? team1Meta : team2Meta;
-                const roleIcon = player.role === 'bat' ? '🏏' : player.role === 'bowl' ? '🎳' : '⭐';
-                return (
-                  <div
-                    key={`${player.name}-${i}`}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50"
-                  >
-                    <span className="text-sm">{roleIcon}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">{player.name}</p>
-                      <p className="text-[9px] text-gray-500">{player.team} · {player.form_note}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 flex items-center justify-center"
-            {...fadeUp}
-            transition={{ delay: 0.35 }}
-          >
-            <p className="text-xs text-gray-500">Key player data loading...</p>
-          </motion.div>
-        )}
-      </div>
-
       {/* Squad + Research Notes — side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Squad */}
         <motion.div
           className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
