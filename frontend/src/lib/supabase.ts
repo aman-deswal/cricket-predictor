@@ -28,6 +28,7 @@ export interface Prediction {
   team2_win_probability: number;
   confidence: 'low' | 'medium' | 'high';
   reasoning: string;
+  toss_insight?: string;
   model: string;
   ensemble_size: number;
   scored_at?: string;

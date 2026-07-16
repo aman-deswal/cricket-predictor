@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
-import { TossImpact } from '@/components/TossImpact';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon } from '@/components/CricketIcons';
 
 function toAmericanOdds(probability: number): string {
@@ -456,26 +455,32 @@ export function PredictDetails() {
         </motion.div>
       </div>
 
-      {/* 3. Toss Scenarios | Squad — side by side on desktop */}
+      {/* 3. Toss Insight | Squad — side by side on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
-        {/* Toss — narrower (2/5) */}
+        {/* Toss — AI-generated insight (2/5) */}
         <div className="lg:col-span-2">
           {prediction ? (
-            <motion.div {...fadeUp} transition={{ delay: 0.35 }}>
-              <TossImpact
-                team1={displayTeam1}
-                team2={displayTeam2}
-                team1Prob={prediction.team1_win_probability}
-                team2Prob={prediction.team2_win_probability}
-              />
-            </motion.div>
-          ) : (
             <motion.div
-              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 h-full"
+              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30 h-full flex flex-col justify-center"
               {...fadeUp}
               transition={{ delay: 0.35 }}
             >
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Toss Scenarios</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider">Toss Factor</h2>
+              </div>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                {prediction.toss_insight || 'Toss analysis not available for this match.'}
+              </p>
+              <p className="text-[9px] text-gray-600 mt-2">AI analysis of venue, format & team toss tendencies</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-gray-800/20 opacity-50 h-full"
+              {...fadeUp}
+              transition={{ delay: 0.35 }}
+            >
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Toss Factor</h2>
               <p className="text-xs text-gray-500 text-center py-4">Prediction pending</p>
             </motion.div>
           )}
