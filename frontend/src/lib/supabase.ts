@@ -250,7 +250,7 @@ function isFutureMatch(match: Match): boolean {
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
-  const [{ data, error }, { data: statsData }, { data: enrichmentData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
@@ -263,11 +263,18 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     supabase
       .from('match_enrichment')
       .select('match_id, venue_name'),
+    supabase
+      .from('espn_match_data')
+      .select('match_id, venue_name'),
   ]);
 
   if (error) throw error;
 
-  // Build venue lookup from enrichment
+  // Build venue lookups (ESPN takes priority over enrichment)
+  const espnVenue = new Map<string, string>();
+  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
+    if (e.venue_name) espnVenue.set(e.match_id, e.venue_name);
+  });
   const enrichmentVenue = new Map<string, string>();
   (enrichmentData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
     if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
@@ -289,8 +296,8 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     const statsMatchType = getStatsMatchType(match.match_type);
     return {
       ...match,
-      // Backfill venue from enrichment if the match has none
-      venue: match.venue || enrichmentVenue.get(match.match_id) || '',
+      // Backfill venue: ESPN > enrichment > original
+      venue: match.venue || espnVenue.get(match.match_id) || enrichmentVenue.get(match.match_id) || '',
       team1_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [],
       team2_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [],
     };
@@ -376,6 +383,111 @@ export async function getMatchSquads(matchId: string): Promise<MatchSquad[]> {
 
   if (error) return [];
   return data ?? [];
+}
+
+// ---------- ESPN Cricinfo Data ----------
+
+export interface ESPNVenue {
+  name: string;
+  city: string;
+  country: string;
+  capacity: number | null;
+  grass: boolean | null;
+  image_url: string | null;
+}
+
+export interface ESPNOfficial {
+  name: string;
+  role: string;
+}
+
+export interface ESPNRosterPlayer {
+  name: string;
+  espn_id: string;
+  position: string;
+  position_abbr: string;
+  headshot_url: string;
+}
+
+export interface ESPNRoster {
+  team_name: string;
+  team_abbr: string;
+  team_logo: string;
+  players: ESPNRosterPlayer[];
+}
+
+export interface ESPNH2HTeam {
+  name: string;
+  abbreviation: string;
+  score: string;
+  winner: boolean;
+}
+
+export interface ESPNH2HGame {
+  date: string;
+  teams: ESPNH2HTeam[];
+}
+
+export interface ESPNStanding {
+  team_name: string;
+  team_abbr: string;
+  stats: Record<string, string>;
+}
+
+export interface ESPNMatchData {
+  match_id: string;
+  espn_event_id: string | null;
+  // Venue
+  venue_name: string | null;
+  venue_city: string | null;
+  venue_country: string | null;
+  venue_capacity: number | null;
+  venue_grass: boolean | null;
+  venue_image_url: string | null;
+  // Toss
+  toss_winner: string | null;
+  toss_decision: string | null;
+  // Schedule
+  match_number: string | null;
+  match_days: string | null;
+  hours_of_play: string | null;
+  series_note: string | null;
+  // JSON fields
+  officials: ESPNOfficial[];
+  rosters: ESPNRoster[];
+  head_to_head: ESPNH2HGame[];
+  standings: ESPNStanding[];
+  scorecards: unknown[];
+  // Metadata
+  fetched_at: string | null;
+}
+
+export async function getESPNMatchData(matchId: string): Promise<ESPNMatchData | null> {
+  const { data, error } = await supabase
+    .from('espn_match_data')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error || !data) return null;
+
+  // Parse JSON fields that may come as strings
+  const parseJSON = (val: unknown): unknown[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return []; }
+    }
+    return [];
+  };
+
+  return {
+    ...data,
+    officials: parseJSON(data.officials) as ESPNOfficial[],
+    rosters: parseJSON(data.rosters) as ESPNRoster[],
+    head_to_head: parseJSON(data.head_to_head) as ESPNH2HGame[],
+    standings: parseJSON(data.standings) as ESPNStanding[],
+    scorecards: parseJSON(data.scorecards),
+  };
 }
 
 export async function getPlayerStats(playerNames: string[], format: string): Promise<PlayerStats[]> {
