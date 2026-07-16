@@ -123,7 +123,7 @@ export function PredictDetails() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Hero: Teams + AI Prediction (replaces VS with chart) */}
+      {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <motion.div
         className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 mb-6 overflow-hidden"
         initial={{ opacity: 0, scale: 0.95 }}
@@ -188,7 +188,7 @@ export function PredictDetails() {
                 <span className="text-xs font-black text-cricket-400 uppercase">VS</span>
               </div>
             )}
-            <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">AI Prediction</span>
+            <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">Prediction</span>
           </motion.div>
 
           {/* Team 2 */}
@@ -250,7 +250,7 @@ export function PredictDetails() {
 
       {/* Form + Odds + Key Players — side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Form & AI Odds */}
+        {/* Form & Our Odds */}
         <motion.div
           className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
           {...fadeUp}
@@ -258,7 +258,7 @@ export function PredictDetails() {
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">Recent Form</h2>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cricket-500/20 text-cricket-300 font-semibold border border-cricket-500/30">AI Odds</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cricket-500/20 text-cricket-300 font-semibold border border-cricket-500/30">Our Odds</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
@@ -352,7 +352,7 @@ export function PredictDetails() {
                 );
               })}
               <p className="text-[9px] text-gray-600 text-center mt-1">
-                🔥 = AI disagrees with market &gt;10%
+                🔥 = Disagrees with market &gt;10%
               </p>
             </div>
           ) : (
@@ -363,7 +363,7 @@ export function PredictDetails() {
 
       {/* Prediction reasoning + Key Players — side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* AI Reasoning */}
+        {/* Reasoning */}
         {prediction ? (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
@@ -371,7 +371,7 @@ export function PredictDetails() {
             transition={{ delay: 0.3 }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider">AI Reasoning</h2>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Reasoning</h2>
               <motion.span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                   prediction.confidence === 'high'

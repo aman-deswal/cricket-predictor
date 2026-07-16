@@ -13,7 +13,14 @@ export default function HomePage() {
 
   const matchesBySection = SECTIONS.map((section) => ({
     section,
-    matches: matches.filter((match) => getMatchSection(match) === section),
+    matches: matches
+      .filter((match) => getMatchSection(match) === section)
+      .sort((a, b) => {
+        // Matches with predictions (most popular) come first
+        const aScore = a.predictions?.length ? 1 : 0;
+        const bScore = b.predictions?.length ? 1 : 0;
+        return bScore - aScore;
+      }),
   })).filter(({ matches }) => matches.length > 0);
 
   useEffect(() => {
@@ -49,10 +56,9 @@ export default function HomePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-          Upcoming <span className="text-cricket-400">Matches</span>
+        <h1 className="text-4xl font-black text-white mb-8 tracking-tight">
+          Up <span className="text-cricket-400">Next</span>
         </h1>
-        <p className="text-gray-500 mb-10 text-sm">AI-powered predictions for upcoming cricket matches</p>
       </motion.div>
 
       {matches.length === 0 ? (
@@ -73,7 +79,7 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-12">
-          {matchesBySection.map(({ section, matches }, sectionIdx) => (
+          {matchesBySection.map(({ section, matches: sectionMatches }, sectionIdx) => (
             <motion.section
               key={section}
               initial={{ opacity: 0, y: 20 }}
@@ -83,15 +89,16 @@ export default function HomePage() {
               <div className="flex items-center gap-3 mb-5">
                 <h2 className="text-lg font-bold text-white">{section}</h2>
                 <div className="flex-1 h-px bg-gradient-to-r from-cricket-800/50 to-transparent" />
-                <span className="text-xs text-gray-600 font-medium">{matches.length} match{matches.length > 1 ? 'es' : ''}</span>
+                <span className="text-xs text-gray-600 font-medium">{sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {matches.map((match, idx) => (
+                {sectionMatches.map((match, idx) => (
                   <MatchCard
                     key={match.match_id}
                     match={match}
                     prediction={match.predictions?.[0] ?? null}
                     index={idx}
+                    hot={sectionIdx === 0 && idx === 0}
                   />
                 ))}
               </div>

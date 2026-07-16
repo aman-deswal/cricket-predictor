@@ -22,7 +22,7 @@ export default function RootLayout({
           <div className="absolute top-1/2 -left-40 w-80 h-80 bg-yellow-600/5 rounded-full blur-3xl" />
         </div>
 
-        <nav className="relative border-b border-amber-900/20 bg-[#0c0a09]/90 backdrop-blur-xl sticky top-0 z-50">
+        <nav className="relative border-b border-amber-800/30 bg-[#121010]/95 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-amber-900/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <Link href="/" className="flex items-center space-x-3 group">
