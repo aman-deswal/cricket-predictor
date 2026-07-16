@@ -356,9 +356,9 @@ export function PredictDetails() {
         )}
       </div>
 
-      {/* 2. Key Players | Research Notes — side by side */}
+      {/* 2. Key Battles | Research Notes — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Key Players */}
+        {/* Key Battles */}
         <motion.div
           className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
             enrichment?.key_players?.length ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
@@ -367,37 +367,71 @@ export function PredictDetails() {
           transition={{ delay: 0.28 }}
         >
           <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
-            Key Players
+            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12L12 4M4 4l8 8" /></svg>
+            Key Battles
           </h2>
           {enrichment?.key_players?.length ? (
-            <div className="grid grid-cols-2 gap-1.5">
-              {enrichment.key_players.map((player, i) => {
-                const imgUrl = playerImageMap.get(player.name.toLowerCase()) || playerImageMap.get(player.name.split(' ').pop()?.toLowerCase() ?? '');
+            <div className="space-y-2">
+              {enrichment.key_players.map((battle, i) => {
+                const isBattleFormat = battle.batter && battle.bowler;
+                if (isBattleFormat) {
+                  const batterImg = playerImageMap.get(battle.batter!.toLowerCase()) || playerImageMap.get(battle.batter!.split(' ').pop()?.toLowerCase() ?? '');
+                  const bowlerImg = playerImageMap.get(battle.bowler!.toLowerCase()) || playerImageMap.get(battle.bowler!.split(' ').pop()?.toLowerCase() ?? '');
+                  return (
+                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50">
+                      {/* Batter */}
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {batterImg ? (
+                          <img src={batterImg} alt={battle.batter!} className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
+                        ) : (
+                          <span className="w-6 h-6 rounded-full bg-cricket-500/15 flex items-center justify-center flex-shrink-0"><BatIcon className="w-3 h-3 text-cricket-400" /></span>
+                        )}
+                        <span className="text-[10px] font-semibold text-white truncate">{battle.batter}</span>
+                      </div>
+                      {/* VS */}
+                      <span className="text-[8px] font-bold text-gray-500 flex-shrink-0">vs</span>
+                      {/* Bowler */}
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                        <span className="text-[10px] font-semibold text-white truncate text-right">{battle.bowler}</span>
+                        {bowlerImg ? (
+                          <img src={bowlerImg} alt={battle.bowler!} className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
+                        ) : (
+                          <span className="w-6 h-6 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0"><BowlIcon className="w-3 h-3 text-orange-400" /></span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                // Legacy key_players format fallback
+                const imgUrl = playerImageMap.get((battle.name || '').toLowerCase()) || playerImageMap.get((battle.name || '').split(' ').pop()?.toLowerCase() ?? '');
                 return (
-                  <div
-                    key={`${player.name}-${i}`}
-                    className="flex items-center gap-1.5 p-1.5 rounded-lg bg-gray-800/30 border border-gray-800/50"
-                  >
+                  <div key={i} className="flex items-center gap-1.5 p-1.5 rounded-lg bg-gray-800/30 border border-gray-800/50">
                     {imgUrl ? (
-                      <img src={imgUrl} alt={player.name} className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
+                      <img src={imgUrl} alt={battle.name!} className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
                     ) : (
                       <span className="w-7 h-7 rounded-full bg-cricket-500/15 flex items-center justify-center text-cricket-400 flex-shrink-0">
-                        {player.role === 'bat' ? <BatIcon className="w-3.5 h-3.5" /> :
-                         player.role === 'bowl' ? <BowlIcon className="w-3.5 h-3.5" /> :
+                        {battle.role === 'bat' ? <BatIcon className="w-3.5 h-3.5" /> :
+                         battle.role === 'bowl' ? <BowlIcon className="w-3.5 h-3.5" /> :
                          <AllRounderIcon className="w-3.5 h-3.5" />}
                       </span>
                     )}
-                   <div className="min-w-0 flex-1">
-                     <p className="text-[10px] font-semibold text-white truncate">{player.name}</p>
-                     <p className="text-[8px] text-gray-500 truncate">{player.team} · {player.form_note}</p>
-                   </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold text-white truncate">{battle.name}</p>
+                      <p className="text-[8px] text-gray-500 truncate">{battle.team} · {battle.form_note}</p>
+                    </div>
                   </div>
                 );
               })}
+              {enrichment.key_players.some(b => b.insight) && (
+                <div className="mt-1 space-y-0.5">
+                  {enrichment.key_players.filter(b => b.insight).map((b, i) => (
+                    <p key={i} className="text-[8px] text-gray-500 leading-tight">• {b.insight}</p>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 text-center py-4">Key player data not available</p>
+            <p className="text-xs text-gray-500 text-center py-4">Key battle data not available</p>
           )}
         </motion.div>
 

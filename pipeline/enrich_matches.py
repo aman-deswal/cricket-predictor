@@ -150,7 +150,7 @@ Return JSON with this shape:
     "toss_insight": string,
     "possible_xi": {{"team1": string[], "team2": string[]}},
     "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "speculative"}}],
-    "key_players": [{{"name": string, "team": string, "role": "bat" | "bowl" | "all", "form_note": string}}],
+    "key_battles": [{{"batter": string, "batter_team": string, "bowler": string, "bowler_team": string, "insight": string}}],
     "confidence": "medium" | "low"
 }}
 
@@ -162,7 +162,7 @@ Rules:
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- key_players: list 3-4 star performers per team based on their known current form and reputation in this format. form_note should be a short phrase like "top ODI scorer in 2026" or "leading wicket-taker this series". For key_players, you may use general cricket knowledge — they do not need to be from the player pools above.
+- key_battles: list 3-4 head-to-head batter vs bowler matchups between opposing teams that could decide the game. Use players likely to be in the playing XI based on the player pools and general cricket knowledge. insight should explain why the battle matters (e.g. "Bumrah has dismissed Buttler 4 times in ODIs" or "Gill averages 55+ against left-arm pace").
 - Do not include players from unrelated teams or unrelated matches in possible_xi or player_updates.
 - For possible_xi, select names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
 - Keep the preview to 3-5 sentences.
@@ -626,18 +626,20 @@ def build_data_backed_details(match: dict) -> dict:
         venue_name = fallback.get("venue_name")
         venue_confidence = fallback.get("venue_confidence", "unknown")
         preview = fallback.get("expert_preview", "")
+        toss_insight = fallback.get("toss_insight")
         possible_xi = filter_possible_xi_to_pools(
             fallback.get("possible_xi", {"team1": [], "team2": []}),
             team1_player_pool,
             team2_player_pool,
         )
         player_updates = fallback.get("player_updates", [])
-        key_players = fallback.get("key_players", [])
+        key_players = fallback.get("key_battles", fallback.get("key_players", []))
         confidence = fallback.get("confidence", "low")
     except Exception as exc:
         logger.warning(f"Model fallback failed: {exc}")
         venue_name = None
         venue_confidence = "unknown"
+        toss_insight = None
         possible_xi = {"team1": [], "team2": []}
         player_updates = []
         key_players = []
@@ -656,6 +658,7 @@ def build_data_backed_details(match: dict) -> dict:
     return {
         "venue_name": venue_name,
         "venue_confidence": venue_confidence,
+        "toss_insight": toss_insight,
         "possible_xi": possible_xi,
         "player_updates": player_updates,
         "key_players": key_players,
@@ -679,7 +682,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "toss_insight": details.get("toss_insight"),
         "possible_xi": details.get("possible_xi", {"team1": [], "team2": []}),
         "player_updates": details.get("player_updates", []),
-        "key_players": details.get("key_players", []),
+        "key_players": details.get("key_battles", details.get("key_players", [])),
         "expert_preview": details.get("expert_preview", ""),
         "source_links": sources,
         "confidence": details.get("confidence", "low"),

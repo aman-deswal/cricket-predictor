@@ -61,10 +61,16 @@ export interface MatchEnrichment {
     source_index?: number;
   }>;
   key_players: Array<{
-    name: string;
-    team: string;
-    role: 'bat' | 'bowl' | 'all';
-    form_note: string;
+    name?: string;
+    team?: string;
+    role?: 'bat' | 'bowl' | 'all';
+    form_note?: string;
+    // Key battles format
+    batter?: string;
+    batter_team?: string;
+    bowler?: string;
+    bowler_team?: string;
+    insight?: string;
   }>;
   expert_preview: string | null;
   toss_insight?: string | null;
