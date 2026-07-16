@@ -78,7 +78,7 @@ export function PredictDetails() {
 
         // Fetch player stats for all squad players
         if (squadData.length > 0 && matchData) {
-          const allNames = squadData.flatMap(s => s.players.map(p => p.name));
+          const allNames = squadData.flatMap(s => (s.players ?? []).map(p => p.name));
           const format = matchData.match_type?.toLowerCase().includes('t20') ? 't20i' :
                          matchData.match_type?.toLowerCase().includes('odi') ? 'odi' : 't20i';
           const stats = await getPlayerStats(allNames, format);
@@ -118,13 +118,13 @@ export function PredictDetails() {
   const team1Meta = getTeamMeta(displayTeam1);
   const team2Meta = getTeamMeta(displayTeam2);
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
-  const isModelEstimated = enrichment !== null && enrichment.source_links.length === 0;
+  const isModelEstimated = enrichment !== null && (enrichment.source_links?.length ?? 0) === 0;
   const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
   squads.forEach(squad => {
-    squad.players.forEach(p => {
+    (squad.players ?? []).forEach(p => {
       if (p.image_url) {
         playerImageMap.set(p.name.toLowerCase(), p.image_url);
         const lastName = p.name.split(' ').pop()?.toLowerCase() ?? '';
@@ -453,9 +453,9 @@ export function PredictDetails() {
                 <p className="text-xs text-gray-300 leading-relaxed mb-3">{enrichment.expert_preview}</p>
               )}
 
-              {enrichment.player_updates.length > 0 && (
+              {(enrichment.player_updates?.length ?? 0) > 0 && (
                 <div className="space-y-1.5 mb-3">
-                  {enrichment.player_updates.slice(0, 4).map((update, index) => (
+                  {(enrichment.player_updates ?? []).slice(0, 4).map((update, index) => (
                     <div
                       key={`${update.player ?? 'update'}-${index}`}
                       className="rounded-md bg-gray-800/30 border border-gray-800/50 px-2 py-1.5 text-[10px]"
@@ -467,9 +467,9 @@ export function PredictDetails() {
                 </div>
               )}
 
-              {enrichment.source_links.length > 0 && (
+              {(enrichment.source_links?.length ?? 0) > 0 && (
                 <div className="space-y-1">
-                  {enrichment.source_links.slice(0, 3).map((source, index) => (
+                  {(enrichment.source_links ?? []).slice(0, 3).map((source, index) => (
                     <a
                       key={`${source.url ?? source.title}-${index}`}
                       href={source.url}
@@ -551,10 +551,10 @@ export function PredictDetails() {
                         <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
                       </div>
                       <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
-                      <span className="text-[8px] text-gray-600">({squad.players.length})</span>
+                      <span className="text-[8px] text-gray-600">({(squad.players ?? []).length})</span>
                     </div>
                     <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-1">
-                      {squad.players.slice(0, 11).map((player) => {
+                      {(squad.players ?? []).slice(0, 11).map((player) => {
                         const RoleIcon = player.is_keeper ? KeeperIcon :
                           player.role?.includes('All') ? AllRounderIcon :
                           player.role?.includes('Bowl') ? BowlIcon : BatIcon;
@@ -589,8 +589,8 @@ export function PredictDetails() {
           ) : hasSquadOrXi ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { team: displayTeam1, players: enrichment!.possible_xi.team1 ?? [], meta: team1Meta },
-              { team: displayTeam2, players: enrichment!.possible_xi.team2 ?? [], meta: team2Meta },
+              { team: displayTeam1, players: enrichment?.possible_xi?.team1 ?? [], meta: team1Meta },
+              { team: displayTeam2, players: enrichment?.possible_xi?.team2 ?? [], meta: team2Meta },
             ].map(({ team, players, meta }) => (
               <div key={team}>
                 <div className="flex items-center gap-1.5 mb-1.5">
