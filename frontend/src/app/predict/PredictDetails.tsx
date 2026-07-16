@@ -123,6 +123,7 @@ export function PredictDetails() {
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
   const isModelEstimated = enrichment !== null && (enrichment.source_links?.length ?? 0) === 0;
   const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
+  const h2hGames = (espnData?.head_to_head ?? []).filter(g => g.teams && g.teams.length > 0);
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -619,7 +620,7 @@ export function PredictDetails() {
       </div>
 
       {/* 4. Venue & Match Info + Head to Head (ESPN data) */}
-      {espnData && (espnData.venue_name || espnData.head_to_head.length > 0 || espnData.toss_winner || espnData.series_note) && (
+      {espnData && (espnData.venue_name || h2hGames.length > 0 || espnData.toss_winner || espnData.series_note) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           {/* Venue Details */}
           {espnData.venue_name && (
@@ -707,14 +708,14 @@ export function PredictDetails() {
             {...fadeUp}
             transition={{ delay: 0.55 }}
           >
-            {espnData.head_to_head.length > 0 ? (
+            {h2hGames.length > 0 ? (
               <div>
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
                   Head to Head
                 </h2>
                 <div className="space-y-1">
-                  {espnData.head_to_head.slice(0, 5).map((game, i) => {
+                  {h2hGames.slice(0, 5).map((game, i) => {
                     const winner = game.teams.find(t => t.winner);
                     return (
                       <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
