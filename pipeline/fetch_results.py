@@ -2,20 +2,21 @@
 
 This is a *backup* scorer. Primary scoring now happens inside
 ``fetch_fixtures.py`` using the cricScore response data, which avoids
-extra CricAPI calls.  This script only calls ``match_info`` for a small
-batch (max 3) of still-unscored predictions whose match date has passed.
+extra CricAPI calls. This script checks still-unscored predictions whose
+match date has passed, prioritizing oldest matches first.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from utils.cricapi import fetch_match_result
-from utils.db import get_client, get_pending_results, store_result
+from utils.db import get_client, store_result
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-MAX_API_CALLS = 3
+MAX_API_CALLS = int(os.getenv("RESULT_CHECK_BATCH_SIZE", "25"))
 
 
 def score_prediction(prediction: dict, actual_winner: str) -> dict:
@@ -77,8 +78,22 @@ def _is_match_in_past(prediction: dict) -> bool:
         return True
 
 
+def _prediction_sort_key(prediction: dict) -> tuple[datetime, str]:
+    """Sort predictions oldest-first so backlog drains deterministically."""
+    date_str = prediction.get("date") or prediction.get("match_date", "")
+    if date_str:
+        try:
+            parsed = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed, prediction.get("match_id", "")
+        except (ValueError, TypeError):
+            pass
+    return datetime.min.replace(tzinfo=timezone.utc), prediction.get("match_id", "")
+
+
 def main() -> None:
-    """Check for completed matches and score predictions (backup, max 3 API calls)."""
+    """Check for completed matches and score predictions (backup scorer)."""
     logger.info("Backup result scorer — checking for completed matches...")
 
     client = get_client()
@@ -92,14 +107,23 @@ def main() -> None:
 
     logger.info(f"Found {len(pending_predictions)} unscored predictions")
 
-    # Filter to only past matches, then cap at MAX_API_CALLS
-    past_predictions = [p for p in pending_predictions if _is_match_in_past(p)]
+    # Filter to past matches and process oldest first so backlog drains predictably.
+    past_predictions = sorted(
+        (p for p in pending_predictions if _is_match_in_past(p)),
+        key=_prediction_sort_key,
+    )
     batch = past_predictions[:MAX_API_CALLS]
+
+    future_count = len(pending_predictions) - len(past_predictions)
+    logger.info(
+        f"Checking {len(batch)} past-date predictions "
+        f"(batch_limit={MAX_API_CALLS}, backlog={len(past_predictions)}, future={future_count})"
+    )
 
     if len(past_predictions) > MAX_API_CALLS:
         logger.info(
             f"Rate-limiting: checking {MAX_API_CALLS} of {len(past_predictions)} "
-            f"past-date predictions (skipped {len(pending_predictions) - len(past_predictions)} future)"
+            f"past-date predictions (skipped {future_count} future)"
         )
 
     scored = 0
