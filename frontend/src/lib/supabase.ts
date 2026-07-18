@@ -19,6 +19,25 @@ export interface Match {
   team2_recent_form?: Array<'W' | 'L'>;
 }
 
+export interface EdgeScoreFactors {
+  form: number;
+  momentum: number;
+  pressure: number;
+  market: number;
+}
+
+export interface EdgeScore {
+  team1_score: number;
+  team2_score: number;
+  net_edge: number;
+  edge_team: string;
+  narrative: string;
+  factors: {
+    team1: EdgeScoreFactors;
+    team2: EdgeScoreFactors;
+  };
+}
+
 export interface Prediction {
   match_id: string;
   team1: string;
@@ -32,6 +51,7 @@ export interface Prediction {
   model: string;
   ensemble_size: number;
   scored_at?: string;
+  edge_score?: EdgeScore;
 }
 
 export interface PredictionResult {
