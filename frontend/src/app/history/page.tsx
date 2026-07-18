@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CricketLoader } from '@/components/CricketLoader';
 import { getPredictionHistory, PredictionResult } from '@/lib/supabase';
 
 export default function HistoryPage() {
@@ -30,15 +31,7 @@ export default function HistoryPage() {
   });
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <motion.div
-          className="rounded-full h-10 w-10 border-2 border-cricket-400 border-t-transparent"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        />
-      </div>
-    );
+    return <CricketLoader />;
   }
 
   return (

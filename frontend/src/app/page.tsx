@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MatchSection, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
+import { CricketLoader } from '@/components/CricketLoader';
 
 const SECTIONS: MatchSection[] = ['International', 'League', 'Other'];
 
@@ -38,15 +39,7 @@ export default function HomePage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <motion.div
-          className="rounded-full h-10 w-10 border-2 border-cricket-400 border-t-transparent"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        />
-      </div>
-    );
+    return <CricketLoader />;
   }
 
   return (
