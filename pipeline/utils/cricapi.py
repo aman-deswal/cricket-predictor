@@ -1,6 +1,8 @@
 """CricAPI helper functions for fetching fixtures and results."""
 
+import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -10,6 +12,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_URL = "https://api.cricapi.com/v1"
+REQUEST_TIMEOUT_SECONDS = 30
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 5
+logger = logging.getLogger(__name__)
 
 INTERNATIONAL_TEAMS = {
     "Afghanistan",
@@ -136,16 +142,47 @@ def fetch_all_current_matches(
         (upcoming_records, completed_raw) — upcoming are clean match records
         for upsert; completed are raw CricAPI dicts for result processing.
     """
-    response = requests.get(
-        f"{BASE_URL}/cricScore",
-        params={"apikey": _get_api_key(), "offset": 0},
-        timeout=30,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data: dict = {}
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(
+                f"{BASE_URL}/cricScore",
+                params={"apikey": _get_api_key(), "offset": 0},
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            if attempt == MAX_RETRIES:
+                raise RuntimeError(
+                    f"CricAPI request to cricScore failed after {MAX_RETRIES} attempts"
+                ) from exc
+            logger.warning(
+                "CricAPI request failed (attempt %s/%s): %s",
+                attempt,
+                MAX_RETRIES,
+                exc,
+            )
+            time.sleep(RETRY_DELAY_SECONDS * attempt)
+            continue
 
-    if data.get("status") != "success":
-        raise RuntimeError(f"CricAPI error: {data.get('status')}")
+        if data.get("status") == "success":
+            break
+
+        status = data.get("status", "unknown")
+        reason = data.get("reason") or data.get("message") or "no reason provided"
+        if attempt == MAX_RETRIES:
+            raise RuntimeError(
+                f"CricAPI error: status={status}, reason={reason}"
+            )
+        logger.warning(
+            "CricAPI returned non-success status (attempt %s/%s): status=%s reason=%s",
+            attempt,
+            MAX_RETRIES,
+            status,
+            reason,
+        )
+        time.sleep(RETRY_DELAY_SECONDS * attempt)
 
     requested_types = {match_type.lower() for match_type in match_types}
     upcoming: list[dict] = []
@@ -191,7 +228,7 @@ def fetch_match_result(match_id: str) -> Optional[dict]:
     response = requests.get(
         f"{BASE_URL}/match_info",
         params={"apikey": _get_api_key(), "id": match_id},
-        timeout=30,
+        timeout=REQUEST_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
     data = response.json()

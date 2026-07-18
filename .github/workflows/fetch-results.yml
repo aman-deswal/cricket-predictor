@@ -2,7 +2,7 @@ name: Fetch Results
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours (backup scorer — primary scoring in fetch-fixtures)
+    - cron: '0 * * * *'  # Every hour (backup scorer)
   workflow_dispatch:
 
 permissions:
@@ -28,4 +28,5 @@ jobs:
           CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          RESULT_CHECK_BATCH_SIZE: '25'
         run: python pipeline/fetch_results.py
