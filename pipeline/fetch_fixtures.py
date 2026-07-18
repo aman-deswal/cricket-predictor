@@ -273,13 +273,25 @@ def main(match_types: Optional[list[str]] = None) -> None:
         logger.info("Upserting CricAPI matches...")
         replace_upcoming_matches(upcoming)
 
-    # --- Phase 4: Auto-map ESPN event IDs ---
+    # --- Phase 4: Auto-map ESPN event IDs onto matches ---
     if upcoming and espn_fixtures:
-        logger.info("Auto-mapping ESPN event IDs to CricAPI matches...")
+        logger.info("Auto-mapping ESPN event IDs to matches...")
         mapping = match_espn_to_cricapi(espn_fixtures, upcoming)
         if mapping:
+            # Store on espn_match_data table (backward compat)
             stored = _store_espn_event_mappings(mapping)
-            logger.info(f"Stored {stored} new ESPN event ID mappings (of {len(mapping)} matched)")
+            # Also stamp espn_event_id directly on matches table
+            client = get_client()
+            stamped = 0
+            for match_id, espn_event_id in mapping.items():
+                try:
+                    client.table("matches").update({
+                        "espn_event_id": espn_event_id,
+                    }).eq("match_id", match_id).execute()
+                    stamped += 1
+                except Exception:
+                    pass
+            logger.info(f"ESPN IDs: {stored} new in espn_match_data, {stamped} stamped on matches table (of {len(mapping)} matched)")
         else:
             logger.info("No new ESPN ↔ CricAPI matches found")
 

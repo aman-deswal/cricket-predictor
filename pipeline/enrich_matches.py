@@ -707,7 +707,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
 
     # --- Fetch ESPN enrichment context ---
     espn_ctx_text = ""
-    espn_event_id = _get_espn_event_id(match_id)
+    espn_event_id = _get_espn_event_id(match_id, match=match)
     espn_league_id = _get_espn_league_id(match_id)
 
     # Auto-discover ESPN event ID if not stored
@@ -721,13 +721,16 @@ def enrich_match(match: dict, source_limit: int) -> dict:
             espn_event_id = find_espn_event_id(team1, team2, match_date, match_type)
             if espn_event_id:
                 logger.info(f"  Auto-discovered ESPN event {espn_event_id} for {team1} vs {team2}")
-                # Store for future use
+                # Store on both tables for future use
                 try:
                     client = get_client()
                     client.table("espn_match_data").upsert({
                         "match_id": match_id,
                         "espn_event_id": espn_event_id,
                     }, on_conflict="match_id").execute()
+                    client.table("matches").update({
+                        "espn_event_id": espn_event_id,
+                    }).eq("match_id", match_id).execute()
                 except Exception:
                     pass
         except Exception as e:
@@ -780,12 +783,21 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     }
 
 
-def _get_espn_event_id(match_id: str) -> Optional[str]:
-    """Look up ESPN event ID for a match from espn_match_data table."""
+def _get_espn_event_id(match_id: str, match: dict = None) -> Optional[str]:
+    """Look up ESPN event ID — first from match record, then espn_match_data table."""
+    # Check match record directly (new: espn_event_id on matches table)
+    if match and match.get("espn_event_id"):
+        return str(match["espn_event_id"])
+
     if not match_id:
         return None
     try:
         client = get_client()
+        # Try matches table first
+        r = client.table("matches").select("espn_event_id").eq("match_id", match_id).execute()
+        if r.data and r.data[0].get("espn_event_id"):
+            return str(r.data[0]["espn_event_id"])
+        # Fall back to espn_match_data lookup table
         r = client.table("espn_match_data").select("espn_event_id").eq("match_id", match_id).execute()
         if r.data and r.data[0].get("espn_event_id"):
             return str(r.data[0]["espn_event_id"])
