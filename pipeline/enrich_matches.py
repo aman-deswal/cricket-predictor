@@ -112,7 +112,8 @@ Return JSON with this shape:
   "venue_name": string | null,
   "venue_confidence": "confirmed" | "reported" | "unknown",
     "possible_xi": {{"team1": string[], "team2": string[]}},
-  "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "confirmed" | "reported" | "speculative", "source_index": number}}],
+  "player_updates": [{{"player": string, "team": string, "status": string, "confidence": "confirmed" | "reported" | "speculative", "source_index": number | null}}],
+  "key_battles": [{{"batter": string, "batter_team": string, "bowler": string, "bowler_team": string, "insight": string}}],
   "expert_preview": string,
   "toss_insight": string,
   "confidence": "high" | "medium" | "low"
@@ -121,10 +122,12 @@ Return JSON with this shape:
 Rules:
 - Do not invent injuries, availability, squads, or playing XIs.
 - For venue_name: use the ESPN confirmed venue if provided. Otherwise use the venue from sources if mentioned. Do NOT guess venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if no source mentions the venue.
-- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions.
-- expert_preview: 3-5 sentences. Incorporate ESPN head-to-head results and recent series form data when available. Reference recent results and current team momentum. Mention uncertainty when sources are thin.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions. Incorporate ESPN venue data when available.
+- expert_preview: 3-5 sentences. Incorporate ESPN head-to-head results, recent series form data, and any notable news (retirements, milestones, captaincy changes, comebacks) when available. Reference recent results and current team momentum. Mention uncertainty when sources are thin.
+- player_updates: Extract injury, availability, fitness, retirement, resting, or milestone news from BOTH source snippets AND ESPN news articles. Mark confidence as "reported" when from ESPN news, "confirmed" when from official sources, "speculative" when rumored. Include retirement rumors, farewell matches, and milestone alerts (e.g., "last international match", "100th cap").
+- key_battles: When ESPN news mentions specific player form, milestones, or retirement context, weave that into the battle insight (e.g., "Rohit's potential farewell adds emotional weight to this contest").
 - If sources do not support a field, use null, empty arrays, or say that no reliable update was found.
-- Use source_index values from the source list for player updates.
+- Use source_index values from the source list for player updates. For ESPN-sourced updates, omit source_index.
 - Prefer article body text over headlines. Headlines alone are not enough for venue, XI, or injury claims.
 - For possible_xi, include only players explicitly named in source-backed squad, probable XI, or playing XI material. Do not imply they are a confirmed playing XI unless the source says so.
 - Do not discuss unrelated matches, unrelated teams, or generic cricket news.
@@ -170,14 +173,14 @@ Return JSON with this shape:
 }}
 
 Rules:
-- The preview must incorporate ESPN head-to-head data, recent series results, and standings when available. Reference actual recent scores and team momentum.
+- The preview must incorporate ESPN head-to-head data, recent series results, standings, and any notable news (retirements, milestones, captaincy changes) when available. Reference actual recent scores and team momentum.
 - Use general cricket knowledge and fixture context to fill in details.
 - venue_name: ONLY use a venue if the fixture API field or ESPN data already contains one. Do NOT guess or infer venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if no data provides the venue.
-- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format.
+- toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format. Use ESPN venue data when available.
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
-- player_updates should be empty unless there is a widely known, non-live context note. Do not invent fresh injuries or availability news.
-- key_battles: list 3-4 batter vs bowler matchups between opposing teams. **CRITICAL: Every player in key_battles MUST be from the confirmed squads listed above.** Do not use players who are not in the squad. insight should explain why the battle matters.
+- player_updates: Extract retirement, milestone, farewell, captaincy, fitness, or availability context from ESPN news articles. Mark confidence as "reported" for ESPN-sourced news, "speculative" for general knowledge. Include retirement rumors, farewell matches, and milestone alerts.
+- key_battles: list 3-4 batter vs bowler matchups between opposing teams. **CRITICAL: Every player in key_battles MUST be from the confirmed squads listed above.** Do not use players who are not in the squad. insight should explain why the battle matters — weave in ESPN news context (retirements, milestones, recent form) when relevant.
 - Do not include players from unrelated teams or unrelated matches.
 - Keep the preview to 3-5 sentences.
 """
