@@ -121,6 +121,27 @@ export function PredictDetails() {
   const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
   const h2hGames = (espnData?.head_to_head ?? []).filter(g => g.teams && g.teams.length > 0);
 
+  // Derive form from ESPN H2H (most recent and accurate for this matchup)
+  // Falls back to Cricsheet format form if no ESPN data
+  const deriveH2HForm = (teamShortName: string): Array<'W' | 'L'> => {
+    if (h2hGames.length === 0) return [];
+    return h2hGames
+      .slice(0, 5)
+      .map(game => {
+        const team = game.teams.find((t: { abbreviation?: string; name?: string }) =>
+          t.abbreviation?.toUpperCase() === teamShortName.toUpperCase()
+        );
+        if (!team) return null;
+        return team.winner ? 'W' as const : 'L' as const;
+      })
+      .filter((r): r is 'W' | 'L' => r !== null)
+      .reverse(); // oldest first → left-to-right chronological
+  };
+  const team1H2H = deriveH2HForm(team1Meta.shortName);
+  const team2H2H = deriveH2HForm(team2Meta.shortName);
+  const team1Form = team1H2H.length > 0 ? team1H2H : (match.team1_recent_form ?? []).slice(-5);
+  const team2Form = team2H2H.length > 0 ? team2H2H : (match.team2_recent_form ?? []).slice(-5);
+
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
   squads.forEach(squad => {
@@ -167,9 +188,9 @@ export function PredictDetails() {
             </motion.div>
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team1Meta.shortName}</h2>
             {/* Form strip — last 5 */}
-            {(match.team1_recent_form?.length ?? 0) > 0 && (
+            {team1Form.length > 0 && (
               <div className="flex justify-center gap-0.5 mt-1">
-                {(match.team1_recent_form ?? []).slice(-5).map((r, i) => (
+                {team1Form.map((r, i) => (
                   <span key={`t1f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
               </div>
@@ -232,9 +253,9 @@ export function PredictDetails() {
             </motion.div>
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team2Meta.shortName}</h2>
             {/* Form strip — last 5 */}
-            {(match.team2_recent_form?.length ?? 0) > 0 && (
+            {team2Form.length > 0 && (
               <div className="flex justify-center gap-0.5 mt-1">
-                {(match.team2_recent_form ?? []).slice(-5).map((r, i) => (
+                {team2Form.map((r, i) => (
                   <span key={`t2f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
               </div>
@@ -468,7 +489,7 @@ export function PredictDetails() {
           )}
         </motion.div>
 
-        {/* Reasoning */}
+        {/* Our Take */}
         {prediction ? (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
@@ -477,8 +498,8 @@ export function PredictDetails() {
           >
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
-                Reasoning
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
+                Our Take
               </h2>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
@@ -492,7 +513,17 @@ export function PredictDetails() {
                 {prediction.confidence} confidence
               </span>
             </div>
-            <p className="text-sm text-gray-300 leading-relaxed">{prediction.reasoning}</p>
+            <ul className="space-y-2">
+              {(prediction.reasoning || '')
+                .split(/(?<=[.!?])\s+/)
+                .filter((s: string) => s.trim().length > 10)
+                .map((sentence: string, i: number) => (
+                  <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
+                    <span className="mt-1.5 w-1 h-1 rounded-full bg-cricket-400 flex-shrink-0" />
+                    <span>{sentence.trim()}</span>
+                  </li>
+                ))}
+            </ul>
           </motion.div>
         ) : (
           <motion.div
@@ -806,44 +837,9 @@ export function PredictDetails() {
         </motion.div>
       </div>
 
-      {/* 4. Venue & Match Info + Series + H2H + Key Players (ESPN data) */}
-      {espnData && (espnData.venue_name || h2hGames.length > 0 || espnData.toss_winner || espnData.series_note || (espnData.series_leaders?.length ?? 0) > 0 || espnData.series_scoreline) && (
+      {/* 4. Series + H2H + Key Players (ESPN data) */}
+      {espnData && (h2hGames.length > 0 || espnData.toss_winner || espnData.series_note || (espnData.series_leaders?.length ?? 0) > 0 || espnData.series_scoreline) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          {/* Venue Details */}
-          {espnData.venue_name && (
-            <motion.div
-              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
-              {...fadeUp}
-              transition={{ delay: 0.45 }}
-            >
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1C4.5 5 2 7.5 2 10.5a6 6 0 0012 0C14 7.5 11.5 5 8 1z" /></svg>
-                Venue
-              </h2>
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-white">{espnData.venue_name}</p>
-                {espnData.venue_city && (
-                  <p className="text-[10px] text-gray-400">{espnData.venue_city}{espnData.venue_country ? `, ${espnData.venue_country}` : ''}</p>
-                )}
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {espnData.venue_capacity && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-800/60 text-gray-300">
-                      🏟️ {espnData.venue_capacity.toLocaleString()} capacity
-                    </span>
-                  )}
-                  {espnData.venue_grass !== null && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-800/60 text-gray-300">
-                      {espnData.venue_grass ? '🌱 Grass' : '🏗️ Drop-in'}
-                    </span>
-                  )}
-                </div>
-                {espnData.series_note && (
-                  <p className="text-[9px] text-cricket-400/80 mt-1 italic">{espnData.series_note}</p>
-                )}
-              </div>
-            </motion.div>
-          )}
-
           {/* Series News & Recent Results */}
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
