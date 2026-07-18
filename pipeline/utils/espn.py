@@ -318,21 +318,39 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
 
     # -- Head to Head --
     h2h_games = []
-    for g in data.get("headToHeadGames", []):
-        comps = g.get("competitors", [])
-        game = {
-            "date": g.get("date", ""),
-            "teams": [],
-        }
-        for c in comps:
-            team = c.get("team", {})
-            game["teams"].append({
-                "name": team.get("displayName", ""),
-                "abbreviation": team.get("abbreviation", ""),
-                "score": c.get("score", ""),
-                "winner": c.get("winner", False),
-            })
-        h2h_games.append(game)
+    seen_event_ids: set[str] = set()
+    for h2h_block in data.get("headToHeadGames", []):
+        home_team = h2h_block.get("team", {})
+        for evt in h2h_block.get("events", []):
+            eid = evt.get("id", "")
+            if eid in seen_event_ids:
+                continue
+            seen_event_ids.add(eid)
+            opponent = evt.get("opponent", {})
+            home_score = evt.get("homeTeamScore", "")
+            away_score = evt.get("awayTeamScore", "")
+            game_result = evt.get("gameResult", "")  # W, L, T, NR
+            game = {
+                "date": evt.get("gameDate", ""),
+                "note": evt.get("matchNote", ""),
+                "teams": [
+                    {
+                        "name": home_team.get("displayName", ""),
+                        "abbreviation": home_team.get("abbreviation", ""),
+                        "score": home_score,
+                        "winner": game_result == "W",
+                    },
+                    {
+                        "name": opponent.get("displayName", ""),
+                        "abbreviation": opponent.get("abbreviation", ""),
+                        "score": away_score,
+                        "winner": game_result == "L",
+                    },
+                ],
+            }
+            h2h_games.append(game)
+    # Sort by date descending (most recent first)
+    h2h_games.sort(key=lambda g: g.get("date", ""), reverse=True)
     result["head_to_head"] = h2h_games
 
     # -- Scorecards (matchcards) --
@@ -377,6 +395,42 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
                 "stats": stats,
             })
     result["standings"] = standings
+
+    # -- Series Leaders (top performers this series) --
+    series_leaders = []
+    for team_block in data.get("leaders", []):
+        team_info = team_block.get("team", {})
+        team_name = team_info.get("displayName", "")
+        team_abbr = team_info.get("abbreviation", "")
+        for category in team_block.get("leaders", []):
+            cat_name = category.get("displayName", category.get("name", ""))
+            for entry in category.get("leaders", [])[:2]:  # top 2 per category
+                athlete = entry.get("athlete", {})
+                headshot = athlete.get("headshot", {})
+                headshot_url = ""
+                if isinstance(headshot, dict):
+                    headshot_url = headshot.get("href", "")
+                elif isinstance(headshot, str):
+                    headshot_url = headshot
+                if "default-player-logo" in headshot_url:
+                    headshot_url = ""
+                series_leaders.append({
+                    "player_name": athlete.get("displayName", ""),
+                    "player_id": athlete.get("id", ""),
+                    "team": team_name,
+                    "team_abbr": team_abbr,
+                    "category": cat_name,
+                    "value": entry.get("displayValue", ""),
+                    "headshot_url": headshot_url,
+                })
+    result["series_leaders"] = series_leaders
+
+    # -- Series scoreline (from latest H2H matchNote) --
+    series_scoreline = ""
+    if h2h_games:
+        # Most recent game's note has the series state
+        series_scoreline = h2h_games[0].get("note", "")
+    result["series_scoreline"] = series_scoreline
 
     # -- Article --
     article = data.get("article", {})

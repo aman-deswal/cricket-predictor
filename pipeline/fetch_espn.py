@@ -61,6 +61,8 @@ def store_espn_data(client, match_id: str, espn_data: dict) -> None:
         "head_to_head": json.dumps(espn_data.get("head_to_head", [])),
         "scorecards": json.dumps(espn_data.get("scorecards", [])),
         "standings": json.dumps(espn_data.get("standings", [])),
+        "series_leaders": json.dumps(espn_data.get("series_leaders", [])),
+        "series_scoreline": espn_data.get("series_scoreline", ""),
         # Metadata
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
