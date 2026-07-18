@@ -320,7 +320,8 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
     h2h_games = []
     seen_event_ids: set[str] = set()
     for h2h_block in data.get("headToHeadGames", []):
-        home_team = h2h_block.get("team", {})
+        perspective_team = h2h_block.get("team", {})
+        perspective_id = perspective_team.get("id", "")
         for evt in h2h_block.get("events", []):
             eid = evt.get("id", "")
             if eid in seen_event_ids:
@@ -329,21 +330,30 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
             opponent = evt.get("opponent", {})
             home_score = evt.get("homeTeamScore", "")
             away_score = evt.get("awayTeamScore", "")
-            game_result = evt.get("gameResult", "")  # W, L, T, NR
+            game_result = evt.get("gameResult", "")  # W, L, T, NR (from perspective team)
+            home_team_id = str(evt.get("homeTeamId", ""))
+            # Determine which score belongs to which team
+            # homeTeamScore/awayTeamScore are venue-based, not perspective-based
+            if home_team_id == perspective_id:
+                perspective_score = home_score
+                opponent_score = away_score
+            else:
+                perspective_score = away_score
+                opponent_score = home_score
             game = {
                 "date": evt.get("gameDate", ""),
                 "note": evt.get("matchNote", ""),
                 "teams": [
                     {
-                        "name": home_team.get("displayName", ""),
-                        "abbreviation": home_team.get("abbreviation", ""),
-                        "score": home_score,
+                        "name": perspective_team.get("displayName", ""),
+                        "abbreviation": perspective_team.get("abbreviation", ""),
+                        "score": perspective_score,
                         "winner": game_result == "W",
                     },
                     {
                         "name": opponent.get("displayName", ""),
                         "abbreviation": opponent.get("abbreviation", ""),
-                        "score": away_score,
+                        "score": opponent_score,
                         "winner": game_result == "L",
                     },
                 ],
@@ -404,7 +414,7 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
         team_abbr = team_info.get("abbreviation", "")
         for category in team_block.get("leaders", []):
             cat_name = category.get("displayName", category.get("name", ""))
-            for entry in category.get("leaders", [])[:2]:  # top 2 per category
+            for entry in category.get("leaders", [])[:1]:  # top 1 per category per team
                 athlete = entry.get("athlete", {})
                 headshot = athlete.get("headshot", {})
                 headshot_url = ""

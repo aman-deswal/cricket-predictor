@@ -12,6 +12,7 @@ from openai import OpenAI
 
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
 from utils.db import (
+    get_client,
     get_h2h_from_cache,
     get_match_enrichment,
     get_prediction,
@@ -21,6 +22,7 @@ from utils.db import (
     store_prediction,
     store_match_enrichment,
 )
+from utils.espn import get_espn_enrichment_context, format_espn_context
 from enrich_matches import enrich_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -56,8 +58,12 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 **Source-backed Match Notes:**
 {enrichment_notes}
 
+**ESPN Cricinfo Context (H2H results, news, series data):**
+{espn_context}
+
 Based on all available information, predict the winner and provide win probabilities.
 IMPORTANT: When referencing win rates in your reasoning, use the EXACT percentages provided above. Do not estimate or round differently.
+Reference specific ESPN data (series scoreline, recent match results, key player form, injury/retirement news) in your reasoning to make it substantive and contextual.
 
 Also analyze the toss factor for this specific match. Consider:
 - Historical toss impact at this venue (pitch type, dew factor, day/night)
@@ -70,7 +76,7 @@ Respond in JSON format:
     "team1_win_probability": <float 0-1>,
     "team2_win_probability": <float 0-1>,
     "confidence": "<low|medium|high>",
-    "reasoning": "<2-3 sentence explanation referencing actual form stats>",
+    "reasoning": "<3-5 sentence analysis referencing specific data: series scoreline, recent match scores, key player form (names + stats), injury/retirement news, and venue conditions. Be specific, not generic.>",
     "toss_insight": "<single sentence: which team benefits more from winning the toss and what they should choose, with a percentage edge if possible>"
 }}"""
 
@@ -136,6 +142,27 @@ def build_context(match: dict) -> dict:
             f"Research confidence: {enrichment.get('confidence', 'low')}"
         )
 
+    # Fetch ESPN enrichment context for richer reasoning
+    espn_ctx = "No ESPN data available."
+    espn_event_id = match.get("espn_event_id")
+    if not espn_event_id:
+        try:
+            client = get_client()
+            r = client.table("espn_match_data").select("espn_event_id").eq("match_id", match["match_id"]).execute()
+            if r.data and r.data[0].get("espn_event_id"):
+                espn_event_id = r.data[0]["espn_event_id"]
+        except Exception:
+            pass
+    if espn_event_id:
+        try:
+            ctx = get_espn_enrichment_context(espn_event_id)
+            formatted = format_espn_context(ctx)
+            if formatted.strip():
+                espn_ctx = formatted
+                logger.info(f"  ESPN context for prediction: {len(espn_ctx)} chars")
+        except Exception as exc:
+            logger.warning(f"  Failed to get ESPN context: {exc}")
+
     return {
         "team1": team1,
         "team2": team2,
@@ -154,6 +181,7 @@ def build_context(match: dict) -> dict:
         "venue_matches": venue_data.get("matches_at_venue", 0),
         "toss_bat_win_rate": venue_data.get("toss_bat_first_win_rate", 0.5),
         "enrichment_notes": enrichment_notes,
+        "espn_context": espn_ctx,
     }
 
 
