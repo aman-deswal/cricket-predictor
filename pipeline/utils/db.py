@@ -142,10 +142,11 @@ def get_recent_results(days: int = 14) -> list[dict]:
 
     client = get_client()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    # Use gte on scored_at — nulls won't match >= a date, so no explicit null filter needed
+    # Query prediction_results which has scored_at, actual_winner, correct
+    # Join match context via predictions(match_id)
     response = (
-        client.table("predictions")
-        .select("match_id, team1, team2, match_type, predicted_winner, winner, scored_at")
+        client.table("prediction_results")
+        .select("match_id, predicted_winner, actual_winner, correct, scored_at, predictions(team1, team2, match_type)")
         .gte("scored_at", cutoff)
         .order("scored_at", desc=True)
         .limit(20)
@@ -153,15 +154,14 @@ def get_recent_results(days: int = 14) -> list[dict]:
     )
     results = []
     for p in response.data:
-        if not p.get("winner"):
-            continue
+        pred = p.get("predictions") or {}
         results.append({
-            "team1": p["team1"],
-            "team2": p["team2"],
-            "match_type": p.get("match_type", ""),
+            "team1": pred.get("team1", ""),
+            "team2": pred.get("team2", ""),
+            "match_type": pred.get("match_type", ""),
             "predicted_winner": p.get("predicted_winner", ""),
-            "actual_winner": p["winner"],
-            "correct": (p.get("predicted_winner") or "").lower() == p["winner"].lower(),
+            "actual_winner": p.get("actual_winner", ""),
+            "correct": p.get("correct", False),
             "scored_at": p.get("scored_at", ""),
         })
     return results
