@@ -30,10 +30,11 @@ export function Navbar() {
               <Logo size={42} />
             </div>
             <span
-              className="text-xl tracking-tight bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent"
+              className="text-xl tracking-tight"
               style={{ fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 900, letterSpacing: '-0.02em' }}
             >
-              SixSense
+              <span className="bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Six</span>
+              <span className="text-white">Sense</span>
             </span>
           </Link>
 
