@@ -7,6 +7,7 @@ import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerSt
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon } from '@/components/CricketIcons';
+import { CricketLoader } from '@/components/CricketLoader';
 
 function toAmericanOdds(probability: number): string {
   if (probability <= 0 || probability >= 1) return '-';
@@ -100,15 +101,7 @@ export function PredictDetails() {
   }, [matchId]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <motion.div
-          className="rounded-full h-10 w-10 border-2 border-cricket-400 border-t-transparent"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        />
-      </div>
-    );
+    return <CricketLoader />;
   }
 
   if (!matchId || !match) {
