@@ -784,7 +784,7 @@ export function PredictDetails() {
                   );
                 })}
               </div>
-              <p className="text-[7px] text-gray-600 mt-2 text-center">Series stats via ESPN Cricinfo</p>
+              <p className="text-[7px] text-gray-600 mt-2 text-center">H2H career stats via ESPN Cricinfo</p>
             </motion.div>
           )}
         </div>
