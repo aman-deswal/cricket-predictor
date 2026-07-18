@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getTeamMeta } from './teams';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -17,6 +18,7 @@ export interface Match {
   winner?: string;
   team1_recent_form?: Array<'W' | 'L'>;
   team2_recent_form?: Array<'W' | 'L'>;
+  bookmaker_odds?: { bookmaker: string; team1_odds: number; team2_odds: number };
 }
 
 export interface EdgeScoreFactors {
@@ -269,7 +271,7 @@ function isFutureMatch(match: Match): boolean {
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
-  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
@@ -284,19 +286,31 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .select('match_id, venue_name'),
     supabase
       .from('espn_match_data')
-      .select('match_id, venue_name'),
+      .select('match_id, venue_name, head_to_head'),
+    supabase
+      .from('match_odds')
+      .select('match_id, bookmaker, team1_odds, team2_odds')
+      .order('fetched_at', { ascending: false }),
   ]);
 
   if (error) throw error;
 
-  // Build venue lookups (ESPN takes priority over enrichment)
+  // Build venue + H2H lookups (ESPN takes priority)
   const espnVenue = new Map<string, string>();
-  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
+  const espnH2H = new Map<string, string>();
+  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null; head_to_head: string | null }) => {
     if (e.venue_name) espnVenue.set(e.match_id, e.venue_name);
+    if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
   });
   const enrichmentVenue = new Map<string, string>();
   (enrichmentData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
     if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
+  });
+
+  // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
+  const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
+  (oddsData ?? []).forEach((o: { match_id: string; bookmaker: string; team1_odds: number; team2_odds: number }) => {
+    if (!oddsMap.has(o.match_id)) oddsMap.set(o.match_id, o);
   });
 
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
@@ -313,12 +327,40 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 
   const matchesWithForm = ((data ?? []) as MatchWithPredictions[]).map((match) => {
     const statsMatchType = getStatsMatchType(match.match_type);
+    let team1Form = recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [];
+    let team2Form = recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [];
+
+    // Override with ESPN H2H form if available (more accurate/recent)
+    const h2hRaw = espnH2H.get(match.match_id);
+    if (h2hRaw) {
+      try {
+        const h2hGames = typeof h2hRaw === 'string' ? JSON.parse(h2hRaw) : h2hRaw;
+        if (Array.isArray(h2hGames) && h2hGames.length > 0) {
+          const team1Meta = getTeamMeta(match.team1);
+          const team2Meta = getTeamMeta(match.team2);
+          const deriveForm = (shortName: string): Array<'W' | 'L'> => {
+            return h2hGames
+              .slice(0, 5)
+              .reverse()
+              .map((g: { teams?: Array<{ abbreviation?: string; winner?: boolean }> }) => {
+                const t = g.teams?.find(t => t.abbreviation === shortName);
+                return t?.winner ? 'W' as const : 'L' as const;
+              });
+          };
+          const f1 = deriveForm(team1Meta.shortName);
+          const f2 = deriveForm(team2Meta.shortName);
+          if (f1.length > 0) team1Form = f1;
+          if (f2.length > 0) team2Form = f2;
+        }
+      } catch {}
+    }
+
     return {
       ...match,
-      // Backfill venue: ESPN > enrichment > original
       venue: match.venue || espnVenue.get(match.match_id) || enrichmentVenue.get(match.match_id) || '',
-      team1_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [],
-      team2_recent_form: recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [],
+      team1_recent_form: team1Form,
+      team2_recent_form: team2Form,
+      bookmaker_odds: oddsMap.get(match.match_id),
     };
   });
 

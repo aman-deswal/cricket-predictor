@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
@@ -100,6 +101,26 @@ export function PredictDetails() {
     load();
   }, [matchId]);
 
+  // Live countdown timer
+  const getCountdown = useCallback(() => {
+    if (!match) return null;
+    const matchDate = match.date.endsWith('Z') || match.date.includes('+') ? match.date : match.date + 'Z';
+    const diff = new Date(matchDate).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+    return { days, hours, mins, secs };
+  }, [match]);
+
+  const [countdown, setCountdown] = useState(getCountdown);
+  useEffect(() => {
+    if (!match) return;
+    const interval = setInterval(() => setCountdown(getCountdown()), 1000);
+    return () => clearInterval(interval);
+  }, [match, getCountdown]);
+
   if (loading) {
     return <CricketLoader />;
   }
@@ -154,8 +175,42 @@ export function PredictDetails() {
     });
   });
 
+  // Resolve team colors once — ensure visual distinction (same logic as donut chart)
+  const colorDist = (c1: string, c2: string) => {
+    const hex = (s: string) => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+    const [r1,g1,b1] = hex(c1);
+    const [r2,g2,b2] = hex(c2);
+    return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+  };
+  const teamColor1 = team1Meta.primaryColor;
+  const teamColor2 = colorDist(team1Meta.primaryColor, team2Meta.primaryColor) < 80
+    ? team2Meta.secondaryColor
+    : team2Meta.primaryColor;
+
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Back link + Countdown */}
+      <div className="flex items-center justify-between mb-4">
+        <Link href="/" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors group">
+          <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
+          All Matches
+        </Link>
+        {countdown && (
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+            <svg className="w-3 h-3 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
+            <span className="font-mono">
+              {countdown.days > 0 && <span className="text-white font-semibold">{countdown.days}</span>}
+              {countdown.days > 0 && <span className="text-gray-500">d </span>}
+              <span className="text-white font-semibold">{String(countdown.hours).padStart(2, '0')}</span>
+              <span className="text-gray-500">h </span>
+              <span className="text-white font-semibold">{String(countdown.mins).padStart(2, '0')}</span>
+              <span className="text-gray-500">m </span>
+              <span className="text-white font-semibold">{String(countdown.secs).padStart(2, '0')}</span>
+              <span className="text-gray-500">s</span>
+            </span>
+          </div>
+        )}
+      </div>
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <motion.div
         className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
@@ -196,13 +251,15 @@ export function PredictDetails() {
               </div>
             )}
             {prediction && (
-              <p className="text-lg sm:text-2xl lg:text-3xl font-black text-cricket-300 mt-1">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-black mt-1" style={{ color: teamColor1, textShadow: '0 0 6px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.6)' }}>
                 {(prediction.team1_win_probability * 100).toFixed(0)}%
               </p>
             )}
             {prediction && (
               <span className="text-xs font-mono text-gray-400">
-                {toAmericanOdds(prediction.team1_win_probability)}
+                {odds.length > 0
+                  ? decimalToAmerican(odds[0].team1_odds)
+                  : toAmericanOdds(prediction.team1_win_probability)}
               </span>
             )}
           </motion.div>
@@ -229,7 +286,7 @@ export function PredictDetails() {
                 <span className="text-xs font-black text-cricket-400 uppercase">VS</span>
               </div>
             )}
-            <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">Prediction</span>
+            <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">AI Verdict</span>
           </motion.div>
 
           {/* Team 2 */}
@@ -261,13 +318,15 @@ export function PredictDetails() {
               </div>
             )}
             {prediction && (
-              <p className="text-lg sm:text-2xl lg:text-3xl font-black text-cricket-300 mt-1">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-black mt-1" style={{ color: teamColor2, textShadow: '0 0 6px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.6)' }}>
                 {(prediction.team2_win_probability * 100).toFixed(0)}%
               </p>
             )}
             {prediction && (
               <span className="text-xs font-mono text-gray-400">
-                {toAmericanOdds(prediction.team2_win_probability)}
+                {odds.length > 0
+                  ? decimalToAmerican(odds[0].team2_odds)
+                  : toAmericanOdds(prediction.team2_win_probability)}
               </span>
             )}
           </motion.div>
@@ -308,6 +367,9 @@ export function PredictDetails() {
         const t1Pct = total > 0 ? (edge.team1_score / total) * 100 : 50;
         const isT1Edge = edge.edge_team === prediction.team1;
 
+        const barColor1 = teamColor1;
+        const barColor2 = teamColor2;
+
         const factors = [
           {
             label: 'Form',
@@ -346,7 +408,7 @@ export function PredictDetails() {
             transition={{ delay: 0.18 }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
                 Who has the edge?
@@ -355,34 +417,37 @@ export function PredictDetails() {
                 SixSense Edge Score™
               </span>
             </div>
+            <p className="text-[9px] text-gray-500 mb-4 pl-5">Based on form, venue, rankings & head-to-head stats</p>
 
             {/* Tug-of-war bar */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
-                <span className={`text-xs font-bold ${isT1Edge && edgeAbs > 5 ? 'text-cricket-400' : 'text-gray-400'}`}>{prediction.team1}</span>
-                <span className={`text-xs font-bold ${!isT1Edge && edgeAbs > 5 ? 'text-amber-400' : 'text-gray-400'}`}>{prediction.team2}</span>
+                <span className="text-xs font-bold" style={{ color: isT1Edge && edgeAbs > 5 ? barColor1 : '#9ca3af', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team1}</span>
+                <span className="text-xs font-bold" style={{ color: !isT1Edge && edgeAbs > 5 ? barColor2 : '#9ca3af', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team2}</span>
               </div>
-              <div className="h-8 rounded-full overflow-hidden flex bg-gray-800/40 border border-gray-700/30">
+              <div className="h-8 rounded-full overflow-hidden flex bg-gray-800/40 border border-white/10 gap-[2px]">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-cricket-700 to-cricket-500 flex items-center justify-center relative"
+                  className="h-full flex items-center justify-center relative rounded-l-full"
+                  style={{ backgroundColor: barColor1, boxShadow: `0 0 8px ${barColor1}40` }}
                   initial={{ width: '50%' }}
                   animate={{ width: `${t1Pct}%` }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
                 >
                   {t1Pct > 30 && (
-                    <span className="text-[11px] font-bold text-white drop-shadow">
+                    <span className="text-[11px] font-bold text-white drop-shadow-lg">
                       {Math.round(t1Pct)}%
                     </span>
                   )}
                 </motion.div>
                 <motion.div
-                  className="h-full bg-gradient-to-r from-amber-500 to-amber-700 flex items-center justify-center relative"
+                  className="h-full flex items-center justify-center relative rounded-r-full"
+                  style={{ backgroundColor: barColor2, boxShadow: `0 0 8px ${barColor2}40` }}
                   initial={{ width: '50%' }}
                   animate={{ width: `${100 - t1Pct}%` }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
                 >
                   {(100 - t1Pct) > 30 && (
-                    <span className="text-[11px] font-bold text-white drop-shadow">
+                    <span className="text-[11px] font-bold text-white drop-shadow-lg">
                       {Math.round(100 - t1Pct)}%
                     </span>
                   )}
@@ -407,20 +472,22 @@ export function PredictDetails() {
                     </div>
 
                     {/* Score left */}
-                    <span className={`text-[10px] font-bold w-6 text-right shrink-0 ${!isEven && t1Leads ? 'text-cricket-400' : 'text-gray-500'}`}>
+                    <span className="text-[10px] font-bold w-6 text-right shrink-0" style={{ color: !isEven && t1Leads ? barColor1 : '#6b7280', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
                       {Math.round(v1)}
                     </span>
 
                     {/* Mini tug bar */}
-                    <div className="flex-1 h-3.5 rounded-full overflow-hidden flex bg-gray-800/40">
+                    <div className="flex-1 h-3.5 rounded-full overflow-hidden flex bg-gray-800/40 border border-white/[0.06] gap-[1px]">
                       <motion.div
-                        className={`h-full ${isEven ? 'bg-gray-600' : t1Leads ? 'bg-cricket-600' : 'bg-gray-700'}`}
+                        className="h-full rounded-l-full"
+                        style={{ backgroundColor: isEven ? '#4b5563' : t1Leads ? barColor1 : '#374151' }}
                         initial={{ width: '50%' }}
                         animate={{ width: `${barPct}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
                       />
                       <motion.div
-                        className={`h-full ${isEven ? 'bg-gray-600' : !t1Leads ? 'bg-amber-600' : 'bg-gray-700'}`}
+                        className="h-full rounded-r-full"
+                        style={{ backgroundColor: isEven ? '#4b5563' : !t1Leads ? barColor2 : '#374151' }}
                         initial={{ width: '50%' }}
                         animate={{ width: `${100 - barPct}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
@@ -428,7 +495,7 @@ export function PredictDetails() {
                     </div>
 
                     {/* Score right */}
-                    <span className={`text-[10px] font-bold w-6 shrink-0 ${!isEven && !t1Leads ? 'text-amber-400' : 'text-gray-500'}`}>
+                    <span className="text-[10px] font-bold w-6 shrink-0" style={{ color: !isEven && !t1Leads ? barColor2 : '#6b7280', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
                       {Math.round(v2)}
                     </span>
                   </div>
@@ -907,13 +974,20 @@ export function PredictDetails() {
                       <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
                         <span className="text-gray-500 w-16 shrink-0">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
                         <div className="flex-1 flex items-center gap-1">
-                          {game.teams.map((t, j) => (
-                            <span key={j} className={`${t.winner ? 'text-cricket-400 font-semibold' : 'text-gray-400'}`}>
-                              {t.abbreviation} {t.score}{j < game.teams.length - 1 ? ' vs ' : ''}
-                            </span>
-                          ))}
+                          {game.teams.map((t, j) => {
+                            const isTeam1 = t.abbreviation === team1Meta.shortName || t.abbreviation === prediction?.team1;
+                            const winColor = isTeam1 ? teamColor1 : teamColor2;
+                            return (
+                              <span key={j} style={t.winner ? { color: winColor, fontWeight: 600, textShadow: '0 0 4px rgba(0,0,0,0.7)' } : undefined} className={t.winner ? '' : 'text-gray-400'}>
+                                {t.abbreviation} {t.score}{j < game.teams.length - 1 ? ' vs ' : ''}
+                              </span>
+                            );
+                          })}
                         </div>
-                        {winner && <span className="text-[8px] text-cricket-400/70">✓ {winner.abbreviation}</span>}
+                        {winner && (() => {
+                          const isTeam1Win = winner.abbreviation === team1Meta.shortName || winner.abbreviation === prediction?.team1;
+                          return <span className="text-[8px]" style={{ color: isTeam1Win ? teamColor1 : teamColor2, textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>✓ {winner.abbreviation}</span>;
+                        })()}
                       </div>
                     );
                   })}
