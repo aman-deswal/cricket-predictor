@@ -51,7 +51,6 @@ export interface Prediction {
   model: string;
   ensemble_size: number;
   scored_at?: string;
-  edge_score?: EdgeScore;
 }
 
 export interface PredictionResult {
@@ -382,6 +381,24 @@ export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
 
   if (error) return [];
   return data ?? [];
+}
+
+export async function getEdgeScore(matchId: string): Promise<EdgeScore | null> {
+  const { data, error } = await supabase
+    .from('match_edge_scores')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error) return null;
+  return {
+    team1_score: data.team1_score,
+    team2_score: data.team2_score,
+    net_edge: data.net_edge,
+    edge_team: data.edge_team,
+    narrative: data.narrative,
+    factors: data.factors,
+  };
 }
 
 export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon } from '@/components/CricketIcons';
@@ -54,6 +54,7 @@ export function PredictDetails() {
   const [squads, setSquads] = useState<MatchSquad[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [espnData, setEspnData] = useState<ESPNMatchData | null>(null);
+  const [edgeScore, setEdgeScore] = useState<EdgeScore | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,13 +65,14 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData, oddsData, squadData, espn] = await Promise.all([
+        const [matchData, predictionData, enrichmentData, oddsData, squadData, espn, edgeData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
           getMatchEnrichment(matchId),
           getMatchOdds(matchId),
           getMatchSquads(matchId),
           getESPNMatchData(matchId),
+          getEdgeScore(matchId),
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
@@ -78,6 +80,7 @@ export function PredictDetails() {
         setOdds(oddsData);
         setSquads(squadData);
         setEspnData(espn);
+        setEdgeScore(edgeData);
 
         // Fetch player stats for all squad players
         if (squadData.length > 0 && matchData) {
@@ -271,8 +274,8 @@ export function PredictDetails() {
       </motion.div>
 
       {/* SixSense Edge Score™ */}
-      {prediction?.edge_score && (() => {
-        const edge = prediction.edge_score;
+      {edgeScore && prediction && (() => {
+        const edge = edgeScore;
         const f1 = edge.factors.team1;
         const f2 = edge.factors.team2;
         const maxScore = Math.max(edge.team1_score, edge.team2_score);

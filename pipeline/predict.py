@@ -101,6 +101,25 @@ def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
     return team_form, team_form, h2h, venue
 
 
+def _store_edge_score(match_id: str, edge: dict) -> None:
+    """Store edge score in Supabase match_edge_scores table."""
+    try:
+        client = get_client()
+        row = {
+            "match_id": match_id,
+            "team1_score": edge["team1_score"],
+            "team2_score": edge["team2_score"],
+            "net_edge": edge["net_edge"],
+            "edge_team": edge["edge_team"],
+            "narrative": edge["narrative"],
+            "factors": edge["factors"],
+        }
+        client.table("match_edge_scores").upsert(row, on_conflict="match_id").execute()
+        logger.info(f"  Edge score stored: {edge['edge_team']} +{abs(edge['net_edge']):.0f}")
+    except Exception as exc:
+        logger.warning(f"  Failed to store edge score: {exc}")
+
+
 def build_context(match: dict) -> dict:
     """Build statistical context for a match prediction."""
     team1 = match["team1"]
@@ -350,7 +369,10 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
             prediction = ensemble_predict(match)
+            edge = prediction.pop("edge_score", None)
             store_prediction(prediction)
+            if edge:
+                _store_edge_score(match["match_id"], edge)
             logger.info(
                 f"  → {prediction['predicted_winner']} "
                 f"({prediction['team1_win_probability']:.1%} / {prediction['team2_win_probability']:.1%})"
