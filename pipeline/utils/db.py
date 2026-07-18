@@ -142,11 +142,10 @@ def get_recent_results(days: int = 14) -> list[dict]:
 
     client = get_client()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    # Use gte on scored_at — nulls won't match >= a date, so no explicit null filter needed
     response = (
         client.table("predictions")
         .select("match_id, team1, team2, match_type, predicted_winner, winner, scored_at")
-        .neq("scored_at", "null")
-        .neq("winner", "null")
         .gte("scored_at", cutoff)
         .order("scored_at", desc=True)
         .limit(20)
