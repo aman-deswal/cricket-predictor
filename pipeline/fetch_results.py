@@ -243,9 +243,59 @@ def main(force: bool = False) -> None:
 
         still_unscored.append(prediction)
 
-    logger.info(f"ESPN phase: scored {scored} predictions")
+    logger.info(f"ESPN phase 1 (stored IDs): scored {scored} predictions")
 
-    # --- Phase 2: Score via CricAPI match_info (fallback, limited) ---
+    # --- Phase 2: Try ESPN header for remaining matches ---
+    if still_unscored:
+        logger.info(f"Phase 2: Checking ESPN header for {len(still_unscored)} remaining...")
+        try:
+            from utils.espn import get_espn_fixtures, match_espn_to_cricapi
+            espn_fixtures = get_espn_fixtures()
+            completed_espn = [f for f in espn_fixtures if f.get("status") == "post" and f.get("winner")]
+
+            if completed_espn:
+                # Try to match remaining unscored predictions to ESPN completed fixtures
+                mapping = match_espn_to_cricapi(completed_espn, [
+                    {"match_id": p["match_id"], "team1": p["team1"], "team2": p["team2"],
+                     "date": date_map.get(p["match_id"], "")}
+                    for p in still_unscored
+                ])
+
+                newly_scored = []
+                for prediction in still_unscored:
+                    mid = prediction["match_id"]
+                    espn_eid = mapping.get(mid)
+                    if not espn_eid:
+                        continue
+
+                    # Find the ESPN fixture to get the winner
+                    espn_match = next((f for f in completed_espn if f["espn_event_id"] == espn_eid), None)
+                    if not espn_match or not espn_match.get("winner"):
+                        continue
+
+                    mapped = _match_espn_winner_to_prediction(espn_match["winner"], prediction)
+                    if mapped:
+                        _persist_score(client, prediction, mapped)
+                        scored += 1
+                        newly_scored.append(mid)
+
+                        # Also store the ESPN event ID for future use
+                        try:
+                            existing = client.table("espn_match_data").select("match_id").eq("match_id", mid).execute()
+                            if not existing.data:
+                                client.table("espn_match_data").insert({
+                                    "match_id": mid,
+                                    "espn_event_id": espn_eid,
+                                }).execute()
+                        except Exception:
+                            pass
+
+                still_unscored = [p for p in still_unscored if p["match_id"] not in newly_scored]
+                logger.info(f"ESPN phase 2 (header): scored {len(newly_scored)} more")
+        except Exception as e:
+            logger.warning(f"ESPN header scoring failed: {e}")
+
+    # --- Phase 3: Score via CricAPI match_info (fallback, limited) ---
     if still_unscored:
         batch = still_unscored[:MAX_CRICAPI_CALLS]
         logger.info(f"CricAPI fallback: checking {len(batch)} of {len(still_unscored)} remaining...")

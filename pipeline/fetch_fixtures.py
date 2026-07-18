@@ -1,7 +1,14 @@
-"""Fetch upcoming cricket fixtures from CricAPI and store in Supabase.
+"""Fetch upcoming cricket fixtures and store in Supabase.
 
-Also detects completed matches from the fixtures response and scores
-any pending predictions — avoiding extra CricAPI calls to match_info.
+Data sources (in priority order):
+1. **ESPN Cricinfo** (primary) — free, unlimited. Uses the scoreboard/header
+   endpoint for upcoming matches across all cricket leagues, plus series-
+   specific scoreboards for known leagues.
+2. **CricAPI** (supplementary) — 100 calls/day free tier. Adds matches that
+   ESPN header doesn't cover.
+
+Also detects completed matches from both sources and scores any pending
+predictions.
 """
 
 import argparse
@@ -11,6 +18,12 @@ from typing import Optional
 
 from utils.cricapi import fetch_all_current_matches
 from utils.db import get_client, replace_upcoming_matches
+from utils.espn import (
+    get_espn_fixtures,
+    get_espn_match_winner,
+    get_series_fixtures,
+    match_espn_to_cricapi,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -123,10 +136,117 @@ def _process_completed_matches(completed: list[dict]) -> int:
     return scored
 
 
+def _store_espn_event_mappings(mapping: dict[str, str]) -> int:
+    """Store ESPN event ID mappings in espn_match_data table.
+
+    Only inserts for match_ids that don't already have an entry.
+    Returns number of new mappings stored.
+    """
+    if not mapping:
+        return 0
+
+    client = get_client()
+    stored = 0
+
+    for match_id, espn_event_id in mapping.items():
+        # Check if already exists
+        existing = (
+            client.table("espn_match_data")
+            .select("match_id")
+            .eq("match_id", match_id)
+            .execute()
+        )
+        if existing.data:
+            continue
+
+        # Insert minimal record — fetch_espn.py will fill in details later
+        try:
+            client.table("espn_match_data").insert({
+                "match_id": match_id,
+                "espn_event_id": espn_event_id,
+            }).execute()
+            stored += 1
+        except Exception as e:
+            logger.debug(f"Failed to store ESPN mapping for {match_id}: {e}")
+
+    return stored
+
+
+def _score_espn_completed(espn_fixtures: list[dict]) -> int:
+    """Score predictions for matches ESPN reports as completed.
+
+    Returns number of predictions scored.
+    """
+    completed = [f for f in espn_fixtures if f.get("status") == "post" and f.get("winner")]
+    if not completed:
+        return 0
+
+    client = get_client()
+    scored = 0
+
+    for fixture in completed:
+        espn_winner = fixture["winner"]
+        espn_eid = fixture["espn_event_id"]
+
+        # Find our match by ESPN event ID
+        espn_rec = (
+            client.table("espn_match_data")
+            .select("match_id")
+            .eq("espn_event_id", espn_eid)
+            .execute()
+        )
+        if not espn_rec.data:
+            continue
+
+        match_id = espn_rec.data[0]["match_id"]
+
+        # Look up unscored prediction
+        pred_resp = (
+            client.table("predictions")
+            .select("*")
+            .eq("match_id", match_id)
+            .is_("scored_at", "null")
+            .execute()
+        )
+        if not pred_resp.data:
+            continue
+
+        prediction = pred_resp.data[0]
+
+        # Map ESPN winner name to our team names
+        from utils.espn import _normalize_team
+        norm_winner = _normalize_team(espn_winner)
+        actual = None
+        if _normalize_team(prediction["team1"]) == norm_winner or norm_winner in _normalize_team(prediction["team1"]):
+            actual = prediction["team1"]
+        elif _normalize_team(prediction["team2"]) == norm_winner or norm_winner in _normalize_team(prediction["team2"]):
+            actual = prediction["team2"]
+        else:
+            logger.warning(f"ESPN winner '{espn_winner}' doesn't match {prediction['team1']}/{prediction['team2']}")
+            continue
+
+        # Update match status
+        client.table("matches").update({
+            "status": "completed",
+            "winner": actual,
+        }).eq("match_id", match_id).execute()
+
+        result = _score_prediction(prediction, actual)
+        client.table("prediction_results").upsert(result, on_conflict="prediction_id").execute()
+        client.table("predictions").update({"scored_at": datetime.utcnow().isoformat()}).eq("match_id", match_id).execute()
+
+        correct_str = "✓" if result["correct"] else "✗"
+        logger.info(f"ESPN scored: {prediction['team1']} vs {prediction['team2']} → winner={actual} {correct_str}")
+        scored += 1
+
+    return scored
+
+
 def main(match_types: Optional[list[str]] = None) -> None:
     """
-    Fetch current fixtures from CricAPI and store in database.
-    Also scores any completed matches found in the response.
+    Fetch current fixtures from ESPN (primary) + CricAPI (supplementary).
+    Auto-maps ESPN event IDs to CricAPI matches for downstream enrichment.
+    Also scores any completed matches found in either response.
 
     Args:
         match_types: List of match types to fetch (default: ["odi", "t20"])
@@ -134,17 +254,52 @@ def main(match_types: Optional[list[str]] = None) -> None:
     if match_types is None:
         match_types = ["odi", "t20"]
 
-    logger.info("Fetching current matches...")
-    upcoming, completed = fetch_all_current_matches(match_types)
-    logger.info(f"Found {len(upcoming)} upcoming, {len(completed)} completed matches")
+    # --- Phase 1: ESPN fixture discovery ---
+    logger.info("Phase 1: Fetching fixtures from ESPN...")
+    espn_fixtures = get_espn_fixtures()
+    logger.info(f"ESPN: {len(espn_fixtures)} fixtures from header")
 
-    logger.info("Upserting upcoming matches...")
-    replace_upcoming_matches(upcoming)
+    # --- Phase 2: CricAPI fixtures (supplementary) ---
+    logger.info("Phase 2: Fetching fixtures from CricAPI...")
+    try:
+        upcoming, completed = fetch_all_current_matches(match_types)
+        logger.info(f"CricAPI: {len(upcoming)} upcoming, {len(completed)} completed")
+    except Exception as e:
+        logger.warning(f"CricAPI failed (rate limit?): {e}")
+        upcoming, completed = [], []
 
+    # --- Phase 3: Upsert matches ---
+    if upcoming:
+        logger.info("Upserting CricAPI matches...")
+        replace_upcoming_matches(upcoming)
+
+    # --- Phase 4: Auto-map ESPN event IDs ---
+    if upcoming and espn_fixtures:
+        logger.info("Auto-mapping ESPN event IDs to CricAPI matches...")
+        mapping = match_espn_to_cricapi(espn_fixtures, upcoming)
+        if mapping:
+            stored = _store_espn_event_mappings(mapping)
+            logger.info(f"Stored {stored} new ESPN event ID mappings (of {len(mapping)} matched)")
+        else:
+            logger.info("No new ESPN ↔ CricAPI matches found")
+
+    # --- Phase 5: Score completed matches ---
+    total_scored = 0
+
+    # Score from CricAPI completed matches
     if completed:
-        logger.info(f"Processing {len(completed)} completed matches for scoring...")
-        scored = _process_completed_matches(completed)
-        logger.info(f"Scored {scored} predictions from fixtures data")
+        logger.info(f"Scoring from CricAPI: {len(completed)} completed matches...")
+        total_scored += _process_completed_matches(completed)
+
+    # Score from ESPN completed matches
+    if espn_fixtures:
+        espn_completed = [f for f in espn_fixtures if f.get("status") == "post" and f.get("winner")]
+        if espn_completed:
+            logger.info(f"Scoring from ESPN: {len(espn_completed)} completed matches...")
+            total_scored += _score_espn_completed(espn_fixtures)
+
+    if total_scored:
+        logger.info(f"Total scored: {total_scored} predictions")
 
     logger.info("Done.")
 

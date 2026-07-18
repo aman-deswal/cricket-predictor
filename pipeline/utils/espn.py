@@ -524,3 +524,189 @@ def find_and_fetch(team1: str, team2: str, match_date: str,
     if not event_id:
         return None
     return get_match_summary(event_id)
+
+
+# ---------------------------------------------------------------------------
+# Fixture discovery: upcoming/recent matches across all cricket
+# ---------------------------------------------------------------------------
+
+ESPN_HEADER_URL = "https://site.web.api.espn.com/apis/v2/scoreboard/header"
+
+
+def get_espn_fixtures() -> List[Dict[str, Any]]:
+    """Fetch all current/upcoming/recent cricket matches from ESPN header.
+
+    Returns a list of dicts with keys:
+        espn_event_id, team1, team2, date, venue, league_name, league_id,
+        status (pre/in/post), winner (if completed)
+    """
+    try:
+        resp = requests.get(
+            ESPN_HEADER_URL,
+            params={"sport": "cricket"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            logger.warning(f"ESPN header returned {resp.status_code}")
+            return []
+
+        data = resp.json()
+    except Exception as e:
+        logger.warning(f"ESPN header request failed: {e}")
+        return []
+
+    fixtures: List[Dict[str, Any]] = []
+
+    for sport in data.get("sports", []):
+        for league in sport.get("leagues", []):
+            league_id = league.get("id", "")
+            league_name = league.get("name", "")
+
+            for event in league.get("events", []):
+                competitors = event.get("competitors", [])
+                if len(competitors) < 2:
+                    continue
+
+                team1 = competitors[0].get("displayName", "")
+                team2 = competitors[1].get("displayName", "")
+                status = event.get("status", "pre")  # pre/in/post
+                date_str = event.get("date", "")
+
+                winner = None
+                if status == "post":
+                    for c in competitors:
+                        if c.get("winner"):
+                            winner = c.get("displayName")
+
+                fixtures.append({
+                    "espn_event_id": str(event.get("id", "")),
+                    "team1": team1,
+                    "team2": team2,
+                    "date": date_str,
+                    "league_name": league_name,
+                    "league_id": league_id,
+                    "status": status,
+                    "winner": winner,
+                })
+
+    logger.info(f"ESPN header: found {len(fixtures)} fixtures across {len(data.get('sports', [{}])[0].get('leagues', []))} leagues")
+    return fixtures
+
+
+def get_series_fixtures(league_id: str) -> List[Dict[str, Any]]:
+    """Fetch matches from an ESPN series scoreboard.
+
+    Returns list of dicts similar to get_espn_fixtures() output.
+    """
+    try:
+        url = ESPN_SCOREBOARD_URL.format(league_id=league_id)
+        resp = requests.get(url, params={"limit": 50}, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+    except Exception as e:
+        logger.debug(f"ESPN series scoreboard failed for {league_id}: {e}")
+        return []
+
+    fixtures = []
+    for event in data.get("events", []):
+        comps = event.get("competitions", [{}])[0]
+        competitors = comps.get("competitors", [])
+        if len(competitors) < 2:
+            continue
+
+        status_obj = comps.get("status", {}).get("type", {})
+        status_desc = status_obj.get("description", "")
+        status_state = status_obj.get("state", "pre")
+
+        winner = None
+        if status_desc == "Result":
+            for c in competitors:
+                if c.get("winner"):
+                    winner = c.get("team", {}).get("displayName")
+
+        venue = comps.get("venue", {})
+
+        fixtures.append({
+            "espn_event_id": str(event.get("id", "")),
+            "team1": competitors[0].get("team", {}).get("displayName", ""),
+            "team2": competitors[1].get("team", {}).get("displayName", ""),
+            "date": event.get("date", ""),
+            "league_name": data.get("leagues", [{}])[0].get("name", ""),
+            "league_id": league_id,
+            "status": status_state,
+            "winner": winner,
+            "venue": venue.get("fullName", ""),
+        })
+
+    return fixtures
+
+
+def get_espn_match_winner(event_id: str) -> Optional[str]:
+    """Quick check if a match has a winner via ESPN summary header.
+
+    Returns winner team display name, '__no_result__' for abandoned,
+    or None if not completed.
+    """
+    try:
+        url = ESPN_SUMMARY_URL.format(league_id=DEFAULT_LEAGUE)
+        r = requests.get(url, params={"event": event_id}, timeout=REQUEST_TIMEOUT)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+
+        header = data.get("header", {})
+        comp = header.get("competitions", [{}])[0]
+        status = comp.get("status", {}).get("type", {})
+        status_desc = status.get("description", "")
+
+        if status_desc not in ("Result", "Abandoned", "No Result"):
+            return None
+
+        for c in comp.get("competitors", []):
+            if c.get("winner"):
+                return c.get("team", {}).get("displayName")
+
+        if status_desc in ("Abandoned", "No Result"):
+            return "__no_result__"
+
+        return None
+    except Exception:
+        return None
+
+
+def match_espn_to_cricapi(
+    espn_fixtures: List[Dict[str, Any]],
+    cricapi_matches: List[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Match ESPN fixtures to CricAPI match records by team names + date.
+
+    Returns dict mapping CricAPI match_id → ESPN event_id.
+    """
+    mapping: Dict[str, str] = {}
+
+    for cric in cricapi_matches:
+        c_team1 = _normalize_team(cric.get("team1", ""))
+        c_team2 = _normalize_team(cric.get("team2", ""))
+        c_date = _parse_date(cric.get("date", ""))
+
+        for espn in espn_fixtures:
+            e_team1 = _normalize_team(espn.get("team1", ""))
+            e_team2 = _normalize_team(espn.get("team2", ""))
+            e_date = _parse_date(espn.get("date", ""))
+
+            # Teams must match (order doesn't matter)
+            teams_ok = {c_team1, c_team2} == {e_team1, e_team2}
+            if not teams_ok:
+                continue
+
+            # Date must be within 1 day
+            if c_date and e_date:
+                diff = abs((c_date - e_date).total_seconds())
+                if diff > 86400 * 2:  # 2 days tolerance
+                    continue
+
+            mapping[cric["match_id"]] = espn["espn_event_id"]
+            break
+
+    return mapping

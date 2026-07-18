@@ -1,4 +1,4 @@
-"""Fetch squad / playing XI data from CricAPI for upcoming matches."""
+"""Fetch squad / playing XI data from ESPN (primary) and CricAPI (fallback)."""
 
 import argparse
 import os
@@ -11,6 +11,7 @@ import requests
 from dotenv import load_dotenv
 
 from utils.db import get_client, get_upcoming_matches
+from utils.espn import get_match_summary
 
 load_dotenv()
 
@@ -18,7 +19,76 @@ BASE_URL = "https://api.cricapi.com/v1"
 
 
 def _get_api_key() -> str:
-    return os.environ["CRICAPI_KEY"]
+    return os.environ.get("CRICAPI_KEY", "")
+
+
+def fetch_squad_from_espn(match_id: str) -> Optional[list[dict]]:
+    """
+    Fetch squad/playing XI from ESPN summary for a match.
+
+    Requires an ESPN event ID to be stored in espn_match_data table.
+    ESPN only has rosters after match starts (confirmed playing XI).
+
+    Returns list of team dicts: [{teamName, players: [...]}] or None.
+    """
+    client = get_client()
+    espn_resp = (
+        client.table("espn_match_data")
+        .select("espn_event_id")
+        .eq("match_id", match_id)
+        .execute()
+    )
+    if not espn_resp.data:
+        return None
+
+    espn_eid = str(espn_resp.data[0]["espn_event_id"])
+    summary = get_match_summary(espn_eid)
+    if not summary:
+        return None
+
+    rosters = summary.get("rosters", [])
+    if not rosters:
+        return None
+
+    # Check if any roster actually has players (ESPN is empty for future matches)
+    if all(len(r.get("players", [])) == 0 for r in rosters):
+        return None
+
+    result = []
+    for roster in rosters:
+        players = []
+        for p in roster.get("players", []):
+            pos = p.get("position", "")
+            players.append({
+                "id": p.get("espn_id", ""),
+                "name": p.get("name", ""),
+                "role": _classify_espn_position(pos),
+                "batting_style": "",
+                "bowling_style": "",
+                "is_captain": False,
+                "is_keeper": pos.lower() == "wicketkeeper" if pos else False,
+                "image_url": p.get("headshot_url", ""),
+            })
+        result.append({
+            "teamName": roster.get("team_name", ""),
+            "players": players,
+        })
+
+    return result if any(r["players"] for r in result) else None
+
+
+def _classify_espn_position(position: str) -> str:
+    """Map ESPN position names to our role categories."""
+    pos = position.lower() if position else ""
+    if "keeper" in pos or "wicketkeeper" in pos:
+        return "WK-Batter"
+    if "allrounder" in pos or "all-rounder" in pos:
+        return "All-Rounder"
+    if "bowler" in pos:
+        return "Bowler"
+    if "batter" in pos or "batsman" in pos or "batsmen" in pos:
+        return "Batter"
+    return "Batter"  # default
 
 
 def fetch_squad_for_match(match_id: str) -> Optional[list[dict]]:
@@ -28,10 +98,14 @@ def fetch_squad_for_match(match_id: str) -> Optional[list[dict]]:
     Returns list of team dicts: [{teamName, players: [{id, name, role, ...}]}]
     or None if not available yet.
     """
+    api_key = _get_api_key()
+    if not api_key:
+        return None
+
     try:
         response = requests.get(
             f"{BASE_URL}/match_squad",
-            params={"apikey": _get_api_key(), "id": match_id},
+            params={"apikey": api_key, "id": match_id},
             timeout=30,
         )
         response.raise_for_status()
@@ -85,7 +159,8 @@ def _classify_role(player: dict) -> str:
     return "Batter"
 
 
-def store_squad(match_id: str, team_name: str, players: list[dict], is_confirmed: bool = False) -> None:
+def store_squad(match_id: str, team_name: str, players: list[dict],
+                is_confirmed: bool = False, source: str = "cricapi_fantasy") -> None:
     """Store squad in Supabase match_squads table."""
     client = get_client()
     squad_data = {
@@ -93,7 +168,7 @@ def store_squad(match_id: str, team_name: str, players: list[dict], is_confirmed
         "team": team_name,
         "players": players,
         "is_confirmed": is_confirmed,
-        "source": "cricapi_fantasy",
+        "source": source,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -151,7 +226,15 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
                 skip_count += 1
                 continue
 
-        squad_data = fetch_squad_for_match(match_id)
+        # Try ESPN first (free, unlimited)
+        squad_data = fetch_squad_from_espn(match_id)
+        source = "espn"
+
+        # Fall back to CricAPI
+        if not squad_data:
+            squad_data = fetch_squad_for_match(match_id)
+            source = "cricapi_fantasy"
+
         if not squad_data:
             print("  ⏳ Squad not available yet")
             continue
@@ -164,18 +247,23 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
                 print(f"  ⚠️  No players listed for {team_name}")
                 continue
 
-            players = [normalize_player(p) for p in raw_players]
+            # ESPN players are already normalized
+            if source == "espn":
+                players = raw_players
+            else:
+                players = [normalize_player(p) for p in raw_players]
 
             # CricAPI fantasySquad usually returns full squad (15-18 players)
-            # If exactly 11 players, it's likely the confirmed XI
-            is_confirmed = len(players) == 11
+            # ESPN always returns confirmed XI (11 players)
+            is_confirmed = len(players) == 11 or source == "espn"
 
-            store_squad(match_id, team_name, players, is_confirmed=is_confirmed)
-            print(f"  ✅ {team_name}: {len(players)} players {'(confirmed XI)' if is_confirmed else '(squad)'}")
+            store_squad(match_id, team_name, players, is_confirmed=is_confirmed, source=source)
+            print(f"  ✅ {team_name}: {len(players)} players {'(confirmed XI)' if is_confirmed else '(squad)'} [{source}]")
             success_count += 1
 
-        # Rate limit: CricAPI free tier is limited
-        time.sleep(1)
+        # Rate limit: only needed for CricAPI calls
+        if source == "cricapi_fantasy":
+            time.sleep(1)
 
     print(f"\n✅ Done! Stored {success_count} team squads, skipped {skip_count}")
 
