@@ -49,7 +49,7 @@ export default function HomePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <h1 className="text-4xl font-black text-white mb-8 tracking-tight">
+        <h1 className="text-2xl font-black text-white mb-6 tracking-tight">
           Up <span className="text-cricket-400">Next</span>
         </h1>
       </motion.div>
@@ -89,7 +89,7 @@ export default function HomePage() {
                   <MatchCard
                     key={match.match_id}
                     match={match}
-                    prediction={match.predictions?.[0] ?? null}
+                    prediction={Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null}
                     index={idx}
                     hot={sectionIdx === 0 && idx === 0}
                   />
