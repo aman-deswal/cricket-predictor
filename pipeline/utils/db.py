@@ -135,7 +135,7 @@ def get_all_predictions() -> list[dict]:
 def get_recent_results(days: int = 14) -> list[dict]:
     """Fetch recently scored predictions (last N days) with match context.
 
-    Returns list of dicts with keys: team1, team2, match_type, date,
+    Returns list of dicts with keys: team1, team2, match_type,
     predicted_winner, actual_winner, correct.
     """
     from datetime import datetime, timedelta, timezone
@@ -145,9 +145,11 @@ def get_recent_results(days: int = 14) -> list[dict]:
     response = (
         client.table("predictions")
         .select("match_id, team1, team2, match_type, predicted_winner, winner, scored_at")
-        .not_.is_("scored_at", "null")
+        .neq("scored_at", "null")
+        .neq("winner", "null")
         .gte("scored_at", cutoff)
         .order("scored_at", desc=True)
+        .limit(20)
         .execute()
     )
     results = []
@@ -160,7 +162,7 @@ def get_recent_results(days: int = 14) -> list[dict]:
             "match_type": p.get("match_type", ""),
             "predicted_winner": p.get("predicted_winner", ""),
             "actual_winner": p["winner"],
-            "correct": p.get("predicted_winner", "").lower() == p["winner"].lower(),
+            "correct": (p.get("predicted_winner") or "").lower() == p["winner"].lower(),
             "scored_at": p.get("scored_at", ""),
         })
     return results
