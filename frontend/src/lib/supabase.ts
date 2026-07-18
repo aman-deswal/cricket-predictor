@@ -425,6 +425,7 @@ export interface ESPNH2HTeam {
 
 export interface ESPNH2HGame {
   date: string;
+  note: string;
   teams: ESPNH2HTeam[];
 }
 
@@ -432,6 +433,16 @@ export interface ESPNStanding {
   team_name: string;
   team_abbr: string;
   stats: Record<string, string>;
+}
+
+export interface ESPNSeriesLeader {
+  player_name: string;
+  player_id: string;
+  team: string;
+  team_abbr: string;
+  category: string;
+  value: string;
+  headshot_url: string;
 }
 
 export interface ESPNMatchData {
@@ -452,6 +463,9 @@ export interface ESPNMatchData {
   match_days: string | null;
   hours_of_play: string | null;
   series_note: string | null;
+  // Series
+  series_scoreline: string | null;
+  series_leaders: ESPNSeriesLeader[];
   // JSON fields
   officials: ESPNOfficial[];
   rosters: ESPNRoster[];
@@ -487,6 +501,8 @@ export async function getESPNMatchData(matchId: string): Promise<ESPNMatchData |
     head_to_head: parseJSON(data.head_to_head) as ESPNH2HGame[],
     standings: parseJSON(data.standings) as ESPNStanding[],
     scorecards: parseJSON(data.scorecards),
+    series_leaders: parseJSON(data.series_leaders) as ESPNSeriesLeader[],
+    series_scoreline: data.series_scoreline ?? null,
   };
 }
 
