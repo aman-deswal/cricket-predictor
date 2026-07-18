@@ -266,7 +266,18 @@ export function PredictDetails() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <span className="uppercase font-semibold text-cricket-400">{match.match_type}</span>
+          <span className="uppercase font-semibold text-cricket-400">
+            {(() => {
+              const scoreline = espnData?.series_scoreline || '';
+              const levelMatch = scoreline.match(/level\s+(\d+)-(\d+)/);
+              const leadsMatch = scoreline.match(/leads?\s+(\d+)-(\d+)/);
+              let matchNum = 0;
+              if (levelMatch) matchNum = parseInt(levelMatch[1]) + parseInt(levelMatch[2]) + 1;
+              else if (leadsMatch) matchNum = parseInt(leadsMatch[1]) + parseInt(leadsMatch[2]) + 1;
+              const suffix = matchNum === 1 ? 'st' : matchNum === 2 ? 'nd' : matchNum === 3 ? 'rd' : 'th';
+              return matchNum > 0 ? `${matchNum}${suffix} ${match.match_type}` : match.match_type;
+            })()}
+          </span>
           <span>{espnData?.venue_name || enrichment?.venue_name || match.venue || 'TBC'}{espnData?.venue_city ? `, ${espnData.venue_city}` : ''}</span>
           <span>{new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
@@ -278,106 +289,139 @@ export function PredictDetails() {
         const edge = edgeScore;
         const f1 = edge.factors.team1;
         const f2 = edge.factors.team2;
-        const maxScore = Math.max(edge.team1_score, edge.team2_score);
-        const t1Pct = (edge.team1_score / maxScore) * 100;
-        const t2Pct = (edge.team2_score / maxScore) * 100;
         const edgeAbs = Math.abs(edge.net_edge);
+        const total = edge.team1_score + edge.team2_score;
+        const t1Pct = total > 0 ? (edge.team1_score / total) * 100 : 50;
+        const isT1Edge = edge.edge_team === prediction.team1;
+
         const factors = [
-          { label: 'Form', key: 'form' as const, weight: '30%', icon: '📊' },
-          { label: 'Momentum', key: 'momentum' as const, weight: '25%', icon: '🔥' },
-          { label: 'Pressure', key: 'pressure' as const, weight: '25%', icon: '⚡' },
-          { label: 'Market', key: 'market' as const, weight: '20%', icon: '💹' },
+          {
+            label: 'Form',
+            desc: 'Recent win rate',
+            v1: f1.form,
+            v2: f2.form,
+          },
+          {
+            label: 'Momentum',
+            desc: 'Win streak & margins',
+            v1: f1.momentum,
+            v2: f2.momentum,
+          },
+          {
+            label: 'Pressure',
+            desc: 'Series stakes',
+            v1: f1.pressure,
+            v2: f2.pressure,
+          },
+          {
+            label: 'Odds',
+            desc: 'Bookmaker signal',
+            v1: f1.market,
+            v2: f2.market,
+          },
         ];
+
+        // Count factor wins per team
+        const t1Wins = factors.filter(f => f.v1 > f.v2).length;
+        const t2Wins = factors.filter(f => f.v2 > f.v1).length;
+
         return (
           <motion.div
-            className="bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-5 border border-cricket-600/40 mb-4"
+            className="bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-5 border border-cricket-600/30 mb-4"
             {...fadeUp}
             transition={{ delay: 0.18 }}
           >
-            <div className="flex items-center justify-between mb-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <span className="text-cricket-400">⬡</span>
-                SixSense Edge Score™
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
+                Who has the edge?
               </h2>
               <span className="text-[9px] text-gray-500 bg-gray-800/60 px-2 py-0.5 rounded-full">
-                Proprietary multi-factor analysis
+                SixSense Edge Score™
               </span>
             </div>
 
-            {/* Score bars */}
+            {/* Tug-of-war bar */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-bold ${isT1Edge && edgeAbs > 5 ? 'text-cricket-400' : 'text-gray-400'}`}>{prediction.team1}</span>
+                <span className={`text-xs font-bold ${!isT1Edge && edgeAbs > 5 ? 'text-amber-400' : 'text-gray-400'}`}>{prediction.team2}</span>
+              </div>
+              <div className="h-8 rounded-full overflow-hidden flex bg-gray-800/40 border border-gray-700/30">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-cricket-700 to-cricket-500 flex items-center justify-center relative"
+                  initial={{ width: '50%' }}
+                  animate={{ width: `${t1Pct}%` }}
+                  transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                >
+                  {t1Pct > 30 && (
+                    <span className="text-[11px] font-bold text-white drop-shadow">
+                      {Math.round(t1Pct)}%
+                    </span>
+                  )}
+                </motion.div>
+                <motion.div
+                  className="h-full bg-gradient-to-r from-amber-500 to-amber-700 flex items-center justify-center relative"
+                  initial={{ width: '50%' }}
+                  animate={{ width: `${100 - t1Pct}%` }}
+                  transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                >
+                  {(100 - t1Pct) > 30 && (
+                    <span className="text-[11px] font-bold text-white drop-shadow">
+                      {Math.round(100 - t1Pct)}%
+                    </span>
+                  )}
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Factor rows — who wins each */}
             <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-white w-16 text-right truncate">{prediction.team1}</span>
-                <div className="flex-1 h-6 bg-gray-800/60 rounded-full overflow-hidden relative">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-cricket-600 to-cricket-400 rounded-full flex items-center justify-end pr-2"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${t1Pct}%` }}
-                    transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
-                  >
-                    <span className="text-[10px] font-bold text-white drop-shadow">{edge.team1_score.toFixed(0)}</span>
-                  </motion.div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-white w-16 text-right truncate">{prediction.team2}</span>
-                <div className="flex-1 h-6 bg-gray-800/60 rounded-full overflow-hidden relative">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full flex items-center justify-end pr-2"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${t2Pct}%` }}
-                    transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
-                  >
-                    <span className="text-[10px] font-bold text-white drop-shadow">{edge.team2_score.toFixed(0)}</span>
-                  </motion.div>
-                </div>
-              </div>
-            </div>
+              {factors.map(({ label, desc, v1, v2 }) => {
+                const diff = v1 - v2;
+                const isEven = Math.abs(diff) < 3;
+                const t1Leads = diff > 0;
+                const barPct = total > 0 ? (v1 / (v1 + v2)) * 100 : 50;
 
-            {/* Net edge badge */}
-            <div className="flex justify-center mb-4">
-              <div className={`px-4 py-1.5 rounded-full border text-xs font-bold ${
-                edgeAbs > 15 ? 'bg-cricket-900/40 border-cricket-500/50 text-cricket-300' :
-                edgeAbs > 5 ? 'bg-gray-800/60 border-gray-600/40 text-gray-300' :
-                'bg-gray-800/40 border-gray-700/30 text-gray-400'
-              }`}>
-                {edgeAbs > 15 ? '🎯 ' : edgeAbs > 5 ? '📐 ' : '⚖️ '}
-                {edge.edge_team} +{edgeAbs.toFixed(0)} edge
-                {edgeAbs > 15 ? ' — Strong advantage' : edgeAbs > 5 ? ' — Slight advantage' : ' — Too close to call'}
-              </div>
-            </div>
-
-            {/* Factor breakdown grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {factors.map(({ label, key, weight, icon }) => {
-                const v1 = f1[key];
-                const v2 = f2[key];
-                const leader = v1 > v2 ? prediction.team1 : v1 < v2 ? prediction.team2 : 'Even';
                 return (
-                  <div key={key} className="bg-gray-800/40 rounded-xl p-3 border border-gray-700/20">
-                    <div className="flex items-center gap-1 mb-2">
-                      <span className="text-sm">{icon}</span>
-                      <span className="text-[10px] font-semibold text-gray-300 uppercase">{label}</span>
-                      <span className="text-[8px] text-gray-600 ml-auto">{weight}</span>
+                  <div key={label} className="flex items-center gap-3">
+                    {/* Factor label */}
+                    <div className="w-24 shrink-0">
+                      <div className="text-[10px] font-semibold text-white leading-tight">{label}</div>
+                      <div className="text-[8px] text-gray-500 leading-tight">{desc}</div>
                     </div>
-                    <div className="flex justify-between items-end">
-                      <div className="text-center">
-                        <div className={`text-sm font-bold ${v1 >= v2 ? 'text-cricket-400' : 'text-gray-400'}`}>{v1.toFixed(0)}</div>
-                        <div className="text-[8px] text-gray-600 truncate max-w-[50px]">{prediction.team1}</div>
-                      </div>
-                      <span className="text-[10px] text-gray-600">vs</span>
-                      <div className="text-center">
-                        <div className={`text-sm font-bold ${v2 >= v1 ? 'text-amber-400' : 'text-gray-400'}`}>{v2.toFixed(0)}</div>
-                        <div className="text-[8px] text-gray-600 truncate max-w-[50px]">{prediction.team2}</div>
-                      </div>
+
+                    {/* Score left */}
+                    <span className={`text-[10px] font-bold w-6 text-right shrink-0 ${!isEven && t1Leads ? 'text-cricket-400' : 'text-gray-500'}`}>
+                      {Math.round(v1)}
+                    </span>
+
+                    {/* Mini tug bar */}
+                    <div className="flex-1 h-3.5 rounded-full overflow-hidden flex bg-gray-800/40">
+                      <motion.div
+                        className={`h-full ${isEven ? 'bg-gray-600' : t1Leads ? 'bg-cricket-600' : 'bg-gray-700'}`}
+                        initial={{ width: '50%' }}
+                        animate={{ width: `${barPct}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
+                      />
+                      <motion.div
+                        className={`h-full ${isEven ? 'bg-gray-600' : !t1Leads ? 'bg-amber-600' : 'bg-gray-700'}`}
+                        initial={{ width: '50%' }}
+                        animate={{ width: `${100 - barPct}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
+                      />
                     </div>
+
+                    {/* Score right */}
+                    <span className={`text-[10px] font-bold w-6 shrink-0 ${!isEven && !t1Leads ? 'text-amber-400' : 'text-gray-500'}`}>
+                      {Math.round(v2)}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
-            {/* Narrative */}
-            <p className="text-[10px] text-gray-500 text-center mt-3 italic">{edge.narrative}</p>
           </motion.div>
         );
       })()}
@@ -425,9 +469,6 @@ export function PredictDetails() {
                   </div>
                 );
               })}
-              <p className="text-[9px] text-gray-600 text-center mt-1">
-                ↑ Value — diverges from market &gt;10%
-              </p>
             </div>
           ) : (
             <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
