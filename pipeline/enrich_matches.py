@@ -709,6 +709,30 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     espn_ctx_text = ""
     espn_event_id = _get_espn_event_id(match_id)
     espn_league_id = _get_espn_league_id(match_id)
+
+    # Auto-discover ESPN event ID if not stored
+    if not espn_event_id:
+        try:
+            from utils.espn import find_espn_event_id
+            team1 = match.get("team1", "")
+            team2 = match.get("team2", "")
+            match_date = match.get("date", "")
+            match_type = match.get("match_type", "")
+            espn_event_id = find_espn_event_id(team1, team2, match_date, match_type)
+            if espn_event_id:
+                logger.info(f"  Auto-discovered ESPN event {espn_event_id} for {team1} vs {team2}")
+                # Store for future use
+                try:
+                    client = get_client()
+                    client.table("espn_match_data").upsert({
+                        "match_id": match_id,
+                        "espn_event_id": espn_event_id,
+                    }, on_conflict="match_id").execute()
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"  ESPN auto-discovery failed: {e}")
+
     if espn_event_id:
         logger.info(f"  Fetching ESPN context for event {espn_event_id}...")
         espn_ctx = get_espn_enrichment_context(espn_event_id, league_id=espn_league_id or "8039")
