@@ -132,6 +132,40 @@ def get_all_predictions() -> list[dict]:
     return response.data
 
 
+def get_recent_results(days: int = 14) -> list[dict]:
+    """Fetch recently scored predictions (last N days) with match context.
+
+    Returns list of dicts with keys: team1, team2, match_type, date,
+    predicted_winner, actual_winner, correct.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    client = get_client()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    response = (
+        client.table("predictions")
+        .select("match_id, team1, team2, match_type, predicted_winner, winner, scored_at")
+        .not_.is_("scored_at", "null")
+        .gte("scored_at", cutoff)
+        .order("scored_at", desc=True)
+        .execute()
+    )
+    results = []
+    for p in response.data:
+        if not p.get("winner"):
+            continue
+        results.append({
+            "team1": p["team1"],
+            "team2": p["team2"],
+            "match_type": p.get("match_type", ""),
+            "predicted_winner": p.get("predicted_winner", ""),
+            "actual_winner": p["winner"],
+            "correct": p.get("predicted_winner", "").lower() == p["winner"].lower(),
+            "scored_at": p.get("scored_at", ""),
+        })
+    return results
+
+
 # --- Stats cache lookups (Supabase-backed) ---
 
 _stats_cache: dict[str, list[dict]] = {}

@@ -710,3 +710,177 @@ def match_espn_to_cricapi(
             break
 
     return mapping
+
+
+# ---------------------------------------------------------------------------
+# Enrichment context: pull structured data from ESPN for LLM prompts
+# ---------------------------------------------------------------------------
+
+def get_espn_enrichment_context(event_id: str, league_id: str = DEFAULT_LEAGUE) -> Dict[str, Any]:
+    """Fetch rich context from ESPN summary for LLM enrichment.
+
+    Returns dict with:
+        h2h_results:  list of recent H2H results with scores
+        news:         list of article headlines + stories
+        standings:    list of team standings (if league/tournament)
+        venue:        confirmed venue name
+        recent_form:  list of recent matchcard results in the series
+    """
+    context: Dict[str, Any] = {
+        "h2h_results": [],
+        "news": [],
+        "standings": [],
+        "venue": None,
+        "recent_form": [],
+    }
+
+    try:
+        url = ESPN_SUMMARY_URL.format(league_id=league_id)
+        r = requests.get(url, params={"event": event_id}, timeout=REQUEST_TIMEOUT)
+        if r.status_code != 200:
+            return context
+        data = r.json()
+    except Exception as e:
+        logger.debug(f"ESPN enrichment context failed for {event_id}: {e}")
+        return context
+
+    # Venue
+    venue = data.get("gameInfo", {}).get("venue", {})
+    if venue.get("fullName"):
+        context["venue"] = venue["fullName"]
+
+    # Head-to-head past games
+    for game in data.get("headToHeadGames", []):
+        comps = game.get("competitions", [{}])[0]
+        teams = comps.get("competitors", [])
+        if len(teams) < 2:
+            continue
+        t1 = teams[0].get("team", {}).get("displayName", "")
+        t2 = teams[1].get("team", {}).get("displayName", "")
+        s1 = teams[0].get("score", "")
+        s2 = teams[1].get("score", "")
+        winner = ""
+        for t in teams:
+            if t.get("winner"):
+                winner = t.get("team", {}).get("displayName", "")
+        date = game.get("date", "")[:10]
+        status = comps.get("status", {}).get("type", {}).get("shortDetail", "")
+        context["h2h_results"].append({
+            "date": date,
+            "team1": t1,
+            "team2": t2,
+            "score1": s1,
+            "score2": s2,
+            "winner": winner,
+            "status": status,
+        })
+
+    # News articles
+    for article in data.get("news", {}).get("articles", [])[:5]:
+        headline = article.get("headline", "")
+        story = article.get("story", "")
+        # Strip HTML from story, keep first 500 chars
+        story_clean = re.sub(r"<[^>]+>", " ", story)
+        story_clean = re.sub(r"\s+", " ", story_clean).strip()[:500]
+        if headline:
+            context["news"].append({
+                "headline": headline,
+                "story": story_clean,
+            })
+
+    # Main article (match report/preview)
+    main_article = data.get("article", {})
+    if main_article.get("headline"):
+        story = main_article.get("story", "")
+        story_clean = re.sub(r"<[^>]+>", " ", story)
+        story_clean = re.sub(r"\s+", " ", story_clean).strip()[:800]
+        context["news"].insert(0, {
+            "headline": main_article["headline"],
+            "story": story_clean,
+        })
+
+    # Standings
+    for entry in data.get("standings", {}).get("entries", []):
+        team = entry.get("team", {}).get("displayName", "")
+        stats = {s.get("name", ""): s.get("displayValue", "") for s in entry.get("stats", [])}
+        if team:
+            context["standings"].append({
+                "team": team,
+                "wins": stats.get("wins", ""),
+                "losses": stats.get("losses", ""),
+                "points": stats.get("points", ""),
+                "nrr": stats.get("netRunRate", ""),
+            })
+
+    # Matchcards — recent results in this series with scorecards
+    for mc in data.get("matchcards", [])[:4]:
+        team_name = mc.get("teamName", "")
+        runs = mc.get("runs", "")
+        total = mc.get("total", "")
+        headline = mc.get("headline", "")
+        top_performers = []
+        for p in mc.get("playerDetails", [])[:3]:
+            name = p.get("playerName", "")
+            runs_scored = p.get("runs", "")
+            balls = p.get("ballsFaced", "")
+            wickets = p.get("wickets", "")
+            overs = p.get("overs", "")
+            if headline == "Batting" and runs_scored:
+                top_performers.append(f"{name} {runs_scored}({balls})")
+            elif headline == "Bowling" and wickets:
+                top_performers.append(f"{name} {wickets}/{p.get('conceded', '')} ({overs} ov)")
+        context["recent_form"].append({
+            "team": team_name,
+            "type": headline,
+            "score": f"{runs}{total}" if runs else "",
+            "top_performers": top_performers,
+        })
+
+    return context
+
+
+def format_espn_context(ctx: Dict[str, Any]) -> str:
+    """Format ESPN enrichment context as text for LLM prompts."""
+    sections = []
+
+    if ctx.get("venue"):
+        sections.append(f"ESPN Confirmed Venue: {ctx['venue']}")
+
+    if ctx.get("h2h_results"):
+        lines = ["Recent Head-to-Head Results (from ESPN):"]
+        for g in ctx["h2h_results"]:
+            line = f"  {g['date']}: {g['team1']} ({g['score1']}) vs {g['team2']} ({g['score2']})"
+            if g["winner"]:
+                line += f" → {g['winner']} won"
+            lines.append(line)
+        sections.append("\n".join(lines))
+
+    if ctx.get("standings"):
+        lines = ["Tournament Standings:"]
+        for s in ctx["standings"]:
+            line = f"  {s['team']}: W={s['wins']} L={s['losses']}"
+            if s.get("points"):
+                line += f" Pts={s['points']}"
+            if s.get("nrr"):
+                line += f" NRR={s['nrr']}"
+            lines.append(line)
+        sections.append("\n".join(lines))
+
+    if ctx.get("recent_form"):
+        lines = ["Recent Series Scorecards:"]
+        for mc in ctx["recent_form"]:
+            line = f"  {mc['team']} {mc['type']}: {mc['score']}"
+            if mc["top_performers"]:
+                line += f" — {', '.join(mc['top_performers'])}"
+            lines.append(line)
+        sections.append("\n".join(lines))
+
+    if ctx.get("news"):
+        lines = ["ESPN News & Previews:"]
+        for n in ctx["news"][:3]:
+            lines.append(f"  • {n['headline']}")
+            if n.get("story"):
+                lines.append(f"    {n['story'][:300]}")
+        sections.append("\n".join(lines))
+
+    return "\n\n".join(sections) if sections else ""

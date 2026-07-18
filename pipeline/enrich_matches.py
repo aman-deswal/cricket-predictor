@@ -21,7 +21,9 @@ from utils.db import (
     store_match_enrichment,
     get_team_form_from_cache,
     get_h2h_from_cache,
+    get_recent_results,
 )
+from utils.espn import get_espn_enrichment_context, format_espn_context
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -90,13 +92,17 @@ POPULAR_LEAGUES = (
     "bpl",
 )
 
-ENRICHMENT_PROMPT = """You are a careful cricket research assistant. Use only the source snippets below.
+ENRICHMENT_PROMPT = """You are a careful cricket research assistant. Use only the source snippets and ESPN data below.
 
 Match:
 - {team1} vs {team2}
 - Format: {match_type}
 - Date: {date}
 - Series or venue: {venue}
+
+{espn_context}
+
+{recent_results_context}
 
 Sources:
 {sources}
@@ -114,10 +120,10 @@ Return JSON with this shape:
 
 Rules:
 - Do not invent injuries, availability, squads, or playing XIs.
-- For venue_name: use the venue from sources if mentioned. Do NOT guess venues from general knowledge — venue data comes from ESPN Cricinfo separately. Only use a venue that is explicitly stated in the source text. Use null if no source mentions the venue.
+- For venue_name: use the ESPN confirmed venue if provided. Otherwise use the venue from sources if mentioned. Do NOT guess venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if no source mentions the venue.
 - toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. Use your cricket knowledge of the venue and conditions.
+- expert_preview: 3-5 sentences. Incorporate ESPN head-to-head results and recent series form data when available. Reference recent results and current team momentum. Mention uncertainty when sources are thin.
 - If sources do not support a field, use null, empty arrays, or say that no reliable update was found.
-- Keep expert_preview to 3-5 sentences and mention uncertainty when sources are thin.
 - Use source_index values from the source list for player updates.
 - Prefer article body text over headlines. Headlines alone are not enough for venue, XI, or injury claims.
 - For possible_xi, include only players explicitly named in source-backed squad, probable XI, or playing XI material. Do not imply they are a confirmed playing XI unless the source says so.
@@ -126,13 +132,17 @@ Rules:
 
 MODEL_FALLBACK_PROMPT = """You are a cricket analyst. You do not have live web access in this call.
 
-Use the fixture details, historical Cricsheet stats, and your general cricket knowledge below.
+Use the fixture details, historical Cricsheet stats, ESPN data, and your general cricket knowledge below.
 
 Match:
 - {team1} vs {team2}
 - Format: {match_type}
 - Date: {date}
 - Series or venue field from fixture API: {venue}
+
+{espn_context}
+
+{recent_results_context}
 
 Historical stats:
 - {team1} recent form: {team1_wins} wins in last {team1_matches} matches, win rate {team1_win_rate:.1%}
@@ -160,9 +170,9 @@ Return JSON with this shape:
 }}
 
 Rules:
-- The preview must clearly say it is based on historical data, not live team news.
+- The preview must incorporate ESPN head-to-head data, recent series results, and standings when available. Reference actual recent scores and team momentum.
 - Use general cricket knowledge and fixture context to fill in details.
-- venue_name: ONLY use a venue if the fixture API field already contains one. Do NOT guess or infer venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if the fixture API field is empty.
+- venue_name: ONLY use a venue if the fixture API field or ESPN data already contains one. Do NOT guess or infer venues from general knowledge — venue data comes from ESPN Cricinfo separately. Use null if no data provides the venue.
 - toss_insight: a single sentence about which team benefits more from winning the toss at this venue and what they should choose (bat/bowl first), with approximate percentage edge if possible. If venue is unknown, provide a general insight for the format.
 - possible_xi should contain recent-player candidates only, not a confirmed squad or playing XI.
 - Select possible_xi names only from the Recent Cricsheet player pools above. If a pool is empty, return an empty array for that team.
@@ -488,7 +498,7 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
     return details
 
 
-def call_llm(match: dict, sources: list[dict]) -> dict:
+def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
     client = OpenAI(
         base_url="https://models.github.ai/inference",
         api_key=os.environ["GITHUB_TOKEN"],
@@ -500,6 +510,8 @@ def call_llm(match: dict, sources: list[dict]) -> dict:
         date=match.get("date", ""),
         venue=match.get("venue", ""),
         sources=format_sources(sources),
+        espn_context=espn_ctx or "No ESPN data available.",
+        recent_results_context=recent_results_ctx or "",
     )
     response = client.chat.completions.create(
         model=MODEL,
@@ -510,7 +522,7 @@ def call_llm(match: dict, sources: list[dict]) -> dict:
     return json.loads(response.choices[0].message.content)
 
 
-def call_model_fallback(match: dict, stats: dict) -> dict:
+def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
     client = OpenAI(
         base_url="https://models.github.ai/inference",
         api_key=os.environ["GITHUB_TOKEN"],
@@ -521,6 +533,8 @@ def call_model_fallback(match: dict, stats: dict) -> dict:
         match_type=match.get("match_type", ""),
         date=match.get("date", ""),
         venue=match.get("venue", ""),
+        espn_context=espn_ctx or "No ESPN data available.",
+        recent_results_context=recent_results_ctx or "",
         **stats,
     )
     response = client.chat.completions.create(
@@ -561,7 +575,7 @@ def get_cricsheet_type(match_type: str) -> str:
     return match_type.lower()
 
 
-def build_data_backed_details(match: dict) -> dict:
+def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
     team1 = match.get("team1", "")
     team2 = match.get("team2", "")
     cricsheet_type = get_cricsheet_type(match.get("match_type", ""))
@@ -632,7 +646,7 @@ def build_data_backed_details(match: dict) -> dict:
     }
 
     try:
-        fallback = call_model_fallback(match, stats)
+        fallback = call_model_fallback(match, stats, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
         venue_name = fallback.get("venue_name")
         venue_confidence = fallback.get("venue_confidence", "unknown")
         preview = fallback.get("expert_preview", "")
@@ -689,21 +703,46 @@ def build_data_backed_details(match: dict) -> dict:
 
 
 def enrich_match(match: dict, source_limit: int) -> dict:
+    match_id = match.get("match_id", "")
+
+    # --- Fetch ESPN enrichment context ---
+    espn_ctx_text = ""
+    espn_event_id = _get_espn_event_id(match_id)
+    espn_league_id = _get_espn_league_id(match_id)
+    if espn_event_id:
+        logger.info(f"  Fetching ESPN context for event {espn_event_id}...")
+        espn_ctx = get_espn_enrichment_context(espn_event_id, league_id=espn_league_id or "8039")
+        espn_ctx_text = format_espn_context(espn_ctx)
+        if espn_ctx_text:
+            logger.info(f"  ESPN context: {len(espn_ctx_text)} chars "
+                        f"(H2H={len(espn_ctx.get('h2h_results', []))}, "
+                        f"news={len(espn_ctx.get('news', []))}, "
+                        f"standings={len(espn_ctx.get('standings', []))})")
+    else:
+        logger.info(f"  No ESPN event ID — skipping ESPN context")
+
+    # --- Fetch recent scored results from our DB ---
+    recent_results_ctx = _build_recent_results_context(match)
+
+    # --- Run enrichment (source-backed or model fallback) ---
     sources = search_sources(match, limit=source_limit)
     has_article_text = any(source.get("article_text") for source in sources)
     if sources and has_article_text:
-        details = sanitize_source_backed_details(call_llm(match, sources), sources)
+        details = sanitize_source_backed_details(
+            call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
+            sources,
+        )
     else:
-        details = build_data_backed_details(match)
+        details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
 
     # Overlay ESPN-verified venue if available (never trust AI for venues)
-    espn_venue = _get_espn_venue(match.get("match_id", ""))
+    espn_venue = _get_espn_venue(match_id)
     if espn_venue:
         details["venue_name"] = espn_venue
         details["venue_confidence"] = "confirmed"
 
     return {
-        "match_id": match["match_id"],
+        "match_id": match_id,
         "venue_name": details.get("venue_name"),
         "venue_confidence": details.get("venue_confidence", "unknown"),
         "toss_insight": details.get("toss_insight"),
@@ -715,6 +754,67 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "confidence": details.get("confidence", "low"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _get_espn_event_id(match_id: str) -> Optional[str]:
+    """Look up ESPN event ID for a match from espn_match_data table."""
+    if not match_id:
+        return None
+    try:
+        client = get_client()
+        r = client.table("espn_match_data").select("espn_event_id").eq("match_id", match_id).execute()
+        if r.data and r.data[0].get("espn_event_id"):
+            return str(r.data[0]["espn_event_id"])
+    except Exception:
+        pass
+    return None
+
+
+def _get_espn_league_id(match_id: str) -> Optional[str]:
+    """Look up ESPN league ID for a match from espn_match_data table."""
+    if not match_id:
+        return None
+    try:
+        client = get_client()
+        r = client.table("espn_match_data").select("league_id").eq("match_id", match_id).execute()
+        if r.data and r.data[0].get("league_id"):
+            return str(r.data[0]["league_id"])
+    except Exception:
+        pass
+    return None
+
+
+def _build_recent_results_context(match: dict) -> str:
+    """Build context string of recent scored results involving these teams."""
+    team1 = match.get("team1", "").lower()
+    team2 = match.get("team2", "").lower()
+
+    try:
+        recent = get_recent_results(days=14)
+    except Exception:
+        return ""
+
+    if not recent:
+        return ""
+
+    # Filter to results involving either team in this match
+    relevant = [
+        r for r in recent
+        if team1 in r["team1"].lower() or team1 in r["team2"].lower()
+        or team2 in r["team1"].lower() or team2 in r["team2"].lower()
+    ]
+
+    if not relevant:
+        return ""
+
+    lines = ["Recent match results (from our scored predictions, last 14 days):"]
+    for r in relevant[:8]:
+        marker = "✓" if r["correct"] else "✗"
+        lines.append(
+            f"  {r['team1']} vs {r['team2']}: Winner = {r['actual_winner']} "
+            f"(we predicted {r['predicted_winner']} {marker})"
+        )
+    return "\n".join(lines)
 
 
 def _get_espn_venue(match_id: str) -> Optional[str]:

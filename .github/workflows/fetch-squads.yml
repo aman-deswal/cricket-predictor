@@ -2,7 +2,7 @@ name: Fetch Squads & Player Stats
 
 on:
   schedule:
-    - cron: '0 4,16 * * *'  # Twice daily: 4 AM and 4 PM UTC
+    - cron: '0 */6 * * *'  # Every 6 hours (ESPN rosters are free)
   workflow_dispatch:
 
 permissions:
