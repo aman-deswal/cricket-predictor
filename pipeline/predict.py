@@ -23,6 +23,7 @@ from utils.db import (
     store_match_enrichment,
 )
 from utils.espn import get_espn_enrichment_context, format_espn_context
+from utils.edge_score import compute_edge_score, format_edge_for_prompt
 from enrich_matches import enrich_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -61,8 +62,15 @@ PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of
 **ESPN Cricinfo Context (H2H results, news, series data):**
 {espn_context}
 
+**SixSense Edge Score™ (proprietary multi-factor analysis):**
+{edge_score_context}
+
+**Sportsbook Odds (market signal):**
+{odds_context}
+
 Based on all available information, predict the winner and provide win probabilities.
 IMPORTANT: When referencing win rates in your reasoning, use the EXACT percentages provided above. Do not estimate or round differently.
+The SixSense Edge Score factors in form, momentum, pressure context, and market odds — use it as an anchor but apply your cricket expertise to adjust.
 Reference specific ESPN data (series scoreline, recent match results, key player form, injury/retirement news) in your reasoning to make it substantive and contextual.
 
 Also analyze the toss factor for this specific match. Consider:
@@ -91,6 +99,25 @@ def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
     h2h = {"total_matches": 0, "team1_wins": 0, "team2_wins": 0}
     venue = {"matches_at_venue": 0, "toss_bat_first_win_rate": 0.5}
     return team_form, team_form, h2h, venue
+
+
+def _store_edge_score(match_id: str, edge: dict) -> None:
+    """Store edge score in Supabase match_edge_scores table."""
+    try:
+        client = get_client()
+        row = {
+            "match_id": match_id,
+            "team1_score": edge["team1_score"],
+            "team2_score": edge["team2_score"],
+            "net_edge": edge["net_edge"],
+            "edge_team": edge["edge_team"],
+            "narrative": edge["narrative"],
+            "factors": edge["factors"],
+        }
+        client.table("match_edge_scores").upsert(row, on_conflict="match_id").execute()
+        logger.info(f"  Edge score stored: {edge['edge_team']} +{abs(edge['net_edge']):.0f}")
+    except Exception as exc:
+        logger.warning(f"  Failed to store edge score: {exc}")
 
 
 def build_context(match: dict) -> dict:
@@ -144,13 +171,16 @@ def build_context(match: dict) -> dict:
 
     # Fetch ESPN enrichment context for richer reasoning
     espn_ctx = "No ESPN data available."
+    espn_h2h_results: list = []
+    espn_series_scoreline = ""
     espn_event_id = match.get("espn_event_id")
     if not espn_event_id:
         try:
             client = get_client()
-            r = client.table("espn_match_data").select("espn_event_id").eq("match_id", match["match_id"]).execute()
+            r = client.table("espn_match_data").select("espn_event_id,series_scoreline").eq("match_id", match["match_id"]).execute()
             if r.data and r.data[0].get("espn_event_id"):
                 espn_event_id = r.data[0]["espn_event_id"]
+                espn_series_scoreline = r.data[0].get("series_scoreline") or ""
         except Exception:
             pass
     if espn_event_id:
@@ -160,8 +190,53 @@ def build_context(match: dict) -> dict:
             if formatted.strip():
                 espn_ctx = formatted
                 logger.info(f"  ESPN context for prediction: {len(espn_ctx)} chars")
+            espn_h2h_results = ctx.get("h2h_results", [])
         except Exception as exc:
             logger.warning(f"  Failed to get ESPN context: {exc}")
+
+    # Fetch latest sportsbook odds
+    odds_data = None
+    odds_context = "No sportsbook odds available."
+    try:
+        client = get_client()
+        r = (
+            client.table("match_odds")
+            .select("team1_odds,team2_odds,bookmaker,fetched_at")
+            .eq("match_id", match["match_id"])
+            .order("fetched_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if r.data:
+            odds_row = r.data[0]
+            odds_data = {
+                "team1_odds": odds_row["team1_odds"],
+                "team2_odds": odds_row["team2_odds"],
+            }
+            t1_implied = (1.0 / odds_row["team1_odds"] * 100) if odds_row["team1_odds"] else 0
+            t2_implied = (1.0 / odds_row["team2_odds"] * 100) if odds_row["team2_odds"] else 0
+            odds_context = (
+                f"{team1}: {odds_row['team1_odds']:.2f} (implied {t1_implied:.0f}%)  |  "
+                f"{team2}: {odds_row['team2_odds']:.2f} (implied {t2_implied:.0f}%)\n"
+                f"Source: {odds_row.get('bookmaker', 'unknown')} @ {odds_row.get('fetched_at', '')[:16]}"
+            )
+            logger.info(f"  Odds: {team1} {odds_row['team1_odds']:.2f} / {team2} {odds_row['team2_odds']:.2f}")
+    except Exception as exc:
+        logger.warning(f"  Failed to fetch odds: {exc}")
+
+    # Compute SixSense Edge Score™
+    edge = compute_edge_score(
+        team1=team1,
+        team2=team2,
+        team1_form=team1_form,
+        team2_form=team2_form,
+        espn_h2h=espn_h2h_results,
+        series_scoreline=espn_series_scoreline,
+        match_type=match_type,
+        odds=odds_data,
+    )
+    edge_score_context = format_edge_for_prompt(edge, team1, team2)
+    logger.info(f"  Edge Score: {team1} {edge['team1_score']:.0f} / {team2} {edge['team2_score']:.0f} (net: {edge['edge_team']} +{abs(edge['net_edge']):.0f})")
 
     return {
         "team1": team1,
@@ -182,6 +257,9 @@ def build_context(match: dict) -> dict:
         "toss_bat_win_rate": venue_data.get("toss_bat_first_win_rate", 0.5),
         "enrichment_notes": enrichment_notes,
         "espn_context": espn_ctx,
+        "edge_score_context": edge_score_context,
+        "odds_context": odds_context,
+        "edge_score": edge,
     }
 
 
@@ -258,6 +336,7 @@ def ensemble_predict(match: dict) -> dict:
         "toss_insight": toss_insight,
         "model": MODEL,
         "ensemble_size": len(predictions),
+        "edge_score": context.get("edge_score"),
     }
 
 
@@ -290,7 +369,10 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
             prediction = ensemble_predict(match)
+            edge = prediction.pop("edge_score", None)
             store_prediction(prediction)
+            if edge:
+                _store_edge_score(match["match_id"], edge)
             logger.info(
                 f"  → {prediction['predicted_winner']} "
                 f"({prediction['team1_win_probability']:.1%} / {prediction['team2_win_probability']:.1%})"
