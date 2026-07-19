@@ -16,10 +16,24 @@ from utils.espn import get_match_summary
 load_dotenv()
 
 BASE_URL = "https://api.cricapi.com/v1"
+PLACEHOLDER_IMAGE_TOKENS = (
+    "default-player-logo",
+    "generic-headshot",
+    "player-placeholder",
+    "cricketdata",
+    "/logo.",
+)
 
 
 def _get_api_key() -> str:
     return os.environ.get("CRICAPI_KEY", "")
+
+
+def _is_placeholder_image_url(url: str) -> bool:
+    if not url:
+        return True
+    lowered = url.lower().strip()
+    return any(token in lowered for token in PLACEHOLDER_IMAGE_TOKENS)
 
 
 def fetch_squad_from_espn(match_id: str) -> Optional[list[dict]]:
@@ -128,6 +142,7 @@ def fetch_squad_for_match(match_id: str) -> Optional[list[dict]]:
 
 def normalize_player(player: dict) -> dict:
     """Normalize player data from CricAPI format."""
+    raw_image_url = player.get("playerImg", "")
     return {
         "id": player.get("id", ""),
         "name": player.get("name", player.get("playerName", "")),
@@ -136,7 +151,8 @@ def normalize_player(player: dict) -> dict:
         "bowling_style": player.get("bowlingStyle", ""),
         "is_captain": player.get("isCaptain", False),
         "is_keeper": player.get("isKeeper", False),
-        "image_url": player.get("playerImg", ""),
+        # Treat generic provider logos/placeholders as missing so headshot enrichment can resolve.
+        "image_url": "" if _is_placeholder_image_url(raw_image_url) else raw_image_url,
     }
 
 

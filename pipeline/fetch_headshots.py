@@ -15,7 +15,7 @@ import io
 import json
 import os
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
@@ -32,9 +32,23 @@ HEADSHOTS_CSV_URL = "https://raw.githubusercontent.com/albtree/cricket-headshots
 
 # Generic placeholder URL to skip
 GENERIC_PLACEHOLDER = "generic-headshot"
+PLACEHOLDER_IMAGE_TOKENS = (
+    "default-player-logo",
+    "generic-headshot",
+    "player-placeholder",
+    "cricketdata",
+    "/logo.",
+)
 
 # CDN base for serving images (faster than espncricinfo.com direct)
 CDN_BASE = "https://img1.hscicdn.com/image/upload/f_auto,t_h_100/lsci"
+
+
+def is_placeholder_image_url(url: str) -> bool:
+    if not url:
+        return True
+    lowered = url.lower().strip()
+    return any(token in lowered for token in PLACEHOLDER_IMAGE_TOKENS)
 
 
 def load_headshot_csv() -> Dict[str, str]:
@@ -58,30 +72,48 @@ def load_headshot_csv() -> Dict[str, str]:
     return mapping
 
 
-def search_espn_player(name: str) -> Optional[str]:
-    """Search ESPN API for a cricket player and return their cricinfo_id."""
+def search_espn_players(name: str) -> List[Dict[str, str]]:
+    """Search ESPN API for cricket player candidates ordered by match quality."""
     try:
         resp = requests.get(
             ESPN_SEARCH_URL,
-            params={"query": name, "limit": 3, "type": "player", "sport": "cricket"},
+            params={"query": name, "limit": 5, "type": "player", "sport": "cricket"},
             timeout=10,
         )
         if resp.status_code != 200:
-            return None
+            return []
         data = resp.json()
         items = data.get("items", [])
         if not items:
-            return None
+            return []
 
-        # Try exact name match first, then take first result
         name_lower = name.lower().strip()
+        exact_matches: List[Dict[str, str]] = []
+        other_matches: List[Dict[str, str]] = []
         for item in items:
-            if item.get("displayName", "").lower().strip() == name_lower:
-                return item["id"]
-        # Fallback: first result
-        return items[0]["id"]
+            cid = str(item.get("id", "")).strip()
+            if not cid:
+                continue
+            headshot = item.get("headshot", {})
+            headshot_url = ""
+            if isinstance(headshot, dict):
+                headshot_url = headshot.get("href", "")
+            elif isinstance(headshot, str):
+                headshot_url = headshot
+
+            entry = {
+                "id": cid,
+                "display_name": item.get("displayName", ""),
+                "headshot_url": headshot_url,
+            }
+            if entry["display_name"].lower().strip() == name_lower:
+                exact_matches.append(entry)
+            else:
+                other_matches.append(entry)
+
+        return exact_matches + other_matches
     except Exception:
-        return None
+        return []
 
 
 def build_cdn_url(image_path: str) -> str:
@@ -114,8 +146,9 @@ def process_squads(force: bool = False) -> None:
 
         needs_update = False
         for player in players:
-            # Skip if already has an image_url (unless --force)
-            if player.get("image_url") and not force:
+            existing_image = player.get("image_url", "")
+            # Skip only if image is present and not a known placeholder (unless --force)
+            if existing_image and not is_placeholder_image_url(existing_image) and not force:
                 skipped += 1
                 continue
 
@@ -123,21 +156,33 @@ def process_squads(force: bool = False) -> None:
             if not name:
                 continue
 
-            # Search ESPN for cricinfo_id
-            cid = search_espn_player(name)
-            if not cid:
+            # Search ESPN for candidate IDs/headshots
+            candidates = search_espn_players(name)
+            if not candidates:
                 not_found += 1
                 continue
 
-            # Look up headshot URL from CSV mapping
-            image_path = headshot_map.get(cid)
-            if image_path:
-                player["image_url"] = build_cdn_url(image_path)
-                resolved += 1
-                needs_update = True
-                print(f"  ✅ {name} → {player['image_url']}")
-            else:
+            resolved_url = ""
+            for candidate in candidates:
+                # Preferred: curated CSV mapping by cricinfo_id
+                image_path = headshot_map.get(candidate["id"])
+                if image_path:
+                    resolved_url = build_cdn_url(image_path)
+                    break
+                # Fallback: use ESPN direct full headshot URL when available
+                candidate_headshot = candidate.get("headshot_url", "")
+                if candidate_headshot and not is_placeholder_image_url(candidate_headshot):
+                    resolved_url = candidate_headshot
+                    break
+
+            if not resolved_url:
                 not_found += 1
+                continue
+
+            player["image_url"] = resolved_url
+            resolved += 1
+            needs_update = True
+            print(f"  ✅ {name} → {player['image_url']}")
 
             # Small delay to avoid rate limiting ESPN
             time.sleep(0.15)

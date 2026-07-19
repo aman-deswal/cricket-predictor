@@ -41,6 +41,32 @@ function getSeriesName(match: Match): string {
   return match.name || match.venue || 'TBC';
 }
 
+function getBookmakerMarketUrl(bookmaker: string, match: Match, market: string): string {
+  const normalized = bookmaker.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const query = encodeURIComponent(`${match.team1} vs ${match.team2} cricket ${market}`);
+
+  const searchUrlByBookmaker: Record<string, string> = {
+    tab: `https://www.tab.com.au/sports/search?query=${query}`,
+    skynet: `https://www.skybet.com/search?query=${query}`,
+    skybet: `https://www.skybet.com/search?query=${query}`,
+    paddypower: `https://www.paddypower.com/search?q=${query}`,
+    boylesports: `https://www.boylesports.com/search?query=${query}`,
+    bet365: `https://www.bet365.com/`,
+    williamhill: `https://sports.williamhill.com/betting/en-gb`,
+    unibet: `https://www.unibet.com/betting/sports/filter/cricket`,
+  };
+
+  return searchUrlByBookmaker[normalized] || `https://www.google.com/search?q=${encodeURIComponent(`${bookmaker} ${match.team1} vs ${match.team2} cricket odds`)}`;
+}
+
+function openExternalMarket(url: string): void {
+  if (typeof window === 'undefined') return;
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    window.location.href = url;
+  }
+}
+
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
@@ -162,6 +188,9 @@ export function PredictDetails() {
   const team2H2H = deriveH2HForm(team2Meta.shortName);
   const team1Form = team1H2H.length > 0 ? team1H2H : (match.team1_recent_form ?? []).slice(-5);
   const team2Form = team2H2H.length > 0 ? team2H2H : (match.team2_recent_form ?? []).slice(-5);
+  const featuredBookmakerUrl = odds.length > 0
+    ? getBookmakerMarketUrl(odds[0].bookmaker, match, odds[0].market)
+    : null;
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -244,7 +273,7 @@ export function PredictDetails() {
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team1Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {team1Form.length > 0 && (
-              <div className="flex justify-center gap-0.5 mt-1">
+              <div className="flex items-center justify-center gap-1 mt-1.5">
                 {team1Form.map((r, i) => (
                   <span key={`t1f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
@@ -256,7 +285,22 @@ export function PredictDetails() {
               </p>
             )}
             {prediction && (
-              <span className="text-xs font-mono text-gray-400">
+              <span
+                className={`inline-flex items-center justify-center mt-1 px-2 py-0.5 rounded-full border text-xs font-mono font-semibold ${
+                  featuredBookmakerUrl
+                    ? 'border-cricket-400/35 bg-cricket-400/10 text-gray-100 cursor-pointer hover:bg-cricket-400/20'
+                    : 'border-white/15 bg-white/5 text-gray-200'
+                }`}
+                onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
+                role={featuredBookmakerUrl ? 'button' : undefined}
+                tabIndex={featuredBookmakerUrl ? 0 : undefined}
+                onKeyDown={featuredBookmakerUrl ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openExternalMarket(featuredBookmakerUrl);
+                  }
+                } : undefined}
+              >
                 {odds.length > 0
                   ? decimalToAmerican(odds[0].team1_odds)
                   : toAmericanOdds(prediction.team1_win_probability)}
@@ -287,6 +331,18 @@ export function PredictDetails() {
               </div>
             )}
             <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">AI Verdict</span>
+            {prediction && (
+              <div className="mt-1 flex items-center gap-3 text-[9px]">
+                <span className="inline-flex items-center gap-1 text-gray-300">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: teamColor1 }} />
+                  {team1Meta.shortName}
+                </span>
+                <span className="inline-flex items-center gap-1 text-gray-300">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: teamColor2 }} />
+                  {team2Meta.shortName}
+                </span>
+              </div>
+            )}
           </motion.div>
 
           {/* Team 2 */}
@@ -311,7 +367,7 @@ export function PredictDetails() {
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team2Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {team2Form.length > 0 && (
-              <div className="flex justify-center gap-0.5 mt-1">
+              <div className="flex items-center justify-center gap-1 mt-1.5">
                 {team2Form.map((r, i) => (
                   <span key={`t2f-${i}`} className={`h-4 w-4 flex items-center justify-center rounded text-[8px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
@@ -323,7 +379,22 @@ export function PredictDetails() {
               </p>
             )}
             {prediction && (
-              <span className="text-xs font-mono text-gray-400">
+              <span
+                className={`inline-flex items-center justify-center mt-1 px-2 py-0.5 rounded-full border text-xs font-mono font-semibold ${
+                  featuredBookmakerUrl
+                    ? 'border-cricket-400/35 bg-cricket-400/10 text-gray-100 cursor-pointer hover:bg-cricket-400/20'
+                    : 'border-white/15 bg-white/5 text-gray-200'
+                }`}
+                onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
+                role={featuredBookmakerUrl ? 'button' : undefined}
+                tabIndex={featuredBookmakerUrl ? 0 : undefined}
+                onKeyDown={featuredBookmakerUrl ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openExternalMarket(featuredBookmakerUrl);
+                  }
+                } : undefined}
+              >
                 {odds.length > 0
                   ? decimalToAmerican(odds[0].team2_odds)
                   : toAmericanOdds(prediction.team2_win_probability)}
@@ -417,13 +488,13 @@ export function PredictDetails() {
                 SixSense Edge Score™
               </span>
             </div>
-            <p className="text-[9px] text-gray-500 mb-4 pl-5">Based on form, venue, rankings & head-to-head stats</p>
+            <p className="text-[9px] text-gray-300 mb-4 pl-5">Based on form, venue, rankings & head-to-head stats</p>
 
             {/* Tug-of-war bar */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold" style={{ color: isT1Edge && edgeAbs > 5 ? barColor1 : '#9ca3af', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team1}</span>
-                <span className="text-xs font-bold" style={{ color: !isT1Edge && edgeAbs > 5 ? barColor2 : '#9ca3af', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team2}</span>
+                <span className="text-xs font-bold" style={{ color: isT1Edge && edgeAbs > 5 ? barColor1 : '#e5e7eb', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team1}</span>
+                <span className="text-xs font-bold" style={{ color: !isT1Edge && edgeAbs > 5 ? barColor2 : '#e5e7eb', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team2}</span>
               </div>
               <div className="h-8 rounded-full overflow-hidden flex bg-gray-800/40 border border-white/10 gap-[2px]">
                 <motion.div
@@ -467,12 +538,12 @@ export function PredictDetails() {
                   <div key={label} className="flex items-center gap-3">
                     {/* Factor label */}
                     <div className="w-24 shrink-0">
-                      <div className="text-[10px] font-semibold text-white leading-tight">{label}</div>
-                      <div className="text-[8px] text-gray-500 leading-tight">{desc}</div>
+                      <div className="text-[10px] font-semibold text-gray-100 leading-tight">{label}</div>
+                      <div className="text-[8px] text-gray-300 leading-tight">{desc}</div>
                     </div>
 
                     {/* Score left */}
-                    <span className="text-[10px] font-bold w-6 text-right shrink-0" style={{ color: !isEven && t1Leads ? barColor1 : '#6b7280', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
+                    <span className="text-[10px] font-bold w-6 text-right shrink-0" style={{ color: !isEven && t1Leads ? barColor1 : '#cbd5e1', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
                       {Math.round(v1)}
                     </span>
 
@@ -480,14 +551,14 @@ export function PredictDetails() {
                     <div className="flex-1 h-3.5 rounded-full overflow-hidden flex bg-gray-800/40 border border-white/[0.06] gap-[1px]">
                       <motion.div
                         className="h-full rounded-l-full"
-                        style={{ backgroundColor: isEven ? '#4b5563' : t1Leads ? barColor1 : '#374151' }}
+                        style={{ backgroundColor: barColor1, opacity: isEven ? 0.6 : t1Leads ? 1 : 0.5 }}
                         initial={{ width: '50%' }}
                         animate={{ width: `${barPct}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
                       />
                       <motion.div
                         className="h-full rounded-r-full"
-                        style={{ backgroundColor: isEven ? '#4b5563' : !t1Leads ? barColor2 : '#374151' }}
+                        style={{ backgroundColor: barColor2, opacity: isEven ? 0.6 : !t1Leads ? 1 : 0.5 }}
                         initial={{ width: '50%' }}
                         animate={{ width: `${100 - barPct}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
@@ -495,7 +566,7 @@ export function PredictDetails() {
                     </div>
 
                     {/* Score right */}
-                    <span className="text-[10px] font-bold w-6 shrink-0" style={{ color: !isEven && !t1Leads ? barColor2 : '#6b7280', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
+                    <span className="text-[10px] font-bold w-6 shrink-0" style={{ color: !isEven && !t1Leads ? barColor2 : '#cbd5e1', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>
                       {Math.round(v2)}
                     </span>
                   </div>
@@ -534,20 +605,26 @@ export function PredictDetails() {
                 const isValue2 = diff1 && Number(diff1) < -10;
 
                 return (
-                  <div key={`${o.bookmaker}-${o.fetched_at}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30">
-                    <span className="text-[10px] text-gray-400 font-medium w-20 truncate">{o.bookmaker}</span>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-mono font-bold ${isValue1 ? 'text-yellow-400' : 'text-white'}`}>
+                  <button
+                    key={`${o.bookmaker}-${o.fetched_at}`}
+                    type="button"
+                    onClick={() => openExternalMarket(getBookmakerMarketUrl(o.bookmaker, match, o.market))}
+                    className="w-full appearance-none flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-cricket-500/40 hover:bg-gray-800/65 transition-colors text-left"
+                  >
+                    <span className="text-[10px] text-gray-300 font-medium w-24 truncate">{o.bookmaker}</span>
+                    <div className="flex items-center gap-2.5">
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
                         {decimalToAmerican(o.team1_odds)}
                         {isValue1 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
                       </span>
-                      <span className="text-gray-700 text-[10px]">|</span>
-                      <span className={`text-xs font-mono font-bold ${isValue2 ? 'text-yellow-400' : 'text-white'}`}>
+                      <span className="text-gray-600 text-[10px]">|</span>
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
                         {decimalToAmerican(o.team2_odds)}
                         {isValue2 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
                       </span>
+                      <svg className="w-3 h-3 text-gray-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
