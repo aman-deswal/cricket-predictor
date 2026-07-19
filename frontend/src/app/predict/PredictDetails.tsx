@@ -83,6 +83,10 @@ export function PredictDetails() {
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [espnData, setEspnData] = useState<ESPNMatchData | null>(null);
   const [edgeScore, setEdgeScore] = useState<EdgeScore | null>(null);
+  const [expandedSections, setExpandedSections] = useState({
+    ourTake: false,
+    researchNotes: false,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -191,6 +195,20 @@ export function PredictDetails() {
   const featuredBookmakerUrl = odds.length > 0
     ? getBookmakerMarketUrl(odds[0].bookmaker, match, odds[0].market)
     : null;
+  const reasoningSentences = (prediction?.reasoning || '')
+    .split(/(?<=[.!?])\s+/)
+    .filter((s: string) => s.trim().length > 10);
+  const visibleReasoning = expandedSections.ourTake ? reasoningSentences : reasoningSentences.slice(0, 3);
+
+  const expertPreview = enrichment?.expert_preview?.trim() || '';
+  const playerUpdates = enrichment?.player_updates ?? [];
+  const sourceLinks = enrichment?.source_links ?? [];
+  const researchNeedsAccordion = expertPreview.length > 260 || playerUpdates.length > 2 || sourceLinks.length > 2;
+  const visiblePreview = expandedSections.researchNotes || expertPreview.length <= 260
+    ? expertPreview
+    : `${expertPreview.slice(0, 260).trimEnd()}…`;
+  const visibleUpdates = expandedSections.researchNotes ? playerUpdates.slice(0, 6) : playerUpdates.slice(0, 2);
+  const visibleSources = expandedSections.researchNotes ? sourceLinks.slice(0, 6) : sourceLinks.slice(0, 2);
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -578,6 +596,51 @@ export function PredictDetails() {
         );
       })()}
 
+      {/* Series context (moved higher for relevance) */}
+      {espnData && (espnData.series_scoreline || espnData.series_note || espnData.standings.length > 0 || espnData.toss_winner) && (
+        <motion.div
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30 mb-4"
+          {...fadeUp}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h12v10H2z" /><path d="M2 6h12" /><path d="M5 3v3" /></svg>
+            Series
+          </h2>
+          <div className="space-y-2">
+            {espnData.series_scoreline && (
+              <p className="text-xs text-cricket-400 font-semibold">{espnData.series_scoreline}</p>
+            )}
+            {espnData.series_note && !espnData.series_scoreline && (
+              <p className="text-xs text-cricket-400 font-medium">{espnData.series_note}</p>
+            )}
+            {espnData.standings.length > 0 && (
+              <div className="space-y-1 mt-1">
+                {espnData.standings.slice(0, 4).map((team, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px] py-0.5 px-1.5 rounded bg-gray-800/30">
+                    <span className="text-white font-medium">{team.team_name}</span>
+                    <div className="flex gap-2 text-gray-400">
+                      {team.stats.matchesPlayed && <span>P:{team.stats.matchesPlayed}</span>}
+                      {team.stats.matchesWon && <span className="text-green-400">W:{team.stats.matchesWon}</span>}
+                      {team.stats.matchesLost && <span className="text-red-400">L:{team.stats.matchesLost}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {espnData.toss_winner && (
+              <div className="pt-1 border-t border-gray-800/50">
+                <p className="text-[10px] text-gray-300">
+                  <span className="text-gray-500">Toss:</span>{' '}
+                  <span className="font-medium text-white">{espnData.toss_winner}</span>
+                  {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
+                </p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* 1. Sportsbook Odds | Reasoning — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Sportsbook Odds */}
@@ -658,16 +721,22 @@ export function PredictDetails() {
               </span>
             </div>
             <ul className="space-y-2">
-              {(prediction.reasoning || '')
-                .split(/(?<=[.!?])\s+/)
-                .filter((s: string) => s.trim().length > 10)
-                .map((sentence: string, i: number) => (
+              {visibleReasoning.map((sentence: string, i: number) => (
                   <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-cricket-400 flex-shrink-0" />
                     <span>{sentence.trim()}</span>
                   </li>
                 ))}
             </ul>
+            {reasoningSentences.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
+                className="mt-3 text-[10px] font-medium text-cricket-300 hover:text-cricket-200 transition-colors"
+              >
+                {expandedSections.ourTake ? 'Show less' : 'Show more'}
+              </button>
+            )}
           </motion.div>
         ) : (
           <motion.div
@@ -815,13 +884,13 @@ export function PredictDetails() {
           </h2>
           {enrichment ? (
             <>
-              {enrichment.expert_preview && (
-                <p className="text-xs text-gray-300 leading-relaxed mb-3">{enrichment.expert_preview}</p>
+              {expertPreview && (
+                <p className="text-xs text-gray-300 leading-relaxed mb-3">{visiblePreview}</p>
               )}
 
-              {(enrichment.player_updates?.length ?? 0) > 0 && (
+              {visibleUpdates.length > 0 && (
                 <div className="space-y-1.5 mb-3">
-                  {(enrichment.player_updates ?? []).slice(0, 4).map((update, index) => (
+                  {visibleUpdates.map((update, index) => (
                     <div
                       key={`${update.player ?? 'update'}-${index}`}
                       className="rounded-md bg-gray-800/30 border border-gray-800/50 px-2 py-1.5 text-[10px]"
@@ -833,9 +902,9 @@ export function PredictDetails() {
                 </div>
               )}
 
-              {(enrichment.source_links?.length ?? 0) > 0 && (
+              {visibleSources.length > 0 && (
                 <div className="space-y-1">
-                  {(enrichment.source_links ?? []).slice(0, 3).map((source, index) => (
+                  {visibleSources.map((source, index) => (
                     <a
                       key={`${source.url ?? source.title}-${index}`}
                       href={source.url}
@@ -847,6 +916,15 @@ export function PredictDetails() {
                     </a>
                   ))}
                 </div>
+              )}
+              {researchNeedsAccordion && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedSections((prev) => ({ ...prev, researchNotes: !prev.researchNotes }))}
+                  className="mt-3 text-[10px] font-medium text-cricket-300 hover:text-cricket-200 transition-colors"
+                >
+                  {expandedSections.researchNotes ? 'Show less' : 'Show more'}
+                </button>
               )}
             </>
           ) : (
@@ -981,104 +1059,45 @@ export function PredictDetails() {
         </motion.div>
       </div>
 
-      {/* 4. Series + H2H + Key Players (ESPN data) */}
-      {espnData && (h2hGames.length > 0 || espnData.toss_winner || espnData.series_note || (espnData.series_leaders?.length ?? 0) > 0 || espnData.series_scoreline) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          {/* Series News & Recent Results */}
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.5 }}
-          >
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h12v10H2z" /><path d="M2 6h12" /><path d="M5 3v3" /></svg>
-              Series
-            </h2>
-            <div className="space-y-2">
-              {espnData.series_scoreline && (
-                <p className="text-xs text-cricket-400 font-semibold">{espnData.series_scoreline}</p>
-              )}
-              {espnData.series_note && !espnData.series_scoreline && (
-                <p className="text-xs text-cricket-400 font-medium">{espnData.series_note}</p>
-              )}
-              {/* Show recent match results from ESPN scorecards */}
-              {espnData.standings.length > 0 && (
-                <div className="space-y-1 mt-1">
-                  {espnData.standings.slice(0, 4).map((team, i) => (
-                    <div key={i} className="flex items-center justify-between text-[10px] py-0.5 px-1.5 rounded bg-gray-800/30">
-                      <span className="text-white font-medium">{team.team_name}</span>
-                      <div className="flex gap-2 text-gray-400">
-                        {team.stats.matchesPlayed && <span>P:{team.stats.matchesPlayed}</span>}
-                        {team.stats.matchesWon && <span className="text-green-400">W:{team.stats.matchesWon}</span>}
-                        {team.stats.matchesLost && <span className="text-red-400">L:{team.stats.matchesLost}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* Toss result if available */}
-              {espnData.toss_winner && (
-                <div className="pt-1 border-t border-gray-800/50">
-                  <p className="text-[10px] text-gray-300">
-                    <span className="text-gray-500">Toss:</span>{' '}
-                    <span className="font-medium text-white">{espnData.toss_winner}</span>
-                    {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
-                  </p>
-                </div>
-              )}
-              {!espnData.series_note && !espnData.series_scoreline && espnData.standings.length === 0 && !espnData.toss_winner && (
-                <p className="text-[10px] text-gray-500">No series data available yet</p>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Head to Head */}
+      {/* 4. Head to Head (ESPN data) */}
+      {espnData && h2hGames.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 mb-4">
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30"
             {...fadeUp}
             transition={{ delay: 0.55 }}
           >
-            {h2hGames.length > 0 ? (
-              <div>
-                <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
-                  Head to Head
-                </h2>
-                <div className="space-y-1">
-                  {h2hGames.slice(0, 5).map((game, i) => {
-                    const winner = game.teams.find(t => t.winner);
-                    return (
-                      <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
-                        <span className="text-gray-500 w-16 shrink-0">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
-                        <div className="flex-1 flex items-center gap-1">
-                          {game.teams.map((t, j) => {
-                            const isTeam1 = t.abbreviation === team1Meta.shortName || t.abbreviation === prediction?.team1;
-                            const winColor = isTeam1 ? teamColor1 : teamColor2;
-                            return (
-                              <span key={j} style={t.winner ? { color: winColor, fontWeight: 600, textShadow: '0 0 4px rgba(0,0,0,0.7)' } : undefined} className={t.winner ? '' : 'text-gray-400'}>
-                                {t.abbreviation} {t.score}{j < game.teams.length - 1 ? ' vs ' : ''}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        {winner && (() => {
-                          const isTeam1Win = winner.abbreviation === team1Meta.shortName || winner.abbreviation === prediction?.team1;
-                          return <span className="text-[8px]" style={{ color: isTeam1Win ? teamColor1 : teamColor2, textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>✓ {winner.abbreviation}</span>;
-                        })()}
+            <div>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
+                Head to Head
+              </h2>
+              <div className="space-y-1">
+                {h2hGames.slice(0, 5).map((game, i) => {
+                  const winner = game.teams.find(t => t.winner);
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
+                      <span className="text-gray-500 w-16 shrink-0">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
+                      <div className="flex-1 flex items-center gap-1">
+                        {game.teams.map((t, j) => {
+                          const isTeam1 = t.abbreviation === team1Meta.shortName || t.abbreviation === prediction?.team1;
+                          const winColor = isTeam1 ? teamColor1 : teamColor2;
+                          return (
+                            <span key={j} style={t.winner ? { color: winColor, fontWeight: 600, textShadow: '0 0 4px rgba(0,0,0,0.7)' } : undefined} className={t.winner ? '' : 'text-gray-400'}>
+                              {t.abbreviation} {t.score}{j < game.teams.length - 1 ? ' vs ' : ''}
+                            </span>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
+                      {winner && (() => {
+                        const isTeam1Win = winner.abbreviation === team1Meta.shortName || winner.abbreviation === prediction?.team1;
+                        return <span className="text-[8px]" style={{ color: isTeam1Win ? teamColor1 : teamColor2, textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>✓ {winner.abbreviation}</span>;
+                      })()}
+                    </div>
+                  );
+                })}
               </div>
-            ) : (
-              <div>
-                <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
-                  Head to Head
-                </h2>
-                <p className="text-[10px] text-gray-500 py-2">No recent head-to-head data available</p>
-              </div>
-            )}
+            </div>
           </motion.div>
         </div>
       )}
