@@ -171,8 +171,10 @@ python pipeline/fetch_headshots.py --force
 cd frontend
 npm install
 cp .env.example .env.local
-npm run dev
+npm run dev:mock
 ```
+
+`npm run dev:mock` starts the local dev server with bundled mock fixtures, predictions, history, and dashboard data. Use `npm run dev` for live Supabase data. You can also flip demo/live data locally from the hidden menu toggle in the navbar.
 
 ---
 
@@ -192,6 +194,7 @@ npm run dev
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser-accessible Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser-accessible Supabase anon key |
+| `NEXT_PUBLIC_USE_MOCK_DATA` | Set to `true` to run the frontend against bundled demo cricket data |
 
 ---
 

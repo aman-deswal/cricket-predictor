@@ -1,8 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 import { getTeamMeta } from './teams';
+import { getStoredDemoMode } from './demo-mode';
+import {
+  getMockAccuracyTrend,
+  getMockCalibrationData,
+  getMockDashboardStats,
+  getMockEdgeScore,
+  getMockESPNMatchData,
+  getMockMatch,
+  getMockMatchEnrichment,
+  getMockMatchOdds,
+  getMockMatchSquads,
+  getMockPlayerStats,
+  getMockPrediction,
+  getMockPredictionHistory,
+  getMockUpcomingMatches,
+} from './mock-data';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const hasSupabaseConfig = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+export function isMockDataEnabled(): boolean {
+  const storedMode = getStoredDemoMode();
+  if (storedMode !== null) return storedMode;
+  return process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || !hasSupabaseConfig;
+}
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://mock.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'mock-anon-key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -271,6 +295,10 @@ function isFutureMatch(match: Match): boolean {
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
+  if (isMockDataEnabled()) {
+    return getMockUpcomingMatches();
+  }
+
   const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
@@ -368,6 +396,10 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
+  if (isMockDataEnabled()) {
+    return getMockMatch(matchId);
+  }
+
   const [{ data, error }, { data: statsData }] = await Promise.all([
     supabase
       .from('matches')
@@ -404,6 +436,10 @@ export async function getMatch(matchId: string): Promise<Match | null> {
 }
 
 export async function getPrediction(matchId: string): Promise<Prediction | null> {
+  if (isMockDataEnabled()) {
+    return getMockPrediction(matchId);
+  }
+
   const { data, error } = await supabase
     .from('predictions')
     .select('*')
@@ -415,6 +451,10 @@ export async function getPrediction(matchId: string): Promise<Prediction | null>
 }
 
 export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
+  if (isMockDataEnabled()) {
+    return getMockMatchOdds(matchId);
+  }
+
   const { data, error } = await supabase
     .from('match_odds')
     .select('*')
@@ -426,6 +466,10 @@ export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
 }
 
 export async function getEdgeScore(matchId: string): Promise<EdgeScore | null> {
+  if (isMockDataEnabled()) {
+    return getMockEdgeScore(matchId);
+  }
+
   const { data, error } = await supabase
     .from('match_edge_scores')
     .select('*')
@@ -444,6 +488,10 @@ export async function getEdgeScore(matchId: string): Promise<EdgeScore | null> {
 }
 
 export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichment | null> {
+  if (isMockDataEnabled()) {
+    return getMockMatchEnrichment(matchId);
+  }
+
   const { data, error } = await supabase
     .from('match_enrichment')
     .select('*')
@@ -455,6 +503,10 @@ export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichme
 }
 
 export async function getMatchSquads(matchId: string): Promise<MatchSquad[]> {
+  if (isMockDataEnabled()) {
+    return getMockMatchSquads(matchId);
+  }
+
   const { data, error } = await supabase
     .from('match_squads')
     .select('*')
@@ -556,6 +608,10 @@ export interface ESPNMatchData {
 }
 
 export async function getESPNMatchData(matchId: string): Promise<ESPNMatchData | null> {
+  if (isMockDataEnabled()) {
+    return getMockESPNMatchData(matchId);
+  }
+
   const { data, error } = await supabase
     .from('espn_match_data')
     .select('*')
@@ -586,6 +642,10 @@ export async function getESPNMatchData(matchId: string): Promise<ESPNMatchData |
 }
 
 export async function getPlayerStats(playerNames: string[], format: string): Promise<PlayerStats[]> {
+  if (isMockDataEnabled()) {
+    return getMockPlayerStats(playerNames, format);
+  }
+
   if (!playerNames.length) return [];
   const { data, error } = await supabase
     .from('player_stats')
@@ -598,6 +658,10 @@ export async function getPlayerStats(playerNames: string[], format: string): Pro
 }
 
 export async function getPredictionHistory(): Promise<PredictionResult[]> {
+  if (isMockDataEnabled()) {
+    return getMockPredictionHistory();
+  }
+
   const { data, error } = await supabase
     .from('prediction_results')
     .select('*')
@@ -613,6 +677,10 @@ export async function getDashboardStats(): Promise<{
   accuracy: number;
   avgBrier: number;
 }> {
+  if (isMockDataEnabled()) {
+    return getMockDashboardStats();
+  }
+
   const { data, error } = await supabase
     .from('prediction_results')
     .select('correct, brier_score');
@@ -634,4 +702,43 @@ export async function getDashboardStats(): Promise<{
       ? brierScores.reduce((a, b) => a + b, 0) / brierScores.length
       : 0,
   };
+}
+
+export async function getCalibrationData(): Promise<Array<{ bin_center: number; predicted_avg: number; actual_avg: number; count: number }>> {
+  if (isMockDataEnabled()) {
+    return getMockCalibrationData();
+  }
+
+  const { data } = await supabase
+    .from('stats_cache')
+    .select('data')
+    .eq('stat_type', 'calibration')
+    .single();
+
+  return (data?.data as Array<{ bin_center: number; predicted_avg: number; actual_avg: number; count: number }>) ?? [];
+}
+
+export async function getAccuracyTrend(): Promise<Array<{ date: string; accuracy: number }>> {
+  if (isMockDataEnabled()) {
+    return getMockAccuracyTrend();
+  }
+
+  const { data } = await supabase
+    .from('prediction_results')
+    .select('correct, scored_at')
+    .order('scored_at', { ascending: true });
+
+  if (!data || data.length < 10) return [];
+
+  const window = 10;
+  const trend = [];
+  for (let i = window - 1; i < data.length; i++) {
+    const slice = data.slice(i - window + 1, i + 1);
+    const correct = slice.filter((r) => r.correct).length;
+    trend.push({
+      date: new Date(data[i].scored_at).toLocaleDateString(),
+      accuracy: (correct / window) * 100,
+    });
+  }
+  return trend;
 }

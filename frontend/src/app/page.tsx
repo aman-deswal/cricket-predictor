@@ -69,6 +69,7 @@ export default function HomePage() {
           </motion.p>
           <p className="text-lg font-medium text-gray-400">No upcoming matches</p>
           <p className="mt-1 text-sm">Check back later for new fixtures</p>
+          <p className="mt-2 text-xs text-gray-600">Use the hidden Demo toggle in the menu to load mock fixtures locally.</p>
         </motion.div>
       ) : (
         <div className="space-y-12">

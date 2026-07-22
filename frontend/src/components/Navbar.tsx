@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from './Logo';
+import { isMockDataEnabled } from '@/lib/supabase';
+import { setStoredDemoMode } from '@/lib/demo-mode';
 
 const NAV_LINKS = [
   { href: '/', label: 'Matches' },
@@ -15,11 +17,23 @@ const NAV_LINKS = [
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [demoEnabled, setDemoEnabled] = useState(false);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
+
+  const toggleDemoMode = () => {
+    const next = !demoEnabled;
+    setStoredDemoMode(next);
+    setDemoEnabled(next);
+    window.location.reload();
+  };
+
+  useEffect(() => {
+    setDemoEnabled(isMockDataEnabled());
+  }, []);
 
   return (
     <nav className="relative border-b border-amber-800/30 bg-[#121010]/95 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-amber-900/5">
@@ -36,6 +50,11 @@ export function Navbar() {
               <span className="bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Six</span>
               <span className="text-white">Sense</span>
             </span>
+            {demoEnabled && (
+              <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                Demo
+              </span>
+            )}
           </Link>
 
           {/* Desktop nav */}
@@ -60,6 +79,13 @@ export function Navbar() {
                 )}
               </Link>
             ))}
+            <button
+              onClick={toggleDemoMode}
+              className="ml-2 px-2 py-1 rounded text-[10px] uppercase tracking-[0.18em] text-gray-600 hover:text-amber-300 hover:bg-amber-500/5 opacity-40 hover:opacity-100 transition-all"
+              title="Toggle demo data"
+            >
+              {demoEnabled ? 'Demo on' : 'Demo off'}
+            </button>
           </div>
 
           {/* Mobile hamburger */}
@@ -111,6 +137,12 @@ export function Navbar() {
                   {label}
                 </Link>
               ))}
+              <button
+                onClick={toggleDemoMode}
+                className="w-full text-left mt-2 px-3 py-2 rounded-lg text-xs uppercase tracking-[0.18em] text-gray-500 hover:text-amber-300 hover:bg-amber-500/5 opacity-70 transition-all"
+              >
+                {demoEnabled ? 'Demo mode: on' : 'Demo mode: off'}
+              </button>
             </div>
           </motion.div>
         )}
