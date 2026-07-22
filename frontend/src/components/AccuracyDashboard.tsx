@@ -12,7 +12,7 @@ import {
   ScatterChart,
   Scatter,
 } from 'recharts';
-import { supabase } from '@/lib/supabase';
+import { getAccuracyTrend, getCalibrationData } from '@/lib/supabase';
 
 interface CalibrationBin {
   bin_center: number;
@@ -27,37 +27,13 @@ export function AccuracyDashboard() {
 
   useEffect(() => {
     async function loadCalibration() {
-      const { data } = await supabase
-        .from('stats_cache')
-        .select('data')
-        .eq('stat_type', 'calibration')
-        .single();
-
-      if (data?.data) {
-        setCalibrationData(data.data as CalibrationBin[]);
-      }
+      const data = await getCalibrationData();
+      setCalibrationData(data);
     }
 
     async function loadTrend() {
-      const { data } = await supabase
-        .from('prediction_results')
-        .select('correct, scored_at')
-        .order('scored_at', { ascending: true });
-
-      if (data) {
-        // Compute rolling accuracy (window of 10)
-        const window = 10;
-        const trend = [];
-        for (let i = window - 1; i < data.length; i++) {
-          const slice = data.slice(i - window + 1, i + 1);
-          const correct = slice.filter((r) => r.correct).length;
-          trend.push({
-            date: new Date(data[i].scored_at).toLocaleDateString(),
-            accuracy: (correct / window) * 100,
-          });
-        }
-        setTrendData(trend);
-      }
+      const trend = await getAccuracyTrend();
+      setTrendData(trend);
     }
 
     loadCalibration();
