@@ -22,6 +22,33 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _score_prediction(prediction: dict, actual_winner: str) -> dict:
+    """Score a single prediction against the actual winner."""
+    predicted_winner = prediction["predicted_winner"]
+    correct = predicted_winner == actual_winner
+
+    if actual_winner == prediction["team1"]:
+        brier = (prediction["team1_win_probability"] - 1.0) ** 2
+    elif actual_winner == prediction["team2"]:
+        brier = (prediction["team2_win_probability"] - 1.0) ** 2
+    else:
+        brier = None
+
+    return {
+        "prediction_id": prediction["match_id"],
+        "match_id": prediction["match_id"],
+        "predicted_winner": predicted_winner,
+        "actual_winner": actual_winner,
+        "correct": correct,
+        "brier_score": brier,
+        "predicted_probability": max(
+            prediction["team1_win_probability"],
+            prediction["team2_win_probability"],
+        ),
+        "scored_at": datetime.utcnow().isoformat(),
+    }
+
+
 def _score_espn_completed(espn_fixtures: list[dict]) -> int:
     """Score predictions for matches ESPN reports as completed.
 

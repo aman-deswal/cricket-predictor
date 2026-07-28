@@ -18,7 +18,6 @@ flowchart LR
     C --> D[Next.js 14 Frontend]
     D --> E[GitHub Pages Static Export]
 
-    F[CricAPI] --> B
     G[ESPN Cricinfo APIs] --> B
     H[The Odds API] --> B
     I[Cricsheet Historical Data] --> B
@@ -26,7 +25,7 @@ flowchart LR
 ```
 
 ### Data/Logic flow
-1. **Fixtures ingestion** merges ESPN-first + CricAPI supplementary coverage.
+1. **Fixtures ingestion** uses ESPN Cricinfo exclusively (free, unlimited). ESPN match IDs (`espn-<id>`) are used as canonical fixture identifiers.
 2. **Stats caching** computes team/venue/H2H from Cricsheet and stores in `stats_cache`.
 3. **Predictions** run via GPT-4o (GitHub Models), using:
    - cached form/H2H/venue stats,
@@ -90,9 +89,9 @@ flowchart LR
 
 | Workflow | Schedule | Purpose |
 |---|---|---|
-| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures (ESPN + CricAPI), backup score pass |
-| `fetch-results.yml` | hourly | Score unscored predictions on completed matches |
-| `fetch-squads.yml` | every 6 hours | Fetch squads, player stats, and headshots |
+| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures from ESPN (free, unlimited), backup score pass |
+| `fetch-results.yml` | hourly | Score unscored predictions on completed matches (ESPN only) |
+| `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN; player stats + headshots (CricAPI optional) |
 | `fetch-headshots.yml` | monthly | Full headshot refresh pass |
 | `fetch-odds.yml` | every 2 hours | Pull bookmaker market data and map to matches |
 | `enrich-matches.yml` | every 6 hours + after results run | LLM web/news enrichment with ESPN context |
@@ -186,7 +185,7 @@ npm run dev:mock
 | `GITHUB_TOKEN` | GitHub token (used for GitHub Models GPT-4o calls) |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_KEY` | Supabase service/anon key used by pipelines |
-| `CRICAPI_KEY` | CricAPI key (fixtures/results/player stats fallback) |
+| `CRICAPI_KEY` | *(Optional)* CricAPI key — enables pre-match squad data and player career stats. Not required for fixtures or results. |
 | `ODDS_API_KEY` | The Odds API key |
 
 ### Frontend (`frontend/.env.local`)
@@ -211,7 +210,7 @@ npm run dev:mock
 ```text
 frontend/                 Next.js app (Matches, Predict, Dashboard, History)
 pipeline/                 ETL + prediction + enrichment + scoring jobs
-pipeline/utils/           ESPN/CricAPI/Cricsheet/DB/Edge-score helpers
+pipeline/utils/           ESPN/Cricsheet/DB/Edge-score helpers (cricapi.py kept for optional squad/stats use)
 supabase/                 SQL for enrichment/cache/ESPN tables
 .github/workflows/        Scheduled and deploy workflows
 docs/screenshots/         Current UI screenshots used in this README
@@ -224,7 +223,7 @@ docs/screenshots/         Current UI screenshots used in this README
 - **Frontend:** Next.js 14, React 18, Tailwind CSS, Framer Motion, Recharts, Supabase JS
 - **Pipelines:** Python 3.11, OpenAI SDK, Requests, Pandas, scikit-learn, Supabase Python client
 - **LLM:** GitHub Models (`openai/gpt-4o`)
-- **Data sources:** ESPN Cricinfo APIs, CricAPI, The Odds API, Cricsheet
+- **Data sources:** ESPN Cricinfo APIs (primary, free/unlimited), The Odds API, Cricsheet, CricAPI (optional)
 - **Hosting:** GitHub Pages via Actions
 
 ---
