@@ -86,6 +86,7 @@ export interface PredictionResult {
   correct: boolean;
   brier_score: number | null;
   predicted_probability: number;
+  result_text?: string | null;
   scored_at: string;
 }
 

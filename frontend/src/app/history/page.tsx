@@ -41,6 +41,34 @@ function computeAccuracy(items: PredictionHistoryItem[]) {
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
+// Cricket keyword → chip label mapping for factor extraction
+const FACTOR_KEYWORDS: [RegExp, string][] = [
+  [/home (advantage|ground|crowd)/i, 'Home advantage'],
+  [/dew factor|dew conditions/i, 'Dew factor'],
+  [/toss|win the toss/i, 'Toss matters'],
+  [/(batting|bowling) (form|lineup|strength)/i, 'Form in focus'],
+  [/pitch (condition|report|behavior|favour)/i, 'Pitch conditions'],
+  [/weather|overcast|humid/i, 'Weather factor'],
+  [/head.to.head|h2h|historically|history between/i, 'H2H history'],
+  [/momentum|recent form|winning streak|in form/i, 'In-form side'],
+  [/strong batting|top order|lower order/i, 'Batting depth'],
+  [/pace attack|spin attack|bowling attack/i, 'Bowling threat'],
+  [/(chasing|defending) total/i, 'Chase dynamics'],
+  [/day.night|floodlight|night game/i, 'D/N conditions'],
+  [/injury|doubt|ruled out|miss/i, 'Team news'],
+  [/experience|senior/i, 'Experience edge'],
+];
+
+function extractFactors(reasoning?: string): string[] {
+  if (!reasoning) return [];
+  const found: string[] = [];
+  for (const [pattern, label] of FACTOR_KEYWORDS) {
+    if (pattern.test(reasoning) && !found.includes(label)) found.push(label);
+    if (found.length >= 4) break;
+  }
+  return found;
+}
+
 function ConfidencePill({ value }: { value?: string }) {
   if (!value) return null;
   const styles: Record<string, string> = {
@@ -219,23 +247,78 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
             transition={{ duration: 0.22, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 pt-2 border-t border-gray-700/40 space-y-4">
+            <div className="px-5 pb-5 pt-3 border-t border-gray-700/40 space-y-4">
 
+              {/* ── Verdict banner ── */}
+              <div className={`rounded-xl px-4 py-3 flex items-start gap-3 ${
+                result.correct
+                  ? 'bg-emerald-500/10 border border-emerald-500/20'
+                  : 'bg-red-500/10 border border-red-500/20'
+              }`}>
+                <span className={`text-xl font-black shrink-0 ${result.correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {result.correct ? '✓' : '✗'}
+                </span>
+                <div>
+                  <p className={`text-sm font-black ${result.correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {result.correct ? 'AI called it' : 'AI missed this one'}
+                  </p>
+                  {result.result_text ? (
+                    <p className="text-xs text-gray-400 mt-0.5">{result.result_text}</p>
+                  ) : (
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {result.actual_winner} won
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Probability bars with edge ── */}
               {result.team1_win_probability !== undefined && result.team2_win_probability !== undefined && (
-                <div className="space-y-2">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Pre-match probability</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Pre-match probability</p>
+                    {/* Edge badge — how far AI was from coinflip */}
+                    {(() => {
+                      const edge = Math.round((Math.max(result.team1_win_probability, result.team2_win_probability) - 0.5) * 100);
+                      return edge >= 5 ? (
+                        <span className="text-[10px] font-bold text-cricket-400 bg-cricket-900/40 border border-cricket-700/30 px-2 py-0.5 rounded-full">
+                          +{edge}% above coinflip
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-700 bg-gray-900/40 border border-gray-700/30 px-2 py-0.5 rounded-full">
+                          Near 50/50
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <ProbBar label={team1} prob={result.team1_win_probability} isWinner={result.actual_winner === team1} isPredicted={result.predicted_winner === team1} />
                   <ProbBar label={team2} prob={result.team2_win_probability} isWinner={result.actual_winner === team2} isPredicted={result.predicted_winner === team2} />
                 </div>
               )}
 
-              {result.reasoning && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">AI Reasoning</p>
-                  <p className="text-sm text-gray-300 leading-relaxed">{result.reasoning}</p>
-                </div>
-              )}
+              {/* ── Key factor chips ── */}
+              {(() => {
+                const factors = extractFactors(result.reasoning);
+                return factors.length > 0 ? (
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Key factors</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {factors.map((f) => (
+                        <span key={f} className="text-[11px] font-medium text-gray-300 bg-gray-800/70 border border-gray-700/40 px-2.5 py-1 rounded-full">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : result.reasoning ? (
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">AI Reasoning</p>
+                    <p className="text-sm text-gray-300 leading-relaxed line-clamp-4">{result.reasoning}</p>
+                  </div>
+                ) : null;
+              })()}
 
+              {/* ── Toss insight ── */}
               {result.toss_insight && (
                 <div className="bg-cricket-950/40 border border-cricket-800/20 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -246,12 +329,6 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
                 </div>
               )}
 
-              {result.brier_score !== null && (
-                <p className="text-[11px] text-gray-600">
-                  Brier score: <span className="text-gray-500">{result.brier_score.toFixed(3)}</span>
-                  <span className="ml-2 text-gray-700">lower = better</span>
-                </p>
-              )}
             </div>
           </motion.div>
         )}
