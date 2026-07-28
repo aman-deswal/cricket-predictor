@@ -26,7 +26,6 @@ jobs:
 
       - name: Fetch fixtures
         env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python pipeline/fetch_fixtures.py
@@ -34,7 +33,6 @@ jobs:
       - name: Backup score pending results
         if: ${{ always() }}
         env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           RESULT_CHECK_BATCH_SIZE: '25'

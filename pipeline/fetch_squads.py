@@ -246,8 +246,9 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
         squad_data = fetch_squad_from_espn(match_id)
         source = "espn"
 
-        # Fall back to CricAPI
-        if not squad_data:
+        # Fall back to CricAPI only if key is set and match is not ESPN-sourced
+        api_key = _get_api_key()
+        if not squad_data and api_key and not match_id.startswith("espn-"):
             squad_data = fetch_squad_for_match(match_id)
             source = "cricapi_fantasy"
 

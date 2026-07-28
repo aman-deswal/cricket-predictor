@@ -18,7 +18,7 @@ BASE_URL = "https://api.cricapi.com/v1"
 
 
 def _get_api_key() -> str:
-    return os.environ["CRICAPI_KEY"]
+    return os.environ.get("CRICAPI_KEY", "")
 
 
 def search_player(name: str) -> Optional[dict]:
@@ -271,6 +271,10 @@ def fetch_stats_for_match_squads(match_id: Optional[str] = None, force: bool = F
 
     if not squads:
         print("No squads found. Run fetch_squads.py first.")
+        return
+
+    if not _get_api_key():
+        print("CRICAPI_KEY not set — skipping player stats fetch.")
         return
 
     # Get match types for format detection
