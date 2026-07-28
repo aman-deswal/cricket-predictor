@@ -6,6 +6,8 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { TeamBadge } from '@/components/TeamBadge';
 import { getPredictionHistory, PredictionHistoryItem } from '@/lib/supabase';
 
+import { getTeamMeta } from '@/lib/teams';
+
 type Filter = 'all' | 'correct' | 'incorrect';
 
 function ConfidencePill({ value }: { value?: string }) {
@@ -194,6 +196,12 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
   );
 }
 
+function isInternationalMatch(result: PredictionHistoryItem): boolean {
+  const t1 = result.team1 || result.predicted_winner;
+  const t2 = result.team2 || result.actual_winner;
+  return Boolean(getTeamMeta(t1).countryCode) && Boolean(getTeamMeta(t2).countryCode);
+}
+
 function dateGroupLabel(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
@@ -248,7 +256,11 @@ export default function HistoryPage() {
   const correct = filtered.filter((r) => r.correct).length;
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-  const groups = groupByDate(filtered);
+  const international = filtered.filter(isInternationalMatch);
+  const league = filtered.filter((r) => !isInternationalMatch(r));
+
+  const intlGroups = groupByDate(international);
+  const leagueGroups = groupByDate(league);
 
   if (loading) return <CricketLoader />;
 
@@ -320,22 +332,66 @@ export default function HistoryPage() {
           <p className="text-lg">No prediction history available</p>
         </motion.div>
       ) : (
-        <div className="space-y-8">
-          {groups.map(({ label, items }) => (
-            <div key={label}>
-              {/* Date group header */}
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</p>
+        <div className="space-y-10">
+          {/* Tier 1: International matches */}
+          {intlGroups.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-lg">🌐</span>
+                <h2 className="text-sm font-bold text-white uppercase tracking-widest">International</h2>
+                <span className="text-[10px] text-gray-600 px-2 py-0.5 rounded-full bg-gray-800/60 border border-gray-700/40">
+                  {international.length} predictions · richer data
+                </span>
                 <div className="flex-1 h-px bg-gray-800/60" />
-                <p className="text-[10px] text-gray-700">{items.length}</p>
               </div>
-              <div className="space-y-3">
-                {items.map((result, i) => (
-                  <HistoryCard key={result.prediction_id} result={result} index={i} />
+              <div className="space-y-8">
+                {intlGroups.map(({ label, items }) => (
+                  <div key={label}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</p>
+                      <div className="flex-1 h-px bg-gray-800/40" />
+                      <p className="text-[10px] text-gray-700">{items.length}</p>
+                    </div>
+                    <div className="space-y-3">
+                      {items.map((result, i) => (
+                        <HistoryCard key={result.prediction_id} result={result} index={i} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-          ))}
+          )}
+
+          {/* Tier 2: Domestic league matches */}
+          {leagueGroups.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-lg">🏏</span>
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest">League Cricket</h2>
+                <span className="text-[10px] text-gray-600 px-2 py-0.5 rounded-full bg-gray-800/60 border border-gray-700/40">
+                  {league.length} predictions · limited data
+                </span>
+                <div className="flex-1 h-px bg-gray-800/60" />
+              </div>
+              <div className="space-y-8">
+                {leagueGroups.map(({ label, items }) => (
+                  <div key={label}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</p>
+                      <div className="flex-1 h-px bg-gray-800/40" />
+                      <p className="text-[10px] text-gray-700">{items.length}</p>
+                    </div>
+                    <div className="space-y-3">
+                      {items.map((result, i) => (
+                        <HistoryCard key={result.prediction_id} result={result} index={i} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
