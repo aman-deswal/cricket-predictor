@@ -1,12 +1,7 @@
 """Fetch completed match results and score predictions.
 
-Uses two sources to find match results:
-1. **ESPN Cricinfo** (primary) — free, unlimited. Checks ESPN event IDs
-   stored in ``espn_match_data`` and also tries to find events by team/date.
-2. **CricAPI match_info** (fallback) — rate-limited to a small batch per run.
-
-Also pulls results from CricAPI's ``cricScore`` endpoint which returns
-recently completed matches without per-match API calls.
+Uses ESPN Cricinfo exclusively — free, unlimited. Checks stored ESPN event IDs
+and the live ESPN header for completed matches.
 """
 
 import argparse
@@ -18,7 +13,6 @@ from typing import Optional
 
 import requests
 
-from utils.cricapi import fetch_match_result
 from utils.db import get_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -26,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 ESPN_SUMMARY_URL = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/{league_id}/summary"
 DEFAULT_LEAGUE = "8048"
-MAX_CRICAPI_CALLS = 5
 
 
 # ---------------------------------------------------------------------------
@@ -294,23 +287,6 @@ def main(force: bool = False) -> None:
                 logger.info(f"ESPN phase 2 (header): scored {len(newly_scored)} more")
         except Exception as e:
             logger.warning(f"ESPN header scoring failed: {e}")
-
-    # --- Phase 3: Score via CricAPI match_info (fallback, limited) ---
-    if still_unscored:
-        batch = still_unscored[:MAX_CRICAPI_CALLS]
-        logger.info(f"CricAPI fallback: checking {len(batch)} of {len(still_unscored)} remaining...")
-
-        for prediction in batch:
-            mid = prediction["match_id"]
-            try:
-                result = fetch_match_result(mid)
-            except Exception as e:
-                logger.debug(f"CricAPI error for {mid}: {e}")
-                continue
-
-            if result and result.get("winner"):
-                _persist_score(client, prediction, result["winner"])
-                scored += 1
 
     logger.info(f"Total scored this run: {scored}")
 

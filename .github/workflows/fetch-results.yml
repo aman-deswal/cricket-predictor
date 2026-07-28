@@ -25,7 +25,6 @@ jobs:
 
       - name: Fetch results and score predictions
         env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           RESULT_CHECK_BATCH_SIZE: '25'
