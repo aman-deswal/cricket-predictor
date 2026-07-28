@@ -242,6 +242,46 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
     return scored
 
 
+def _infer_match_type(league_name: str) -> str:
+    """Infer a match type string from an ESPN league name."""
+    lower = league_name.lower()
+    if "test" in lower:
+        return "Test"
+    if "odi" in lower or "one day" in lower or "one-day" in lower:
+        return "ODI"
+    return "T20"
+
+
+def _espn_fixtures_to_matches(espn_fixtures: list[dict]) -> list[dict]:
+    """Convert ESPN 'pre' (upcoming) fixtures to matches-table rows.
+
+    Uses 'espn-<event_id>' as a stable match_id so these records can coexist
+    with CricAPI-sourced rows without collisions.
+    """
+    matches = []
+    for f in espn_fixtures:
+        if f.get("status") != "pre":
+            continue
+        espn_id = f.get("espn_event_id", "")
+        if not espn_id:
+            continue
+        team1 = f.get("team1", "")
+        team2 = f.get("team2", "")
+        if not team1 or not team2:
+            continue
+        matches.append({
+            "match_id": f"espn-{espn_id}",
+            "name": f"{team1} vs {team2}",
+            "team1": team1,
+            "team2": team2,
+            "date": f.get("date", ""),
+            "venue": f.get("venue", ""),
+            "match_type": _infer_match_type(f.get("league_name", "")),
+            "status": "upcoming",
+        })
+    return matches
+
+
 def main(match_types: Optional[list[str]] = None) -> None:
     """
     Fetch current fixtures from ESPN (primary) + CricAPI (supplementary).
@@ -273,7 +313,38 @@ def main(match_types: Optional[list[str]] = None) -> None:
         logger.info("Upserting CricAPI matches...")
         replace_upcoming_matches(upcoming)
 
+    # --- Phase 3b: ESPN fallback — upsert upcoming fixtures when CricAPI is unavailable ---
+    espn_upcoming = _espn_fixtures_to_matches(espn_fixtures)
+    if espn_upcoming:
+        if not upcoming:
+            logger.info(f"CricAPI unavailable — upserting {len(espn_upcoming)} ESPN upcoming fixtures as fallback...")
+        else:
+            logger.info(f"Supplementing with {len(espn_upcoming)} ESPN upcoming fixtures...")
+        replace_upcoming_matches(espn_upcoming)
+
     # --- Phase 4: Auto-map ESPN event IDs onto matches ---
+    # For ESPN-sourced matches the espn_event_id is already embedded in match_id;
+    # stamp it on the matches table and espn_match_data for downstream enrichment.
+    if espn_upcoming:
+        client = get_client()
+        for m in espn_upcoming:
+            espn_eid = m["match_id"].removeprefix("espn-")
+            try:
+                client.table("matches").update({
+                    "espn_event_id": espn_eid,
+                }).eq("match_id", m["match_id"]).execute()
+            except Exception:
+                pass
+            try:
+                existing = client.table("espn_match_data").select("match_id").eq("match_id", m["match_id"]).execute()
+                if not existing.data:
+                    client.table("espn_match_data").insert({
+                        "match_id": m["match_id"],
+                        "espn_event_id": espn_eid,
+                    }).execute()
+            except Exception:
+                pass
+
     if upcoming and espn_fixtures:
         logger.info("Auto-mapping ESPN event IDs to matches...")
         mapping = match_espn_to_cricapi(espn_fixtures, upcoming)
