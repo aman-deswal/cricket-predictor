@@ -8,7 +8,7 @@ import type {
   MatchWithPredictions,
   PlayerStats,
   Prediction,
-  PredictionResult,
+  PredictionHistoryItem,
 } from './supabase';
 
 const now = Date.now();
@@ -413,20 +413,69 @@ const demoEspnData: ESPNMatchData[] = [
   },
 ];
 
-const demoHistory: PredictionResult[] = Array.from({ length: 60 }, (_, index) => {
-  const matchIds = ['demo-mi-vs-csk-ipl', 'demo-ind-vs-aus-odi', 'demo-engw-vs-saw-t20', 'demo-nep-vs-nam-odi'];
-  const matchId = matchIds[index % matchIds.length];
+type DemoFixture = {
+  team1: string;
+  team2: string;
+  favorite: string;
+  underdog: string;
+  t1prob: number;
+  t2prob: number;
+  reasoning: string;
+  toss_insight: string;
+  confidence: 'low' | 'medium' | 'high';
+};
+
+const DEMO_FIXTURES: DemoFixture[] = [
+  {
+    team1: 'India', team2: 'Australia', favorite: 'India', underdog: 'Australia',
+    t1prob: 0.64, t2prob: 0.36,
+    reasoning: "India's formidable home record and depth across all departments make them strong favourites. Australia's pace attack is potent but India's batting lineup has handled similar threats well in recent series.",
+    toss_insight: "The pitch historically assists spin in the second half, so the team batting first should look to post 320+.",
+    confidence: 'high',
+  },
+  {
+    team1: 'England', team2: 'Pakistan', favorite: 'England', underdog: 'Pakistan',
+    t1prob: 0.58, t2prob: 0.42,
+    reasoning: "England's aggressive Bazball approach has been highly effective in home conditions. Pakistan's bowling attack is impressive but their batting collapses under pressure remain a concern.",
+    toss_insight: "Overcast conditions favour Pakistan's swing bowlers early. A batting side winning the toss may have an advantage.",
+    confidence: 'medium',
+  },
+  {
+    team1: 'Mumbai Indians', team2: 'Chennai Super Kings', favorite: 'Mumbai Indians', underdog: 'Chennai Super Kings',
+    t1prob: 0.55, t2prob: 0.45,
+    reasoning: "This is the most contested fixture in IPL history. MI edge this out based on their recent powerplay bowling and strong middle-order finishing. CSK's experience with dew in night games adds variance.",
+    toss_insight: "Dew is expected post-innings. Chasing has won 7 of the last 10 MI vs CSK night games at Wankhede.",
+    confidence: 'medium',
+  },
+  {
+    team1: 'South Africa Women', team2: 'England Women', favorite: 'England Women', underdog: 'South Africa Women',
+    t1prob: 0.38, t2prob: 0.62,
+    reasoning: "England Women have been in exceptional form, led by strong performances from their top-3. South Africa Women have the bowling to compete but their batting has been inconsistent.",
+    toss_insight: "Flat pitch expected. Toss less critical — batting conditions should remain consistent throughout.",
+    confidence: 'medium',
+  },
+];
+
+const demoHistory: PredictionHistoryItem[] = Array.from({ length: 60 }, (_, index) => {
+  const fixture = DEMO_FIXTURES[index % DEMO_FIXTURES.length];
   const correct = index % 3 !== 0;
-  const predictedProbability = 0.52 + ((index % 5) * 0.04);
+  const predictedProbability = fixture.t1prob + ((index % 5) * 0.02);
   return {
     prediction_id: `demo-pred-${index + 1}`,
-    match_id: matchId,
-    predicted_winner: correct ? 'Demo Favorite' : 'Demo Favorite',
-    actual_winner: correct ? 'Demo Favorite' : 'Demo Underdog',
+    match_id: `demo-${index + 1}`,
+    team1: fixture.team1,
+    team2: fixture.team2,
+    predicted_winner: fixture.favorite,
+    actual_winner: correct ? fixture.favorite : fixture.underdog,
     correct,
     brier_score: correct ? 0.18 : 0.32,
     predicted_probability: Math.min(predictedProbability, 0.82),
     scored_at: pastIso(60 - index),
+    reasoning: fixture.reasoning,
+    toss_insight: fixture.toss_insight,
+    confidence: fixture.confidence,
+    team1_win_probability: fixture.t1prob,
+    team2_win_probability: fixture.t2prob,
   };
 }).reverse();
 
@@ -438,7 +487,7 @@ const demoCalibration = [
   { bin_center: 0.95, predicted_avg: 0.93, actual_avg: 0.9, count: 10 },
 ];
 
-function buildRollingTrend(results: PredictionResult[]): Array<{ date: string; accuracy: number }> {
+function buildRollingTrend(results: PredictionHistoryItem[]): Array<{ date: string; accuracy: number }> {
   const ordered = [...results].sort((a, b) => new Date(a.scored_at).getTime() - new Date(b.scored_at).getTime());
   const window = 10;
   const trend: Array<{ date: string; accuracy: number }> = [];
@@ -493,7 +542,7 @@ export function getMockPlayerStats(playerNames: string[], format: string): Playe
   );
 }
 
-export function getMockPredictionHistory(): PredictionResult[] {
+export function getMockPredictionHistory(): PredictionHistoryItem[] {
   return demoHistory;
 }
 

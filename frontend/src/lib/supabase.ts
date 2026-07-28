@@ -13,8 +13,7 @@ import {
   getMockMatchSquads,
   getMockPlayerStats,
   getMockPrediction,
-  getMockPredictionHistory,
-  getMockUpcomingMatches,
+  getMockPredictionHistory,  getMockUpcomingMatches,
 } from './mock-data';
 
 const hasSupabaseConfig = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -88,6 +87,17 @@ export interface PredictionResult {
   brier_score: number | null;
   predicted_probability: number;
   scored_at: string;
+}
+
+/** PredictionResult enriched with pre-match prediction details for the history drilldown. */
+export interface PredictionHistoryItem extends PredictionResult {
+  team1: string;
+  team2: string;
+  reasoning?: string;
+  toss_insight?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  team1_win_probability?: number;
+  team2_win_probability?: number;
 }
 
 export interface MatchEnrichment {
@@ -657,18 +667,38 @@ export async function getPlayerStats(playerNames: string[], format: string): Pro
   return data ?? [];
 }
 
-export async function getPredictionHistory(): Promise<PredictionResult[]> {
+export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
   if (isMockDataEnabled()) {
     return getMockPredictionHistory();
   }
 
-  const { data, error } = await supabase
+  const { data: results, error } = await supabase
     .from('prediction_results')
     .select('*')
     .order('scored_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  if (!results?.length) return [];
+
+  // Enrich with pre-match prediction details (team names, reasoning, probabilities)
+  const matchIds = results.map((r) => r.match_id);
+  const { data: predictions } = await supabase
+    .from('predictions')
+    .select('match_id, team1, team2, reasoning, toss_insight, confidence, team1_win_probability, team2_win_probability')
+    .in('match_id', matchIds);
+
+  const predMap = Object.fromEntries((predictions ?? []).map((p) => [p.match_id, p]));
+
+  return results.map((r) => ({
+    ...r,
+    team1: predMap[r.match_id]?.team1 ?? '',
+    team2: predMap[r.match_id]?.team2 ?? '',
+    reasoning: predMap[r.match_id]?.reasoning,
+    toss_insight: predMap[r.match_id]?.toss_insight,
+    confidence: predMap[r.match_id]?.confidence,
+    team1_win_probability: predMap[r.match_id]?.team1_win_probability,
+    team2_win_probability: predMap[r.match_id]?.team2_win_probability,
+  }));
 }
 
 export async function getDashboardStats(): Promise<{
