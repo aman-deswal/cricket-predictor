@@ -99,6 +99,8 @@ export interface PredictionHistoryItem extends PredictionResult {
   confidence?: 'low' | 'medium' | 'high';
   team1_win_probability?: number;
   team2_win_probability?: number;
+  toss_winner?: string | null;
+  toss_decision?: string | null;
 }
 
 export interface MatchEnrichment {
@@ -688,7 +690,14 @@ export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
     .select('match_id, team1, team2, reasoning, toss_insight, confidence, team1_win_probability, team2_win_probability')
     .in('match_id', matchIds);
 
+  // Pull toss data from espn_match_data
+  const { data: espnData } = await supabase
+    .from('espn_match_data')
+    .select('match_id, toss_winner, toss_decision')
+    .in('match_id', matchIds);
+
   const predMap = Object.fromEntries((predictions ?? []).map((p) => [p.match_id, p]));
+  const tossMap = Object.fromEntries((espnData ?? []).map((e) => [e.match_id, e]));
 
   return results.map((r) => ({
     ...r,
@@ -699,6 +708,8 @@ export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
     confidence: predMap[r.match_id]?.confidence,
     team1_win_probability: predMap[r.match_id]?.team1_win_probability,
     team2_win_probability: predMap[r.match_id]?.team2_win_probability,
+    toss_winner: tossMap[r.match_id]?.toss_winner ?? null,
+    toss_decision: tossMap[r.match_id]?.toss_decision ?? null,
   }));
 }
 

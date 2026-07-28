@@ -6,7 +6,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { TeamBadge } from '@/components/TeamBadge';
 import {
   GlobeIcon, ShieldIcon, TrophyIcon, SparkleIcon,
-  ChevronDownIcon, CoinIcon,
+  ChevronDownIcon, CoinIcon, TargetIcon,
 } from '@/components/CricketIcons';
 import { getPredictionHistory, PredictionHistoryItem } from '@/lib/supabase';
 import { getTeamMeta } from '@/lib/teams';
@@ -198,6 +198,36 @@ function MatchupVisual({ result }: { result: PredictionHistoryItem }) {
   );
 }
 
+function ReasoningToggle({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+      >
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.15 }}>
+          <ChevronDownIcon className="w-3 h-3" />
+        </motion.span>
+        Full AI report
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.p
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="text-xs text-gray-500 leading-relaxed mt-2 overflow-hidden"
+          >
+            {text}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const team1 = result.team1 || result.predicted_winner;
@@ -296,38 +326,63 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
                 </div>
               )}
 
-              {/* ── Key factor chips ── */}
-              {(() => {
-                const factors = extractFactors(result.reasoning);
-                return factors.length > 0 ? (
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Key factors</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {factors.map((f) => (
-                        <span key={f} className="text-[11px] font-medium text-gray-300 bg-gray-800/70 border border-gray-700/40 px-2.5 py-1 rounded-full">
-                          {f}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : result.reasoning ? (
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">AI Reasoning</p>
-                    <p className="text-sm text-gray-300 leading-relaxed line-clamp-4">{result.reasoning}</p>
-                  </div>
-                ) : null;
-              })()}
+              {/* ── Key fact rows ── */}
+              <div className="space-y-2">
 
-              {/* ── Toss insight ── */}
-              {result.toss_insight && (
-                <div className="bg-cricket-950/40 border border-cricket-800/20 rounded-xl px-4 py-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <CoinIcon className="w-3.5 h-3.5 text-cricket-600" />
-                    <p className="text-[10px] text-cricket-600 uppercase tracking-wider">Toss Insight</p>
+                {/* AI's call + outcome */}
+                <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <SparkleIcon className="w-3.5 h-3.5 text-cricket-500 shrink-0" />
+                    <span className="text-xs text-gray-400">AI picked</span>
+                    <span className="text-xs font-semibold text-white">{result.predicted_winner}</span>
+                    <span className="text-xs text-gray-600">at {(result.predicted_probability * 100).toFixed(0)}%</span>
                   </div>
-                  <p className="text-sm text-cricket-200/80 leading-relaxed">{result.toss_insight}</p>
+                  <span className={`text-xs font-bold ${result.correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {result.correct ? 'Correct' : `${result.actual_winner} won`}
+                  </span>
                 </div>
-              )}
+
+                {/* Edge signal */}
+                {(() => {
+                  const edge = Math.round((result.predicted_probability - 0.5) * 100);
+                  if (edge < 3) return null;
+                  const strong = edge >= 15;
+                  return (
+                    <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <TargetIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                        <span className="text-xs text-gray-400">Signal strength</span>
+                      </div>
+                      <span className={`text-xs font-bold ${strong ? 'text-cricket-400' : 'text-amber-400'}`}>
+                        +{edge}% above coinflip · {strong ? 'Strong edge' : 'Moderate edge'}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Toss outcome — structured data if available */}
+                {result.toss_winner && (
+                  <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <CoinIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                      <span className="text-xs text-gray-400">Toss</span>
+                      <span className="text-xs font-semibold text-white">{result.toss_winner}</span>
+                      {result.toss_decision && (
+                        <span className="text-xs text-gray-600">→ chose to {result.toss_decision}</span>
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold ${
+                      result.toss_winner === result.actual_winner ? 'text-emerald-400' : 'text-gray-500'
+                    }`}>
+                      {result.toss_winner === result.actual_winner ? 'Toss winner won' : 'Toss winner lost'}
+                    </span>
+                  </div>
+                )}
+
+              </div>
+
+              {/* ── Full AI reasoning — collapsible ── */}
+              {result.reasoning && <ReasoningToggle text={result.reasoning} />}
 
             </div>
           </motion.div>
