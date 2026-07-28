@@ -701,6 +701,35 @@ export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
   }));
 }
 
+export async function getAccuracyBySplit(): Promise<{
+  international: { total: number; correct: number; accuracy: number };
+  league: { total: number; correct: number; accuracy: number };
+}> {
+  const history = await getPredictionHistory();
+
+  const classify = (r: PredictionHistoryItem) => {
+    const t1 = r.team1 || r.predicted_winner;
+    const t2 = r.team2 || r.actual_winner;
+    return Boolean(getTeamMeta(t1).countryCode) && Boolean(getTeamMeta(t2).countryCode);
+  };
+
+  const intl = history.filter(classify);
+  const league = history.filter((r) => !classify(r));
+
+  return {
+    international: {
+      total: intl.length,
+      correct: intl.filter((r) => r.correct).length,
+      accuracy: intl.length > 0 ? intl.filter((r) => r.correct).length / intl.length : 0,
+    },
+    league: {
+      total: league.length,
+      correct: league.filter((r) => r.correct).length,
+      accuracy: league.length > 0 ? league.filter((r) => r.correct).length / league.length : 0,
+    },
+  };
+}
+
 export async function getDashboardStats(): Promise<{
   total: number;
   correct: number;

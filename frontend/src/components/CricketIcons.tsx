@@ -53,3 +53,85 @@ export function CaptainIcon({ className = 'w-3 h-3' }: IconProps) {
     </svg>
   );
 }
+
+/** Globe — international matches */
+export function GlobeIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3c-2.5 4-2.5 14 0 18M12 3c2.5 4 2.5 14 0 18" strokeLinecap="round" />
+      <path d="M3.5 8.5h17M3.5 15.5h17" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Shield — league / domestic cricket */
+export function ShieldIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round">
+      <path d="M12 2l8 3v6c0 5.3-4 9.4-8 11-4-1.6-8-5.7-8-11V5l8-3z" />
+    </svg>
+  );
+}
+
+/** Trophy — match winner */
+export function TrophyIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h10v8a5 5 0 01-10 0V3z" />
+      <path d="M5 5H3v4a4 4 0 004 4M19 5h2v4a4 4 0 01-4 4" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
+  );
+}
+
+/** Sparkle / AI pick indicator */
+export function SparkleIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 2z" />
+      <path d="M5 17l.9 2.1L8 20l-2.1.9L5 23l-.9-2.1L2 20l2.1-.9L5 17z" opacity="0.6" />
+    </svg>
+  );
+}
+
+/** Target — accuracy metric */
+export function TargetIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Bar chart — brier / stats */
+export function BarChartIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <rect x="4" y="14" width="4" height="7" rx="1" />
+      <rect x="10" y="9" width="4" height="12" rx="1" />
+      <rect x="16" y="4" width="4" height="17" rx="1" />
+    </svg>
+  );
+}
+
+/** Chevron down — expand/collapse */
+export function ChevronDownIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/** Coin / toss insight */
+export function CoinIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v4l2.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
