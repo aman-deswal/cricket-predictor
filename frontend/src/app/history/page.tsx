@@ -17,7 +17,7 @@ function ConfidencePill({ value }: { value?: string }) {
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${styles[value] ?? styles.medium}`}>
-      {value} confidence
+      {value}
     </span>
   );
 }
@@ -43,71 +43,102 @@ function ProbBar({ label, prob, isWinner, isPredicted }: { label: string; prob: 
   );
 }
 
-function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: number }) {
-  const [expanded, setExpanded] = useState(false);
-
+/** Visual matchup: both teams side by side, actual winner and AI pick clearly marked. */
+function MatchupVisual({ result }: { result: PredictionHistoryItem }) {
   const team1 = result.team1 || result.predicted_winner;
   const team2 = result.team2 || result.actual_winner;
+  const team1Won = result.actual_winner === team1;
+  const team2Won = result.actual_winner === team2;
+  const aiPickedTeam1 = result.predicted_winner === team1;
+  const aiPickedTeam2 = result.predicted_winner === team2;
+
+  return (
+    <div className="flex items-center gap-2 sm:gap-4">
+      {/* Team 1 */}
+      <div className={`flex-1 flex flex-col items-center gap-1 transition-opacity ${team2Won ? 'opacity-40' : ''}`}>
+        <TeamBadge teamName={team1} size="sm" showName={false} isWinner={team1Won} />
+        <p className="text-[11px] font-semibold text-white text-center truncate max-w-[72px]">{team1}</p>
+        <div className="flex flex-col items-center gap-0.5 min-h-[28px]">
+          {team1Won && (
+            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5">🏆 Won</span>
+          )}
+          {aiPickedTeam1 && (
+            <span className="text-[9px] text-cricket-400 font-semibold flex items-center gap-0.5">🤖 AI pick</span>
+          )}
+        </div>
+      </div>
+
+      {/* Centre verdict */}
+      <div className="flex flex-col items-center gap-1 shrink-0">
+        <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">vs</span>
+        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
+          result.correct ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+        }`}>
+          {result.correct ? '✓' : '✗'}
+        </span>
+        <span className={`text-[9px] font-semibold ${result.correct ? 'text-emerald-600' : 'text-red-600'}`}>
+          {result.correct ? 'Correct' : 'Wrong'}
+        </span>
+      </div>
+
+      {/* Team 2 */}
+      <div className={`flex-1 flex flex-col items-center gap-1 transition-opacity ${team1Won ? 'opacity-40' : ''}`}>
+        <TeamBadge teamName={team2} size="sm" showName={false} isWinner={team2Won} />
+        <p className="text-[11px] font-semibold text-white text-center truncate max-w-[72px]">{team2}</p>
+        <div className="flex flex-col items-center gap-0.5 min-h-[28px]">
+          {team2Won && (
+            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5">🏆 Won</span>
+          )}
+          {aiPickedTeam2 && (
+            <span className="text-[9px] text-cricket-400 font-semibold flex items-center gap-0.5">🤖 AI pick</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: number }) {
+  const [expanded, setExpanded] = useState(false);
   const hasDetail = Boolean(result.reasoning || result.team1_win_probability !== undefined);
+  const team1 = result.team1 || result.predicted_winner;
+  const team2 = result.team2 || result.actual_winner;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.025, duration: 0.3 }}
-      className="bg-gray-800/40 border border-gray-700/40 rounded-2xl overflow-hidden hover:border-cricket-700/40 transition-colors"
+      transition={{ delay: Math.min(index * 0.02, 0.4), duration: 0.25 }}
+      className="bg-gray-800/40 border border-gray-700/40 rounded-2xl overflow-hidden hover:border-cricket-700/30 transition-colors"
     >
-      {/* Summary row */}
       <button
-        className="w-full text-left px-5 py-4 flex items-center gap-4"
+        className="w-full text-left px-4 py-4"
         onClick={() => hasDetail && setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        {/* Teams */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <TeamBadge teamName={team1} size="sm" showName={false} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-              {team1} <span className="text-gray-500 font-normal">vs</span> {team2}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              {new Date(result.scored_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
+        <div className="flex items-center gap-4">
+          {/* Matchup visual — core story */}
+          <div className="flex-1 min-w-0">
+            <MatchupVisual result={result} />
           </div>
-          <TeamBadge teamName={team2} size="sm" showName={false} />
+
+          {/* Right meta column */}
+          <div className="flex flex-col items-end gap-2 shrink-0 pl-2 border-l border-gray-700/40">
+            <span className="text-[11px] text-gray-500">
+              {(result.predicted_probability * 100).toFixed(0)}% conf.
+            </span>
+            <ConfidencePill value={result.confidence} />
+            {hasDetail && (
+              <motion.span
+                className="text-gray-600 text-[10px]"
+                animate={{ rotate: expanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                ▼
+              </motion.span>
+            )}
+          </div>
         </div>
-
-        {/* Predicted winner */}
-        <div className="hidden sm:block text-right min-w-[100px]">
-          <p className="text-[10px] text-gray-600 uppercase tracking-wider">AI Predicted</p>
-          <p className="text-xs font-semibold text-gray-300 mt-0.5 truncate">{result.predicted_winner}</p>
-        </div>
-
-        {/* Probability */}
-        <div className="text-right min-w-[52px]">
-          <p className="text-[10px] text-gray-600 uppercase tracking-wider">Prob</p>
-          <p className="text-sm font-bold text-cricket-400">{(result.predicted_probability * 100).toFixed(0)}%</p>
-        </div>
-
-        {/* Result pill */}
-        <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold ${
-          result.correct
-            ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20'
-            : 'bg-red-500/15 text-red-400 ring-1 ring-red-500/20'
-        }`}>
-          {result.correct ? '✓ Correct' : '✗ Wrong'}
-        </span>
-
-        {/* Expand chevron */}
-        {hasDetail && (
-          <motion.span
-            className="text-gray-600 text-xs ml-1 shrink-0"
-            animate={{ rotate: expanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            ▼
-          </motion.span>
-        )}
       </button>
 
       {/* Expanded detail */}
@@ -123,52 +154,19 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
           >
             <div className="px-5 pb-5 pt-1 border-t border-gray-700/40 space-y-4">
 
-              {/* Prediction vs Reality */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-900/60 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">AI Predicted</p>
-                  <div className="flex items-center gap-2">
-                    <TeamBadge teamName={result.predicted_winner} size="sm" showName={false} />
-                    <span className="text-sm font-semibold text-white">{result.predicted_winner}</span>
-                  </div>
-                </div>
-                <div className={`rounded-xl p-3 ${result.correct ? 'bg-emerald-950/40' : 'bg-red-950/30'}`}>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Actual Result</p>
-                  <div className="flex items-center gap-2">
-                    <TeamBadge teamName={result.actual_winner} size="sm" showName={false} />
-                    <span className={`text-sm font-semibold ${result.correct ? 'text-emerald-300' : 'text-red-300'}`}>
-                      {result.actual_winner}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               {/* Probability breakdown */}
               {result.team1_win_probability !== undefined && result.team2_win_probability !== undefined && (
                 <div className="space-y-2">
                   <p className="text-[10px] text-gray-500 uppercase tracking-wider">Pre-match probability</p>
-                  <ProbBar
-                    label={team1}
-                    prob={result.team1_win_probability}
-                    isWinner={result.actual_winner === team1}
-                    isPredicted={result.predicted_winner === team1}
-                  />
-                  <ProbBar
-                    label={team2}
-                    prob={result.team2_win_probability}
-                    isWinner={result.actual_winner === team2}
-                    isPredicted={result.predicted_winner === team2}
-                  />
+                  <ProbBar label={team1} prob={result.team1_win_probability} isWinner={result.actual_winner === team1} isPredicted={result.predicted_winner === team1} />
+                  <ProbBar label={team2} prob={result.team2_win_probability} isWinner={result.actual_winner === team2} isPredicted={result.predicted_winner === team2} />
                 </div>
               )}
 
               {/* AI Reasoning */}
               {result.reasoning && (
                 <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">AI Reasoning</p>
-                    <ConfidencePill value={result.confidence} />
-                  </div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">AI Reasoning</p>
                   <p className="text-sm text-gray-300 leading-relaxed">{result.reasoning}</p>
                 </div>
               )}
@@ -185,7 +183,7 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
               {result.brier_score !== null && (
                 <p className="text-[11px] text-gray-600">
                   Brier score: <span className="text-gray-500">{result.brier_score.toFixed(3)}</span>
-                  <span className="ml-2 text-gray-700">— lower is better (0 = perfect)</span>
+                  <span className="ml-2 text-gray-700">lower = better (0 = perfect)</span>
                 </p>
               )}
             </div>
@@ -194,6 +192,31 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
       </AnimatePresence>
     </motion.div>
   );
+}
+
+function dateGroupLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return 'This week';
+  if (diffDays < 14) return 'Last week';
+  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+function groupByDate(items: PredictionHistoryItem[]) {
+  const groups: { label: string; items: PredictionHistoryItem[] }[] = [];
+  const seen = new Map<string, PredictionHistoryItem[]>();
+  for (const item of items) {
+    const label = dateGroupLabel(item.scored_at);
+    if (!seen.has(label)) {
+      seen.set(label, []);
+      groups.push({ label, items: seen.get(label)! });
+    }
+    seen.get(label)!.push(item);
+  }
+  return groups;
 }
 
 export default function HistoryPage() {
@@ -215,11 +238,17 @@ export default function HistoryPage() {
     load();
   }, []);
 
-  const filteredResults = results.filter((r) => {
+  const filtered = results.filter((r) => {
     if (filter === 'correct') return r.correct;
     if (filter === 'incorrect') return !r.correct;
     return true;
   });
+
+  const total = filtered.length;
+  const correct = filtered.filter((r) => r.correct).length;
+  const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  const groups = groupByDate(filtered);
 
   if (loading) return <CricketLoader />;
 
@@ -229,47 +258,83 @@ export default function HistoryPage() {
         <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
           Prediction <span className="text-cricket-400">History</span>
         </h1>
-        <p className="text-gray-400 mb-8 text-sm">
-          Tap any result to see the full AI breakdown vs what actually happened
-        </p>
+        <p className="text-gray-400 mb-6 text-sm">Tap any result to see the full AI breakdown</p>
       </motion.div>
 
+      {/* Summary strip */}
+      {total > 0 && (
+        <motion.div
+          className="flex items-center gap-6 mb-6 px-4 py-3 bg-gray-800/40 rounded-xl border border-gray-700/40"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="text-center">
+            <p className="text-2xl font-black text-cricket-400">{accuracy}%</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Accuracy</p>
+          </div>
+          <div className="w-px h-8 bg-gray-700/60" />
+          <div className="text-center">
+            <p className="text-xl font-bold text-emerald-400">{correct}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Correct</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-bold text-red-400">{total - correct}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Wrong</p>
+          </div>
+          <div className="ml-auto text-right">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Showing</p>
+            <p className="text-sm font-semibold text-gray-300">{total} results</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Filters */}
       <motion.div
-        className="flex items-center justify-between mb-6"
+        className="flex space-x-2 mb-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.15 }}
       >
-        <div className="flex space-x-2">
-          {(['all', 'correct', 'incorrect'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
-                filter === f
-                  ? 'bg-cricket-500 text-white shadow-lg shadow-cricket-500/20'
-                  : 'bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700/50 hover:border-cricket-800/50'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-gray-600">{filteredResults.length} results</p>
+        {(['all', 'correct', 'incorrect'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+              filter === f
+                ? 'bg-cricket-500 text-white shadow-lg shadow-cricket-500/20'
+                : 'bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700/50 hover:border-cricket-800/50'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
       </motion.div>
 
-      {filteredResults.length === 0 ? (
+      {filtered.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className="text-center text-gray-500 py-20 bg-gray-900/40 rounded-2xl border border-gray-800/30"
         >
           <p className="text-lg">No prediction history available</p>
         </motion.div>
       ) : (
-        <div className="space-y-3">
-          {filteredResults.map((result, i) => (
-            <HistoryCard key={result.prediction_id} result={result} index={i} />
+        <div className="space-y-8">
+          {groups.map(({ label, items }) => (
+            <div key={label}>
+              {/* Date group header */}
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</p>
+                <div className="flex-1 h-px bg-gray-800/60" />
+                <p className="text-[10px] text-gray-700">{items.length}</p>
+              </div>
+              <div className="space-y-3">
+                {items.map((result, i) => (
+                  <HistoryCard key={result.prediction_id} result={result} index={i} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
