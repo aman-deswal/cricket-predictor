@@ -161,13 +161,22 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
               style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
               whileHover={{ scale: 1.15 }}
             >
-              <img
-                src={getFlagUrl(team1Meta.countryCode, 48)}
-                srcSet={`${getFlag2xUrl(team1Meta.countryCode, 48)} 2x`}
-                alt={match.team1}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              {team1Meta.countryCode ? (
+                <img
+                  src={getFlagUrl(team1Meta.countryCode, 48)}
+                  srcSet={`${getFlag2xUrl(team1Meta.countryCode, 48)} 2x`}
+                  alt={match.team1}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center font-bold text-white text-[11px]"
+                  style={{ backgroundColor: team1Meta.primaryColor }}
+                >
+                  {team1Meta.shortName.slice(0, 3)}
+                </div>
+              )}
             </motion.div>
             <p className="font-bold text-white text-sm">{team1Meta.shortName}</p>
             {prediction && (
@@ -195,13 +204,22 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
               style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
               whileHover={{ scale: 1.15 }}
             >
-              <img
-                src={getFlagUrl(team2Meta.countryCode, 48)}
-                srcSet={`${getFlag2xUrl(team2Meta.countryCode, 48)} 2x`}
-                alt={match.team2}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              {team2Meta.countryCode ? (
+                <img
+                  src={getFlagUrl(team2Meta.countryCode, 48)}
+                  srcSet={`${getFlag2xUrl(team2Meta.countryCode, 48)} 2x`}
+                  alt={match.team2}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center font-bold text-white text-[11px]"
+                  style={{ backgroundColor: team2Meta.primaryColor }}
+                >
+                  {team2Meta.shortName.slice(0, 3)}
+                </div>
+              )}
             </motion.div>
             <p className="font-bold text-white text-sm">{team2Meta.shortName}</p>
             {prediction && (
