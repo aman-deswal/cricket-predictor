@@ -23,9 +23,16 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const ev2 = prediction && match.bookmaker_odds
     ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
     : 0;
-  const topEV = Math.abs(ev1) > Math.abs(ev2) ? ev1 : ev2;
-  const topEVTeam = Math.abs(ev1) > Math.abs(ev2) ? team1Meta.shortName : team2Meta.shortName;
-  const hasEV = Math.abs(topEV) >= 7;
+  // Always pick the team with POSITIVE edge (AI thinks they're underpriced by market)
+  const valueIsT1 = ev1 >= ev2 && ev1 >= 7;
+  const valueIsT2 = !valueIsT1 && ev2 >= 7;
+  const hasEdge = valueIsT1 || valueIsT2;
+  const edgePct  = valueIsT1 ? ev1 : ev2;
+  const edgeTeam = valueIsT1 ? team1Meta.shortName : team2Meta.shortName;
+  const edgeAiPct      = valueIsT1 ? Math.round((prediction?.team1_win_probability ?? 0) * 100) : Math.round((prediction?.team2_win_probability ?? 0) * 100);
+  const edgeImpliedPct = valueIsT1
+    ? Math.round((1 / (match.bookmaker_odds?.team1_odds ?? 1)) * 100)
+    : Math.round((1 / (match.bookmaker_odds?.team2_odds ?? 1)) * 100);
 
   function decimalToAmerican(d: number): string {
     if (d <= 1) return '-';
@@ -63,18 +70,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
               </span>
               <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">{match.match_type} · {match.venue?.split(',')[0]}</span>
             </div>
-            {hasEV && (
+            {hasEdge && (
               <motion.span
-                className={`flex items-center gap-1 text-[10px] font-black tabular-nums px-2.5 py-1 rounded-full border cursor-help ${
-                  topEV > 0
-                    ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30'
-                    : 'text-red-400 bg-red-500/10 border-red-500/25'
-                }`}
+                className="flex items-center gap-1 text-[10px] font-black tabular-nums px-2.5 py-1 rounded-full border cursor-help text-emerald-300 bg-emerald-500/10 border-emerald-500/30"
                 animate={{ opacity: [1, 0.7, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                title={`Our AI win probability for ${topEVTeam} differs from the bookmaker's implied odds by ${Math.abs(topEV)}%. Hover the badge on the card for more detail.`}
+                title={`${edgeTeam}: AI says ${edgeAiPct}% win chance, bookmaker implies ${edgeImpliedPct}%. Our model sees +${edgePct}% extra value here.`}
               >
-                {topEV > 0 ? '↑' : '↓'} AI Edge: {topEVTeam} {topEV > 0 ? '+' : ''}{topEV}% vs market
+                ↑ AI Edge: {edgeTeam} +{edgePct}% vs market
               </motion.span>
             )}
           </div>
