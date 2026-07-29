@@ -464,6 +464,77 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
+      {/* AI vs Market Edge — the betting value signal */}
+      {odds.length > 0 && prediction && (() => {
+        const o = odds[0];
+        const ai1 = Math.round(prediction.team1_win_probability * 100);
+        const ai2 = Math.round(prediction.team2_win_probability * 100);
+        const implied1 = Math.round((1 / o.team1_odds) * 100);
+        const implied2 = Math.round((1 / o.team2_odds) * 100);
+        const edge1 = ai1 - implied1;
+        const edge2 = ai2 - implied2;
+
+        const EdgeRow = ({ shortName, color, aiPct, impliedPct, edgePct }: { shortName: string; color: string; aiPct: number; impliedPct: number; edgePct: number }) => {
+          const isValue = edgePct >= 7;
+          return (
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-gray-300 w-10 shrink-0 tabular-nums">{shortName}</span>
+              <div className="flex-1 relative h-4 bg-gray-800/60 rounded-full overflow-hidden">
+                {/* Book implied — background track */}
+                <div className="absolute inset-y-0 left-0 rounded-full opacity-30" style={{ width: `${impliedPct}%`, backgroundColor: color }} />
+                {/* AI probability — foreground */}
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ backgroundColor: color, boxShadow: isValue ? `0 0 6px ${color}60` : undefined }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${aiPct}%` }}
+                  transition={{ duration: 0.9, ease: 'easeOut', delay: 0.4 }}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 text-[9px] tabular-nums w-44">
+                <span className="font-bold" style={{ color }}>{aiPct}% AI</span>
+                <span className="text-gray-600">/</span>
+                <span className="text-gray-500">{impliedPct}% Book</span>
+                {isValue && (
+                  <motion.span
+                    className="ml-1 text-emerald-400 font-black"
+                    animate={{ opacity: [1, 0.6, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    ↑ +{edgePct}% edge
+                  </motion.span>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-5 border border-cricket-600/20 mb-4"
+            {...fadeUp}
+            transition={{ delay: 0.15 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h12M8 2v12" /><circle cx="8" cy="8" r="6" /></svg>
+                AI vs Market
+              </h2>
+              <span className="text-[9px] text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded-full">
+                via {o.bookmaker}
+              </span>
+            </div>
+            <div className="space-y-3 mb-3">
+              <EdgeRow shortName={team1Meta.shortName} color={teamColor1} aiPct={ai1} impliedPct={implied1} edgePct={edge1} />
+              <EdgeRow shortName={team2Meta.shortName} color={teamColor2} aiPct={ai2} impliedPct={implied2} edgePct={edge2} />
+            </div>
+            <p className="text-[8px] text-gray-600 leading-relaxed">
+              Solid bar = AI model probability · Faded track = bookmaker-implied probability · ↑ edge fires when gap ≥ 7 points
+            </p>
+          </motion.div>
+        );
+      })()}
+
       {/* SixSense Edge Score™ */}
       {edgeScore && prediction && (() => {
         const edge = edgeScore;

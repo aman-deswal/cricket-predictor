@@ -344,30 +344,137 @@ const demoMatchEnrichment: MatchEnrichment[] = [
       { batter: 'Suryakumar Yadav', batter_team: 'Mumbai Indians', bowler: 'Matheesha Pathirana', bowler_team: 'Chennai Super Kings', insight: 'This matchup can swing the middle overs if MI attack the short ball early.' },
       { batter: 'Ruturaj Gaikwad', batter_team: 'Chennai Super Kings', bowler: 'Jasprit Bumrah', bowler_team: 'Mumbai Indians', insight: 'New-ball discipline will decide whether CSK can get ahead of the chase.' },
     ],
-    expert_preview: 'Mock preview: Mumbai have home advantage, but CSK’s bowling control keeps this close into the final overs. The demo data is designed to exercise the full prediction detail page without live feeds.',
-    toss_insight: 'Chasing is slightly preferred if dew arrives late.',
+    expert_preview: 'Mumbai have home advantage at Wankhede, but CSK\'s bowling control — especially Pathirana\'s slippage and Jadeja\'s spin — keeps this tight into the final overs. Hardik Pandya\'s role as finisher is pivotal: if MI need 30 off 18, he\'s the difference. CSK\'s experience in knockout-pressure scenarios gives them the edge in a close chase.',
+    toss_insight: 'Dew is expected post-innings. Chasing has won 7 of the last 10 MI vs CSK night games at Wankhede — winning the toss and fielding first is almost mandatory.',
     source_links: [
-      { title: 'Demo team briefing', url: 'https://example.com/demo-brief-1', source: 'demo', published_at: pastIso(1) },
-      { title: 'Demo scouting note', url: 'https://example.com/demo-brief-2', source: 'demo', published_at: pastIso(1) },
+      { title: 'MI squad update — Bumrah confirmed fit', url: 'https://example.com/mi-squad', source: 'demo', published_at: pastIso(1) },
+      { title: 'Wankhede curator: dew likely to play a role', url: 'https://example.com/wankhede-dew', source: 'demo', published_at: pastIso(1) },
     ],
     confidence: 'high',
     generated_at: pastIso(1),
   },
+  {
+    match_id: 'demo-ind-vs-aus-odi',
+    venue_name: 'Wankhede Stadium',
+    venue_confidence: 'confirmed',
+    possible_xi: {
+      team1: indiaSquadPlayers.map((player) => player.name),
+      team2: australiaSquadPlayers.map((player) => player.name),
+    },
+    player_updates: [
+      { player: 'Jasprit Bumrah', team: 'India', status: 'Full training load completed — fit and raring to go', confidence: 'confirmed' },
+      { player: 'Shubman Gill', team: 'India', status: 'Career-best ODI form — 3 fifties in last 4 innings', confidence: 'confirmed' },
+      { player: 'Pat Cummins', team: 'Australia', status: 'Shoulder scan cleared; will lead the attack', confidence: 'reported' },
+      { player: 'David Warner', team: 'Australia', status: 'Strong record at Wankhede; confirmed to open', confidence: 'confirmed' },
+    ],
+    key_players: [
+      { batter: 'Virat Kohli', batter_team: 'India', bowler: 'Pat Cummins', bowler_team: 'Australia', insight: 'Kohli averages 65 against Cummins in ODIs — one of cricket\'s great modern rivalries. If Cummins gets him early, Australia are firmly back in it.' },
+      { batter: 'Travis Head', batter_team: 'Australia', bowler: 'Jasprit Bumrah', bowler_team: 'India', insight: 'Head\'s aggressive powerplay approach runs straight into Bumrah\'s reverse swing at Wankhede — this battle in overs 1–10 sets the tone for the chase.' },
+      { batter: 'Shubman Gill', batter_team: 'India', bowler: 'Mitchell Starc', bowler_team: 'Australia', insight: 'Starc\'s left-arm angle targets Gill\'s off stump hard — if Gill survives the new ball, India can post 340+.' },
+    ],
+    expert_preview: 'India go into this ODI as clear favourites at Wankhede. Rohit\'s side have won 8 of their last 10 home ODIs and their spin-heavy attack on a turning track will trouble Australia\'s middle order. The danger for India is Australia\'s pace: Starc and Cummins with the new ball can make the first 10 overs treacherous. If India\'s top-3 navigate that phase, they should post 320+. The 10% AI Edge on India is the biggest value signal on today\'s card — book pricing hasn\'t fully adjusted for India\'s home dominance.',
+    toss_insight: 'Chasing is slightly preferred at Wankhede in day-night ODIs. Dew arrives after 8pm and flattens the pitch for the team batting second — winning the toss and fielding first is the smart call.',
+    source_links: [
+      { title: 'India announce squad — Bumrah fit', url: 'https://example.com/ind-squad-aus', source: 'demo', published_at: pastIso(2) },
+      { title: 'Wankhede pitch report — spin expected from mid-innings', url: 'https://example.com/wankhede-pitch-report', source: 'demo', published_at: pastIso(1) },
+      { title: 'Head: "Australia ready for the battle"', url: 'https://example.com/head-quote', source: 'demo', published_at: pastIso(1) },
+    ],
+    confidence: 'high',
+    generated_at: pastIso(1),
+  },
+  {
+    match_id: 'demo-engw-vs-saw-t20',
+    venue_name: 'The Oval',
+    venue_confidence: 'confirmed',
+    possible_xi: { team1: [], team2: [] },
+    player_updates: [
+      { player: 'Nat Sciver-Brunt', team: 'England Women', status: '3 fifties in last 4 T20Is — in devastating form', confidence: 'confirmed' },
+      { player: 'Shabnim Ismail', team: 'South Africa Women', status: 'Fit and leading SA\'s pace attack', confidence: 'confirmed' },
+    ],
+    key_players: [
+      { batter: 'Nat Sciver-Brunt', batter_team: 'England Women', bowler: 'Shabnim Ismail', bowler_team: 'South Africa Women', insight: 'SA\'s pace spearhead against England\'s most destructive batter. Ismail must get Sciver-Brunt cheaply — if she goes past 30, England are in a commanding position.' },
+      { batter: 'Laura Wolvaardt', batter_team: 'South Africa Women', bowler: 'Sophie Ecclestone', bowler_team: 'England Women', insight: 'Ecclestone\'s left-arm spin is the biggest threat to SA\'s chase. Wolvaardt needs to read the turn early and rotate strike effectively.' },
+    ],
+    expert_preview: 'A closely matched contest at The Oval. England\'s depth and home conditions make them slight favourites, but South Africa have beaten them in 3 of the last 5 T20Is. England\'s top order has been in great nick — Sciver-Brunt and Jones especially — but SA\'s bowling discipline has been exceptional in this tri-series. Whoever wins the powerplay controls the game.',
+    toss_insight: 'Flat pitch expected at The Oval. Neither team gains an obvious toss advantage — batting conditions are expected to remain consistent throughout.',
+    source_links: [
+      { title: 'England Women name unchanged XI', url: 'https://example.com/engw-xi', source: 'demo', published_at: pastIso(1) },
+      { title: 'Ismail fit to bowl — SA confirm', url: 'https://example.com/sa-ismail', source: 'demo', published_at: pastIso(1) },
+    ],
+    confidence: 'medium',
+    generated_at: pastIso(1),
+  },
+  {
+    match_id: 'demo-nep-vs-nam-odi',
+    venue_name: 'Tribhuvan University Ground',
+    venue_confidence: 'confirmed',
+    possible_xi: { team1: [], team2: [] },
+    player_updates: [
+      { player: 'Sandeep Lamichhane', team: 'Nepal', status: 'Back from absence — sharp in training, strong favourite to start', confidence: 'reported' },
+      { player: 'Ruben Trumpelmann', team: 'Namibia', status: 'Fit and leading Namibia\'s pace attack', confidence: 'confirmed' },
+      { player: 'Kushal Bhurtel', team: 'Nepal', status: 'Top-scorer in last 3 home ODIs — key for Nepal\'s power-hitting phase', confidence: 'confirmed' },
+    ],
+    key_players: [
+      { batter: 'Kushal Bhurtel', batter_team: 'Nepal', bowler: 'Ruben Trumpelmann', bowler_team: 'Namibia', insight: 'Trumpelmann\'s outswing with the new ball at high altitude in Kirtipur has historically troubled top-order batters. Bhurtel needs to survive those first 5 overs.' },
+      { batter: 'Gerhard Erasmus', batter_team: 'Namibia', bowler: 'Sandeep Lamichhane', bowler_team: 'Nepal', insight: 'Lamichhane\'s leg spin exploited Erasmus last time out at this ground — both captains know this duel is potentially decisive for the chase.' },
+    ],
+    expert_preview: 'This is the value bet of the day. Despite being priced as underdogs at +125, Nepal have an exceptional home record at Kirtipur — the 1,400m altitude and local conditions consistently disrupt touring teams. Our model gives Nepal 57% while the bookmaker implies just 44%, a +13% gap making this the highest AI Edge on today\'s card. Lamichhane\'s spin on a turning Kirtipur track is a serious weapon. Namibia are dangerous — Baard and Erasmus can accelerate — but Nepal\'s familiarity with these conditions is a structural edge the market is underpricing.',
+    toss_insight: 'Batting first is strongly preferred at Kirtipur. The pitch historically offers more pace and bounce in the first 25 overs before slowing. Altitude means the ball carries further — spinners become increasingly effective from overs 30+.',
+    source_links: [
+      { title: 'Nepal home record at Kirtipur: 14W from last 17', url: 'https://example.com/nepal-home', source: 'demo', published_at: pastIso(3) },
+      { title: 'Lamichhane included in Nepal XI after clearance', url: 'https://example.com/lamichhane-return', source: 'demo', published_at: pastIso(1) },
+    ],
+    confidence: 'medium',
+    generated_at: pastIso(1),
+  },
 ];
 
-const demoEdgeScores: EdgeScore[] = [
-  {
+const demoEdgeScores: Record<string, EdgeScore> = {
+  'demo-mi-vs-csk-ipl': {
     team1_score: 54,
     team2_score: 46,
     net_edge: 8,
     edge_team: 'Chennai Super Kings',
-    narrative: 'CSK hold the tighter bowling and finishing edge in this mock card.',
+    narrative: 'CSK hold the tighter bowling and finishing edge — Jadeja and Pathirana against MI\'s lower-middle order is the key advantage.',
     factors: {
       team1: { form: 7, momentum: 6, pressure: 5, market: 6 },
       team2: { form: 8, momentum: 7, pressure: 7, market: 7 },
     },
   },
-];
+  'demo-ind-vs-aus-odi': {
+    team1_score: 63,
+    team2_score: 37,
+    net_edge: 26,
+    edge_team: 'India',
+    narrative: 'India\'s superior home record, spin depth, and explosive top-3 give them a commanding edge at Wankhede.',
+    factors: {
+      team1: { form: 9, momentum: 8, pressure: 7, market: 6 },
+      team2: { form: 6, momentum: 5, pressure: 6, market: 7 },
+    },
+  },
+  'demo-engw-vs-saw-t20': {
+    team1_score: 55,
+    team2_score: 45,
+    net_edge: 10,
+    edge_team: 'England Women',
+    narrative: 'England\'s batting depth and home conditions give them a slight but clear edge — SA need a perfect bowling performance.',
+    factors: {
+      team1: { form: 8, momentum: 7, pressure: 6, market: 6 },
+      team2: { form: 7, momentum: 6, pressure: 6, market: 7 },
+    },
+  },
+  'demo-nep-vs-nam-odi': {
+    team1_score: 58,
+    team2_score: 42,
+    net_edge: 16,
+    edge_team: 'Nepal',
+    narrative: 'Nepal\'s altitude advantage and Lamichhane\'s spin make Kirtipur a fortress — the market is significantly underpricing their home edge.',
+    factors: {
+      team1: { form: 7, momentum: 7, pressure: 8, market: 4 },
+      team2: { form: 6, momentum: 5, pressure: 5, market: 8 },
+    },
+  },
+};
 
 const demoEspnData: ESPNMatchData[] = [
   {
@@ -384,7 +491,7 @@ const demoEspnData: ESPNMatchData[] = [
     match_number: '55',
     match_days: '1',
     hours_of_play: '19:30 - 23:00',
-    series_note: 'Mock IPL fixture used for local development.',
+    series_note: 'IPL 2026 — Group stage',
     series_scoreline: 'Mumbai Indians lead 1-0',
     series_leaders: [],
     officials: [],
@@ -392,7 +499,7 @@ const demoEspnData: ESPNMatchData[] = [
     head_to_head: [
       {
         date: pastIso(20),
-        note: 'Previous demo contest',
+        note: 'IPL 2026, Wankhede',
         teams: [
           { name: 'Mumbai Indians', abbreviation: 'MI', score: '176/6', winner: false },
           { name: 'Chennai Super Kings', abbreviation: 'CSK', score: '178/4', winner: true },
@@ -400,10 +507,83 @@ const demoEspnData: ESPNMatchData[] = [
       },
       {
         date: pastIso(50),
-        note: 'Another demo contest',
+        note: 'IPL 2026, Chepauk',
         teams: [
           { name: 'Mumbai Indians', abbreviation: 'MI', score: '184/5', winner: true },
           { name: 'Chennai Super Kings', abbreviation: 'CSK', score: '179/8', winner: false },
+        ],
+      },
+      {
+        date: pastIso(380),
+        note: 'IPL 2025, Wankhede',
+        teams: [
+          { name: 'Chennai Super Kings', abbreviation: 'CSK', score: '192/3', winner: true },
+          { name: 'Mumbai Indians', abbreviation: 'MI', score: '183/7', winner: false },
+        ],
+      },
+    ],
+    standings: [],
+    scorecards: [],
+    fetched_at: pastIso(1),
+  },
+  {
+    match_id: 'demo-ind-vs-aus-odi',
+    espn_event_id: 'demo-espn-ind-aus',
+    venue_name: 'Wankhede Stadium',
+    venue_city: 'Mumbai',
+    venue_country: 'India',
+    venue_capacity: 33108,
+    venue_grass: true,
+    venue_image_url: null,
+    toss_winner: null,
+    toss_decision: null,
+    match_number: '1',
+    match_days: '1',
+    hours_of_play: '13:30 - 21:00',
+    series_note: 'Australia tour of India — 3-match ODI series',
+    series_scoreline: 'Series level 0-0',
+    series_leaders: [],
+    officials: [],
+    rosters: [],
+    head_to_head: [
+      {
+        date: pastIso(60),
+        note: 'ODI, Sydney',
+        teams: [
+          { name: 'Australia', abbreviation: 'AUS', score: '287/9', winner: true },
+          { name: 'India', abbreviation: 'IND', score: '284/7', winner: false },
+        ],
+      },
+      {
+        date: pastIso(180),
+        note: 'ODI, Kolkata',
+        teams: [
+          { name: 'India', abbreviation: 'IND', score: '349/7', winner: true },
+          { name: 'Australia', abbreviation: 'AUS', score: '298/6', winner: false },
+        ],
+      },
+      {
+        date: pastIso(270),
+        note: 'World Cup Final, Ahmedabad',
+        teams: [
+          { name: 'India', abbreviation: 'IND', score: '240/10', winner: false },
+          { name: 'Australia', abbreviation: 'AUS', score: '241/4', winner: true },
+        ],
+      },
+      {
+        date: pastIso(400),
+        note: 'ODI, Rajkot',
+        teams: [
+          { name: 'India', abbreviation: 'IND', score: '304/6', winner: true },
+          { name: 'Australia', abbreviation: 'AUS', score: '271/9', winner: false },
+        ],
+      },
+      {
+        date: pastIso(500),
+        note: 'ODI, Melbourne',
+        teams: [
+          { name: 'Australia', abbreviation: 'AUS', score: '310/5', winner: true },
+          { name: 'India', abbreviation: 'IND', score: '276/8', winner: false },
         ],
       },
     ],
@@ -519,8 +699,7 @@ export function getMockMatchOdds(matchId: string): MatchOdds[] {
 }
 
 export function getMockEdgeScore(matchId: string): EdgeScore | null {
-  if (matchId !== 'demo-mi-vs-csk-ipl') return null;
-  return demoEdgeScores[0] ?? null;
+  return demoEdgeScores[matchId] ?? null;
 }
 
 export function getMockMatchEnrichment(matchId: string): MatchEnrichment | null {
