@@ -124,7 +124,7 @@ const demoMatches: MatchWithPredictions[] = sortMatches([
       venue: 'Wankhede Stadium, Mumbai',
       match_type: 'ODI',
       status: 'upcoming',
-    }, 'India', 0.58, 'high')],
+    }, 'India', 0.68, 'high')],   // AI sees 68% but book prices India at 1.72 (~58%) → +10% EV
   },
   {
     match_id: 'demo-mi-vs-csk-ipl',
@@ -148,7 +148,7 @@ const demoMatches: MatchWithPredictions[] = sortMatches([
       venue: 'Wankhede Stadium, Mumbai',
       match_type: 'T20',
       status: 'upcoming',
-    }, 'Chennai Super Kings', 0.46, 'high')],
+    }, 'Chennai Super Kings', 0.62, 'high')],  // AI: CSK 62%, book implies ~53.5% → +8.5% EV on CSK
   },
   {
     match_id: 'demo-engw-vs-saw-t20',
@@ -196,7 +196,7 @@ const demoMatches: MatchWithPredictions[] = sortMatches([
       venue: 'Tribhuvan University International Cricket Ground, Kirtipur',
       match_type: 'ODI',
       status: 'upcoming',
-    }, 'Namibia', 0.41, 'medium')],
+    }, 'Nepal', 0.57, 'medium')],  // AI: Nepal 57%, book implies ~44% (2.25 odds) → +13% EV upset special
   },
 ]);
 
