@@ -175,22 +175,15 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                   {match.match_type}
                 </span>
 
-                {/* HOT badge — cinematic */}
+                {/* HOT badge — only on non-hero cards (hero already calls this out as Best Bet) */}
                 {hot && (
                   <motion.span
                     className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500/25 to-red-500/25 border border-orange-500/40 text-[9px] font-black uppercase tracking-widest text-orange-300"
                     animate={{ opacity: [1, 0.75, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                   >
-                    🔥 Hot
+                    🔥 Best Bet
                   </motion.span>
-                )}
-
-                {/* Confidence pill */}
-                {prediction?.confidence && (
-                  <span className={`text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${confidenceColor}`}>
-                    {prediction.confidence === 'high' ? '↑ High' : prediction.confidence === 'medium' ? '~ Mid' : '↓ Low'}
-                  </span>
                 )}
               </div>
 

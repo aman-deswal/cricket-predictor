@@ -62,23 +62,25 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
-          {/* Row 1: label + badge */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
-                ⚡ Best Bet
-              </span>
-              <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">{match.match_type} · {match.venue?.split(',')[0]}</span>
-            </div>
+          {/* Row 1: unified Best Bet label + match context */}
+          <div className="flex items-center gap-2 mb-4">
+            <motion.span
+              className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2.5 py-1 rounded-full"
+              animate={{ opacity: [1, 0.75, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity }}
+            >
+              🔥 Best Bet
+            </motion.span>
+            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">
+              {match.match_type} · {match.venue?.split(',')[0]}
+            </span>
             {hasEdge && (
-              <motion.span
-                className="flex items-center gap-1 text-[10px] font-black tabular-nums px-2.5 py-1 rounded-full border cursor-help text-emerald-300 bg-emerald-500/10 border-emerald-500/30"
-                animate={{ opacity: [1, 0.7, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+              <span
+                className="ml-auto text-[9px] font-bold tabular-nums text-emerald-400 cursor-help"
                 title={`${edgeTeam}: AI says ${edgeAiPct}% win chance, bookmaker implies ${edgeImpliedPct}%. Our model sees +${edgePct}% extra value here.`}
               >
-                ↑ AI Edge: {edgeTeam} +{edgePct}% vs market
-              </motion.span>
+                ↑ AI Edge +{edgePct}%
+              </span>
             )}
           </div>
 
@@ -118,15 +120,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             {/* Center VS */}
             <div className="flex flex-col items-center flex-shrink-0 px-2">
               <span className="text-xs font-black text-gray-700 uppercase tracking-widest">vs</span>
-              {prediction?.confidence && (
-                <span className={`mt-1.5 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                  prediction.confidence === 'high'   ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' :
-                  prediction.confidence === 'medium' ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' :
-                                                       'text-red-400 border-red-500/25 bg-red-500/10'
-                }`}>
-                  {prediction.confidence} conf.
-                </span>
-              )}
             </div>
 
             {/* Team 2 */}
