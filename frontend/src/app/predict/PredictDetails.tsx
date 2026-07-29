@@ -484,7 +484,7 @@ export function PredictDetails() {
           const isValue = edgePct >= 7;
           return (
             <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-gray-300 w-10 shrink-0">{shortName}</span>
+              <span className="text-[10px] font-bold text-white w-10 shrink-0">{shortName}</span>
               <div className="flex-1 space-y-1.5">
                 {/* AI bar */}
                 <div className="flex items-center gap-2">
@@ -499,7 +499,7 @@ export function PredictDetails() {
                     />
                   </div>
                   <span className="text-[9px] font-bold tabular-nums w-7 text-right" style={{ color }}>{aiPct}%</span>
-                  <span className="text-[8px] text-gray-600 w-4">AI</span>
+                  <span className="text-[8px] text-gray-400 w-4">AI</span>
                 </div>
                 {/* Book bar */}
                 <div className="flex items-center gap-2">
@@ -509,8 +509,8 @@ export function PredictDetails() {
                       style={{ width: `${impliedPct}%`, backgroundColor: color }}
                     />
                   </div>
-                  <span className="text-[9px] tabular-nums w-7 text-right text-gray-500">{impliedPct}%</span>
-                  <span className="text-[8px] text-gray-600 w-4">Bk</span>
+                  <span className="text-[9px] tabular-nums w-7 text-right text-gray-300">{impliedPct}%</span>
+                  <span className="text-[8px] text-gray-400 w-4">Bk</span>
                 </div>
               </div>
               {isValue ? (
@@ -533,7 +533,7 @@ export function PredictDetails() {
                 <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h12M8 2v12" /><circle cx="8" cy="8" r="6" /></svg>
                 AI vs Market
               </h2>
-              <span className="text-[9px] text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] text-gray-400 bg-gray-800/50 px-2 py-0.5 rounded-full">
                 via {o.bookmaker}
               </span>
             </div>
@@ -541,7 +541,7 @@ export function PredictDetails() {
               <EdgeRow shortName={team1Meta.shortName} color={teamColor1} aiPct={ai1} impliedPct={implied1} edgePct={edge1} />
               <EdgeRow shortName={team2Meta.shortName} color={teamColor2} aiPct={ai2} impliedPct={implied2} edgePct={edge2} />
             </div>
-            <p className="text-[8px] text-gray-600 leading-relaxed">
+            <p className="text-[8px] text-gray-400 leading-relaxed">
               Top bar = AI model · Bottom bar (faded) = bookmaker implied · ↑ edge fires when gap ≥ 7 pts
             </p>
           </motion.div>
