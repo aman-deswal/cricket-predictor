@@ -881,6 +881,8 @@ export function PredictDetails() {
               const bowlerLast = battle.bowler.split(' ').slice(-1)[0];
               const isFlipped = flippedBattle === i;
               const h2h = battle.h2h;
+              const batterImg = playerImageMap.get(battle.batter.toLowerCase()) || playerImageMap.get(batterLast.toLowerCase());
+              const bowlerImg = playerImageMap.get(battle.bowler.toLowerCase()) || playerImageMap.get(bowlerLast.toLowerCase());
               // Extract stat lead from insight (bold the first number found)
               const insightParts = battle.insight
                 ? battle.insight.replace(/(\d+(?:\.\d+)?(?:\s*%)?)/g, '|||$1|||').split('|||')
@@ -890,28 +892,31 @@ export function PredictDetails() {
                 <div
                   key={i}
                   className="rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none"
-                  style={{ perspective: '1000px', minHeight: '96px' }}
+                  style={{ perspective: '1000px', height: '180px' }}
                   onClick={() => setFlippedBattle(isFlipped ? null : i)}
                 >
                   {/* Flip container */}
                   <div
-                    className="relative w-full h-full"
+                    className="relative w-full"
                     style={{
+                      height: '180px',
                       transformStyle: 'preserve-3d',
                       transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
                       transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                      minHeight: '96px',
                     }}
                   >
                     {/* ── FRONT FACE ─────────────────────────────── */}
-                    <div className="absolute inset-0 w-full" style={{ backfaceVisibility: 'hidden' }}>
-                      <div className="flex items-stretch h-full">
+                    <div className="absolute inset-0 w-full flex flex-col" style={{ backfaceVisibility: 'hidden' }}>
+                      <div className="flex items-stretch flex-1">
                         {/* Batter */}
                         <div className="flex-1 p-3.5" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}18 0%, transparent 70%)` }}>
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <BatIcon className="w-3 h-3 flex-shrink-0" style={{ color: bMeta.primaryColor }} />
                             <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: bMeta.primaryColor }}>{bMeta.shortName} · Bat</span>
                           </div>
+                          {batterImg && (
+                            <img src={batterImg} alt={batterLast} className="w-10 h-10 rounded-full object-cover object-top mb-1.5 ring-2" style={{ ringColor: bMeta.primaryColor }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          )}
                           <p className="text-xl font-black text-white leading-none tracking-tight">{batterLast}</p>
                           {batterStats ? (
                             <p className="text-[8px] font-mono text-gray-400 mt-1.5">Avg {batterStats.batting_avg?.toFixed(0)} · SR {batterStats.batting_sr?.toFixed(0)}</p>
@@ -930,6 +935,9 @@ export function PredictDetails() {
                             <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: wMeta.primaryColor }}>{wMeta.shortName} · Bowl</span>
                             <BowlIcon className="w-3 h-3 flex-shrink-0" style={{ color: wMeta.primaryColor }} />
                           </div>
+                          {bowlerImg && (
+                            <img src={bowlerImg} alt={bowlerLast} className="w-10 h-10 rounded-full object-cover object-top mb-1.5 ring-2 ml-auto" style={{ ringColor: wMeta.primaryColor }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          )}
                           <p className="text-xl font-black text-white leading-none tracking-tight">{bowlerLast}</p>
                           {bowlerStats ? (
                             <p className="text-[8px] font-mono text-gray-400 mt-1.5">{bowlerStats.bowling_wickets} wkts · Econ {bowlerStats.bowling_economy?.toFixed(1)}</p>

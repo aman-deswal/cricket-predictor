@@ -236,31 +236,31 @@ const cskSquadPlayers = [
 ];
 
 const indiaSquadPlayers = [
-  { id: 'ind-1', name: 'Rohit Sharma', role: 'Bat', is_captain: true },
-  { id: 'ind-2', name: 'Shubman Gill', role: 'Bat' },
-  { id: 'ind-3', name: 'Virat Kohli', role: 'Bat' },
-  { id: 'ind-4', name: 'KL Rahul', role: 'Keeper', is_keeper: true },
-  { id: 'ind-5', name: 'Suryakumar Yadav', role: 'Bat' },
-  { id: 'ind-6', name: 'Hardik Pandya', role: 'All' },
-  { id: 'ind-7', name: 'Ravindra Jadeja', role: 'All' },
-  { id: 'ind-8', name: 'Jasprit Bumrah', role: 'Bowl' },
-  { id: 'ind-9', name: 'Mohammed Siraj', role: 'Bowl' },
-  { id: 'ind-10', name: 'Kuldeep Yadav', role: 'Bowl' },
-  { id: 'ind-11', name: 'Ravichandran Ashwin', role: 'Bowl' },
+  { id: 'ind-1', name: 'Rohit Sharma', role: 'Bat', is_captain: true, image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383478.jpg' },
+  { id: 'ind-2', name: 'Shubman Gill', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383463.jpg' },
+  { id: 'ind-3', name: 'Virat Kohli', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316607.jpg' },
+  { id: 'ind-4', name: 'KL Rahul', role: 'Keeper', is_keeper: true, image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316630.jpg' },
+  { id: 'ind-5', name: 'Suryakumar Yadav', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383476.jpg' },
+  { id: 'ind-6', name: 'Hardik Pandya', role: 'All', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316643.jpg' },
+  { id: 'ind-7', name: 'Ravindra Jadeja', role: 'All', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316631.jpg' },
+  { id: 'ind-8', name: 'Jasprit Bumrah', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316636.jpg' },
+  { id: 'ind-9', name: 'Mohammed Siraj', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383471.jpg' },
+  { id: 'ind-10', name: 'Kuldeep Yadav', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316644.jpg' },
+  { id: 'ind-11', name: 'Ravichandran Ashwin', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316622.jpg' },
 ];
 
 const australiaSquadPlayers = [
-  { id: 'aus-1', name: 'Travis Head', role: 'Bat' },
-  { id: 'aus-2', name: 'David Warner', role: 'Bat' },
-  { id: 'aus-3', name: 'Steve Smith', role: 'Bat' },
-  { id: 'aus-4', name: 'Marnus Labuschagne', role: 'Bat' },
-  { id: 'aus-5', name: 'Glenn Maxwell', role: 'All' },
-  { id: 'aus-6', name: 'Mitchell Marsh', role: 'All', is_captain: true },
-  { id: 'aus-7', name: 'Alex Carey', role: 'Keeper', is_keeper: true },
-  { id: 'aus-8', name: 'Pat Cummins', role: 'Bowl' },
-  { id: 'aus-9', name: 'Josh Hazlewood', role: 'Bowl' },
-  { id: 'aus-10', name: 'Adam Zampa', role: 'Bowl' },
-  { id: 'aus-11', name: 'Mitchell Starc', role: 'Bowl' },
+  { id: 'aus-1', name: 'Travis Head', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383459.jpg' },
+  { id: 'aus-2', name: 'David Warner', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316616.jpg' },
+  { id: 'aus-3', name: 'Steve Smith', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316613.jpg' },
+  { id: 'aus-4', name: 'Marnus Labuschagne', role: 'Bat', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383461.jpg' },
+  { id: 'aus-5', name: 'Glenn Maxwell', role: 'All', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316620.jpg' },
+  { id: 'aus-6', name: 'Mitchell Marsh', role: 'All', is_captain: true, image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316637.jpg' },
+  { id: 'aus-7', name: 'Alex Carey', role: 'Keeper', is_keeper: true, image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/383400/383453.jpg' },
+  { id: 'aus-8', name: 'Pat Cummins', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316618.jpg' },
+  { id: 'aus-9', name: 'Josh Hazlewood', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316627.jpg' },
+  { id: 'aus-10', name: 'Adam Zampa', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316642.jpg' },
+  { id: 'aus-11', name: 'Mitchell Starc', role: 'Bowl', image_url: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_320,q_50/lsci/db/PICTURES/CMS/316600/316612.jpg' },
 ];
 
 function makePlayerStats(team: string, players: Array<{ name: string; role: string }>, format: string): PlayerStats[] {
