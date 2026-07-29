@@ -65,15 +65,16 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             </div>
             {hasEV && (
               <motion.span
-                className={`flex items-center gap-1 text-[10px] font-black tabular-nums px-2.5 py-1 rounded-full border ${
+                className={`flex items-center gap-1 text-[10px] font-black tabular-nums px-2.5 py-1 rounded-full border cursor-help ${
                   topEV > 0
                     ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30'
                     : 'text-red-400 bg-red-500/10 border-red-500/25'
                 }`}
                 animate={{ opacity: [1, 0.7, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
+                title={`Our AI win probability for ${topEVTeam} differs from the bookmaker's implied odds by ${Math.abs(topEV)}%. Hover the badge on the card for more detail.`}
               >
-                {topEV > 0 ? '↑' : '↓'} {topEVTeam} {topEV > 0 ? '+' : ''}{topEV}% EV vs market
+                {topEV > 0 ? '↑' : '↓'} AI Edge: {topEVTeam} {topEV > 0 ? '+' : ''}{topEV}% vs market
               </motion.span>
             )}
           </div>

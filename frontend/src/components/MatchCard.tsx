@@ -87,17 +87,20 @@ function getMatchTime(date: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-/** EV badge: shown when AI probability meaningfully disagrees with the market */
-function EVBadge({ aiProb, bookOdds, teamName }: { aiProb: number; bookOdds: number; teamName: string }) {
+/** AI Edge badge: shown when our model meaningfully disagrees with bookmaker pricing */
+function AIEdgeBadge({ aiProb, bookOdds, teamName }: { aiProb: number; bookOdds: number; teamName: string }) {
   const impliedProb = 1 / bookOdds;
   const edgePct = Math.round((aiProb - impliedProb) * 100);
   const absEdge = Math.abs(edgePct);
 
-  // Only surface if the edge is meaningful
   if (absEdge < 7) return null;
 
-  const isValueBet = edgePct > 0;
-  const label = isValueBet ? `+${edgePct}% EV` : `${edgePct}% EV`;
+  const isValue = edgePct > 0;
+  // e.g. "AI Edge: India +10%" or "AI Edge: Aus -8%"
+  const label = isValue ? `AI Edge +${edgePct}%` : `AI Edge ${edgePct}%`;
+  const tooltip = isValue
+    ? `Our AI gives ${teamName} a ${Math.round(aiProb * 100)}% chance — the bookmaker prices them at ${Math.round(impliedProb * 100)}%. That's a +${absEdge}% gap, suggesting value on ${teamName}.`
+    : `Our AI gives ${teamName} a ${Math.round(aiProb * 100)}% chance — the bookmaker prices them higher at ${Math.round(impliedProb * 100)}%. AI thinks they're overpriced.`;
 
   return (
     <motion.div
@@ -105,20 +108,19 @@ function EVBadge({ aiProb, bookOdds, teamName }: { aiProb: number; bookOdds: num
       initial={{ scale: 0.6, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, delay: 0.5 }}
+      title={tooltip}
     >
       {/* Pulse ring */}
+      <span className={`absolute inset-0 rounded-full animate-ev-ping ${isValue ? 'bg-emerald-400/30' : 'bg-red-400/20'}`} />
       <span
-        className={`absolute inset-0 rounded-full animate-ev-ping ${isValueBet ? 'bg-emerald-400/30' : 'bg-red-400/20'}`}
-      />
-      <span
-        className={`relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide border ${
-          isValueBet
+        className={`relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide border cursor-help ${
+          isValue
             ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
             : 'bg-red-500/10 border-red-400/30 text-red-400'
         }`}
       >
         <svg className="w-2 h-2" viewBox="0 0 8 8" fill="currentColor">
-          {isValueBet
+          {isValue
             ? <path d="M4 1L7 4H5v3H3V4H1L4 1z" />
             : <path d="M4 7L1 4h2V1h2v3h2L4 7z" />}
         </svg>
@@ -258,7 +260,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                   if (!showEV1 && !showEV2) return null;
                   const useT1 = Math.abs(ev1Pct) >= Math.abs(ev2Pct);
                   return (
-                    <EVBadge
+                    <AIEdgeBadge
                       aiProb={useT1 ? aiProb1! : aiProb2!}
                       bookOdds={useT1 ? odds1 : odds2}
                       teamName={useT1 ? team1Meta.shortName : team2Meta.shortName}
