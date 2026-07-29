@@ -19,80 +19,113 @@ function getMatchDescriptor(match: Match): string {
   return match.name || match.venue;
 }
 
-function FormStrip({ form, align = 'center' }: { form?: Array<'W' | 'L'>; align?: 'left' | 'center' | 'right' }) {
+/** Win/Loss dots — tight, readable, right-aligned */
+function FormDots({ form, align = 'center' }: { form?: Array<'W' | 'L'>; align?: 'left' | 'center' | 'right' }) {
   if (!form || form.length === 0) return null;
   const recent = form.slice(-5);
-  const wins = recent.filter(r => r === 'W').length;
   const alignClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
-
   return (
-    <div className={`flex ${alignClass} gap-0.5 mb-1.5`} aria-label={`Recent form: ${wins}W ${recent.length - wins}L`}>
-      {recent.map((result, index) => (
+    <div className={`flex ${alignClass} gap-[3px] mb-2`}>
+      {recent.map((r, i) => (
         <motion.span
-          key={`${result}-${index}`}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: index * 0.04 }}
-          className={`flex h-[14px] w-[14px] items-center justify-center rounded-[3px] text-[8px] font-bold text-white ${
-            result === 'W' ? 'bg-emerald-500/90' : 'bg-red-500/80'
-          }`}
-        >
-          {result}
-        </motion.span>
+          key={i}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: i * 0.05 }}
+          className={`w-[5px] h-[5px] rounded-full flex-shrink-0 ${r === 'W' ? 'bg-emerald-400' : 'bg-red-500/70'}`}
+          title={r === 'W' ? 'Win' : 'Loss'}
+        />
       ))}
     </div>
   );
 }
 
-function ProbabilityBar({ team1Prob, team1Color, team2Color }: { team1Prob: number; team1Color: string; team2Color: string }) {
+/** Animated split probability bar */
+function ProbBar({ team1Prob, c1, c2 }: { team1Prob: number; c1: string; c2: string }) {
   return (
-    <div className="w-full h-1.5 bg-gray-800/50 rounded-full overflow-hidden flex">
+    <div className="w-full h-[3px] bg-gray-800/60 rounded-full overflow-hidden flex">
       <motion.div
         className="h-full rounded-l-full"
-        style={{ backgroundColor: team1Color }}
+        style={{ backgroundColor: c1 }}
         initial={{ width: 0 }}
         animate={{ width: `${team1Prob * 100}%` }}
-        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.25 }}
       />
       <motion.div
         className="h-full rounded-r-full"
-        style={{ backgroundColor: team2Color }}
+        style={{ backgroundColor: c2 }}
         initial={{ width: 0 }}
         animate={{ width: `${(1 - team1Prob) * 100}%` }}
-        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.25 }}
       />
     </div>
   );
 }
 
-function toAmericanOdds(probability: number): string {
-  if (probability <= 0 || probability >= 1) return '-';
-  if (probability >= 0.5) {
-    return Math.round(-100 * probability / (1 - probability)).toString();
-  } else {
-    return '+' + Math.round(100 * (1 - probability) / probability).toString();
-  }
+function toAmericanOdds(p: number): string {
+  if (p <= 0 || p >= 1) return '-';
+  if (p >= 0.5) return Math.round(-100 * p / (1 - p)).toString();
+  return '+' + Math.round(100 * (1 - p) / p).toString();
 }
 
-function decimalToAmerican(decimal: number): string {
-  if (decimal <= 1) return '-';
-  if (decimal >= 2) return '+' + Math.round((decimal - 1) * 100).toString();
-  return Math.round(-100 / (decimal - 1)).toString();
+function decimalToAmerican(d: number): string {
+  if (d <= 1) return '-';
+  if (d >= 2) return '+' + Math.round((d - 1) * 100).toString();
+  return Math.round(-100 / (d - 1)).toString();
 }
 
 function getMatchTime(date: string): string {
   const raw = date.endsWith('Z') || date.includes('+') ? date : date + 'Z';
   const d = new Date(raw);
   const now = new Date();
-  // Compare calendar days in local timezone
   const matchDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.round((matchDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
   if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** EV badge: shown when AI probability meaningfully disagrees with the market */
+function EVBadge({ aiProb, bookOdds, teamName }: { aiProb: number; bookOdds: number; teamName: string }) {
+  const impliedProb = 1 / bookOdds;
+  const edgePct = Math.round((aiProb - impliedProb) * 100);
+  const absEdge = Math.abs(edgePct);
+
+  // Only surface if the edge is meaningful
+  if (absEdge < 7) return null;
+
+  const isValueBet = edgePct > 0;
+  const label = isValueBet ? `+${edgePct}% EV` : `${edgePct}% EV`;
+
+  return (
+    <motion.div
+      className="relative flex items-center gap-1"
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 300, delay: 0.5 }}
+    >
+      {/* Pulse ring */}
+      <span
+        className={`absolute inset-0 rounded-full animate-ev-ping ${isValueBet ? 'bg-emerald-400/30' : 'bg-red-400/20'}`}
+      />
+      <span
+        className={`relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide border ${
+          isValueBet
+            ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
+            : 'bg-red-500/10 border-red-400/30 text-red-400'
+        }`}
+      >
+        <svg className="w-2 h-2" viewBox="0 0 8 8" fill="currentColor">
+          {isValueBet
+            ? <path d="M4 1L7 4H5v3H3V4H1L4 1z" />
+            : <path d="M4 7L1 4h2V1h2v3h2L4 7z" />}
+        </svg>
+        {label}
+      </span>
+    </motion.div>
+  );
 }
 
 export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCardProps) {
@@ -100,181 +133,212 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
 
+  // EV calculations
+  const aiProb1 = prediction?.team1_win_probability ?? null;
+  const aiProb2 = prediction?.team2_win_probability ?? null;
+  const odds1 = match.bookmaker_odds?.team1_odds ?? null;
+  const odds2 = match.bookmaker_odds?.team2_odds ?? null;
+
+  // Who has the EV edge (pick the bigger one to feature)
+  const ev1Pct = aiProb1 && odds1 ? Math.round((aiProb1 - 1 / odds1) * 100) : 0;
+  const ev2Pct = aiProb2 && odds2 ? Math.round((aiProb2 - 1 / odds2) * 100) : 0;
+
+  // Confidence colour
+  const confidenceColor =
+    prediction?.confidence === 'high'   ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30' :
+    prediction?.confidence === 'medium' ? 'text-amber-300   bg-amber-500/15   border-amber-500/30'   :
+                                          'text-red-300     bg-red-500/15     border-red-500/30';
+
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block relative group">
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.08 }}
-      whileHover={{ y: -4, scale: 1.02 }}
-    >
-      {/* Glow effect — fiery for hot match */}
-      <div className={`absolute -inset-0.5 rounded-2xl blur-sm transition-all duration-300 ${
-        hot
-          ? 'bg-gradient-to-r from-orange-500/30 via-amber-500/30 to-red-500/30 animate-pulse-slow'
-          : 'bg-gradient-to-r from-cricket-500/0 to-amber-500/0 group-hover:from-cricket-500/20 group-hover:to-amber-500/20'
-      }`} />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: index * 0.08 }}
+        whileHover={{ y: -5, scale: 1.015 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        {/* Ambient glow — cinematic for hot, subtle hover for rest */}
+        <div className={`absolute -inset-0.5 rounded-[20px] blur-md transition-all duration-500 ${
+          hot
+            ? 'bg-gradient-to-br from-orange-500/40 via-amber-400/30 to-red-500/25 animate-pulse-slow'
+            : 'bg-gradient-to-r from-cricket-500/0 to-amber-500/0 group-hover:from-cricket-500/15 group-hover:to-amber-500/15'
+        }`} />
 
-      <div className={`relative bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-4 border transition-all duration-300 overflow-hidden ${
-        hot
-          ? 'border-amber-500/60 group-hover:border-amber-400/80'
-          : 'border-cricket-800/50 group-hover:border-cricket-600/50'
-      }`}>
-        {/* Subtle shimmer */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+        <div className={`relative bg-[#18130a]/95 backdrop-blur-xl rounded-[18px] border overflow-hidden transition-all duration-300 ${
+          hot
+            ? 'border-amber-500/50 shadow-lg shadow-amber-900/30'
+            : 'border-white/[0.07] group-hover:border-white/[0.13]'
+        }`}>
 
-        {/* Header: match type + time + venue */}
-        <div className="flex flex-col gap-0.5 mb-3">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-semibold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10">
-                {match.match_type}
+          {/* Top accent line */}
+          {hot && (
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-400 to-red-500" />
+          )}
+
+          {/* Shimmer sweep on hover */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.025] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] pointer-events-none" />
+
+          <div className="p-4">
+            {/* ── Header row ── */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                {/* Match type pill */}
+                <span className="text-[9px] font-bold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 border border-cricket-400/15">
+                  {match.match_type}
+                </span>
+
+                {/* HOT badge — cinematic */}
+                {hot && (
+                  <motion.span
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500/25 to-red-500/25 border border-orange-500/40 text-[9px] font-black uppercase tracking-widest text-orange-300"
+                    animate={{ opacity: [1, 0.75, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    🔥 Hot
+                  </motion.span>
+                )}
+
+                {/* Confidence pill */}
+                {prediction?.confidence && (
+                  <span className={`text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${confidenceColor}`}>
+                    {prediction.confidence === 'high' ? '↑ High' : prediction.confidence === 'medium' ? '~ Mid' : '↓ Low'}
+                  </span>
+                )}
+              </div>
+
+              {/* Time */}
+              <span className="text-[10px] text-gray-500 font-medium tabular-nums">
+                {getMatchTime(match.date)}
               </span>
-              {hot && (
-                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30">
-                  <svg className="w-2.5 h-2.5 text-orange-400" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0C4.5 2.5 2 4 2 7a4 4 0 108 0c0-3-2.5-4.5-4-7z" /></svg>
-                  <span className="text-[9px] font-bold text-orange-300 uppercase tracking-wide">Hot</span>
-                </span>
-              )}
             </div>
-            <span className="text-[10px] text-gray-400 font-medium">
-              {getMatchTime(match.date)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            {match.venue ? (
-              <span className="text-[10px] text-gray-500">{match.venue.split(',')[0]}</span>
-            ) : <span />}
-            <span className="text-[9px] text-gray-600">
-              {new Date(match.date.endsWith('Z') || match.date.includes('+') ? match.date : match.date + 'Z').toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
 
-        {/* Teams */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          {/* Team 1 */}
-          <div className="flex-1 text-center">
-            <FormStrip form={match.team1_recent_form} />
-            <motion.div
-              className="w-10 h-10 mx-auto mb-1.5 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
-              style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
-              whileHover={{ scale: 1.15 }}
-            >
-              {team1Meta.countryCode ? (
-                <img
-                  src={getFlagUrl(team1Meta.countryCode, 48)}
-                  srcSet={`${getFlag2xUrl(team1Meta.countryCode, 48)} 2x`}
-                  alt={match.team1}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center font-bold text-white text-[11px]"
-                  style={{ backgroundColor: team1Meta.primaryColor }}
+            {/* ── Teams ── */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+
+              {/* Team 1 */}
+              <div className="flex-1 text-center">
+                <motion.div
+                  className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
+                  style={{
+                    ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(75,85,99,0.3)',
+                    ['--tw-ring-offset-color' as string]: '#18130a',
+                  }}
+                  whileHover={{ scale: 1.12 }}
                 >
-                  {team1Meta.shortName.slice(0, 3)}
-                </div>
-              )}
-            </motion.div>
-            <p className="font-bold text-white text-sm">{team1Meta.shortName}</p>
-            {prediction && (
-              <motion.p
-                className={`text-xs font-semibold mt-0.5 ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-500'}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                {(prediction.team1_win_probability * 100).toFixed(0)}%
-              </motion.p>
-            )}
-          </div>
+                  {team1Meta.countryCode ? (
+                    <img src={getFlagUrl(team1Meta.countryCode, 48)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 48)} 2x`} alt={match.team1} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-black text-white text-[11px]" style={{ backgroundColor: team1Meta.primaryColor }}>
+                      {team1Meta.shortName.slice(0, 3)}
+                    </div>
+                  )}
+                </motion.div>
+                <p className="font-bold text-white text-sm leading-tight">{team1Meta.shortName}</p>
+                <FormDots form={match.team1_recent_form} />
+                {prediction && (
+                  <motion.p
+                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-600'}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.35 }}
+                  >
+                    {(prediction.team1_win_probability * 100).toFixed(0)}%
+                  </motion.p>
+                )}
+              </div>
 
-          {/* VS divider */}
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">vs</span>
-          </div>
+              {/* VS + EV signal */}
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-[9px] font-black text-gray-700 uppercase tracking-widest">vs</span>
+                {/* EV badge — biggest edge of the two sides */}
+                {prediction && odds1 && odds2 && (() => {
+                  const showEV1 = Math.abs(ev1Pct) >= 7;
+                  const showEV2 = Math.abs(ev2Pct) >= 7;
+                  if (!showEV1 && !showEV2) return null;
+                  const useT1 = Math.abs(ev1Pct) >= Math.abs(ev2Pct);
+                  return (
+                    <EVBadge
+                      aiProb={useT1 ? aiProb1! : aiProb2!}
+                      bookOdds={useT1 ? odds1 : odds2}
+                      teamName={useT1 ? team1Meta.shortName : team2Meta.shortName}
+                    />
+                  );
+                })()}
+              </div>
 
-          {/* Team 2 */}
-          <div className="flex-1 text-center">
-            <FormStrip form={match.team2_recent_form} />
-            <motion.div
-              className="w-10 h-10 mx-auto mb-1.5 rounded-full overflow-hidden ring-2 ring-offset-1 ring-offset-cricket-950 shadow-md"
-              style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(75, 85, 99, 0.4)' }}
-              whileHover={{ scale: 1.15 }}
-            >
-              {team2Meta.countryCode ? (
-                <img
-                  src={getFlagUrl(team2Meta.countryCode, 48)}
-                  srcSet={`${getFlag2xUrl(team2Meta.countryCode, 48)} 2x`}
-                  alt={match.team2}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center font-bold text-white text-[11px]"
-                  style={{ backgroundColor: team2Meta.primaryColor }}
+              {/* Team 2 */}
+              <div className="flex-1 text-center">
+                <motion.div
+                  className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
+                  style={{
+                    ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(75,85,99,0.3)',
+                    ['--tw-ring-offset-color' as string]: '#18130a',
+                  }}
+                  whileHover={{ scale: 1.12 }}
                 >
-                  {team2Meta.shortName.slice(0, 3)}
-                </div>
-              )}
-            </motion.div>
-            <p className="font-bold text-white text-sm">{team2Meta.shortName}</p>
-            {prediction && (
-              <motion.p
-                className={`text-xs font-semibold mt-0.5 ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-500'}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                {(prediction.team2_win_probability * 100).toFixed(0)}%
-              </motion.p>
-            )}
-          </div>
-        </div>
-
-        {/* Probability bar - team colored */}
-        {prediction && (
-          <ProbabilityBar
-            team1Prob={prediction.team1_win_probability}
-            team1Color={team1Meta.primaryColor}
-            team2Color={team2Meta.primaryColor}
-          />
-        )}
-
-        {/* Footer: series + odds */}
-        <div className="mt-3 pt-3 border-t border-gray-800/50">
-          <p className="text-[10px] text-gray-500 truncate">{getMatchDescriptor(match)}</p>
-
-          {(match.bookmaker_odds || prediction) && (
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Odds</span>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-mono font-semibold text-gray-300">
-                  {team1Meta.shortName}{' '}
-                  <span className="text-cricket-400">
-                    {match.bookmaker_odds
-                      ? decimalToAmerican(match.bookmaker_odds.team1_odds)
-                      : prediction ? toAmericanOdds(prediction.team1_win_probability) : '-'}
-                  </span>
-                </span>
-                <span className="text-gray-700">|</span>
-                <span className="text-[11px] font-mono font-semibold text-gray-300">
-                  {team2Meta.shortName}{' '}
-                  <span className="text-cricket-400">
-                    {match.bookmaker_odds
-                      ? decimalToAmerican(match.bookmaker_odds.team2_odds)
-                      : prediction ? toAmericanOdds(prediction.team2_win_probability) : '-'}
-                  </span>
-                </span>
+                  {team2Meta.countryCode ? (
+                    <img src={getFlagUrl(team2Meta.countryCode, 48)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 48)} 2x`} alt={match.team2} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-black text-white text-[11px]" style={{ backgroundColor: team2Meta.primaryColor }}>
+                      {team2Meta.shortName.slice(0, 3)}
+                    </div>
+                  )}
+                </motion.div>
+                <p className="font-bold text-white text-sm leading-tight">{team2Meta.shortName}</p>
+                <FormDots form={match.team2_recent_form} />
+                {prediction && (
+                  <motion.p
+                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-600'}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.35 }}
+                  >
+                    {(prediction.team2_win_probability * 100).toFixed(0)}%
+                  </motion.p>
+                )}
               </div>
             </div>
-          )}
+
+            {/* Probability bar */}
+            {prediction && (
+              <ProbBar team1Prob={prediction.team1_win_probability} c1={team1Meta.primaryColor} c2={team2Meta.primaryColor} />
+            )}
+
+            {/* ── Footer: series name + odds ── */}
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
+              <p className="text-[9px] text-gray-600 truncate mb-2">{getMatchDescriptor(match)}</p>
+
+              {(match.bookmaker_odds || prediction) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] text-gray-700 uppercase tracking-widest font-semibold">Odds</span>
+                  <div className="flex items-center gap-2">
+                    {/* Team 1 odds */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-[8px] text-gray-600 mb-0.5">{team1Meta.shortName}</span>
+                      <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
+                        ev1Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev1Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
+                      }`}>
+                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : prediction ? toAmericanOdds(prediction.team1_win_probability) : '-'}
+                      </span>
+                    </div>
+                    <span className="text-gray-800 text-[10px]">·</span>
+                    {/* Team 2 odds */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-[8px] text-gray-600 mb-0.5">{team2Meta.shortName}</span>
+                      <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
+                        ev2Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev2Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
+                      }`}>
+                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : prediction ? toAmericanOdds(prediction.team2_win_probability) : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
     </Link>
   );
 }

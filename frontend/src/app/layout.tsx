@@ -1,6 +1,19 @@
 import type { Metadata } from 'next';
 import { Navbar } from '@/components/Navbar';
 import './globals.css';
+import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'SixSense | AI Cricket Predictions',
@@ -30,8 +43,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-[#111008] text-white min-h-screen antialiased flex flex-col">
+    <html lang="en" className={`dark ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+      <body className="bg-[#111008] text-white min-h-screen antialiased flex flex-col" style={{ fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif' }}>
         {/* Background gradient orbs — amber theme */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-500/8 rounded-full blur-3xl" />
