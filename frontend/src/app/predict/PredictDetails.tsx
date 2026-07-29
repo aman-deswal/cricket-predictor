@@ -132,6 +132,7 @@ export function PredictDetails() {
   }, [matchId]);
 
   const [edgeBarsReady, setEdgeBarsReady] = useState(false);
+  const [flippedBattle, setFlippedBattle] = useState<number | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setEdgeBarsReady(true), 50);
     return () => clearTimeout(t);
@@ -852,7 +853,7 @@ export function PredictDetails() {
         )}
       </div>
 
-      {/* Key Battles — full width, each duel is its own card */}
+      {/* Key Battles — flip cards */}
       {enrichment?.key_players?.length ? (
         <motion.div
           className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
@@ -864,7 +865,10 @@ export function PredictDetails() {
               <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12L12 4M4 4l8 8" /></svg>
               Key Battles
             </h2>
-            <span className="text-[9px] text-gray-400">{enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}</span>
+            <span className="text-[9px] text-gray-400 flex items-center gap-1">
+              {enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}
+              <span className="text-gray-600">· tap to flip</span>
+            </span>
           </div>
           <div className="space-y-2">
             {enrichment.key_players.map((battle, i) => {
@@ -875,50 +879,136 @@ export function PredictDetails() {
               const wMeta = getTeamMeta(battle.bowler_team ?? '');
               const batterLast = battle.batter.split(' ').slice(-1)[0];
               const bowlerLast = battle.bowler.split(' ').slice(-1)[0];
+              const isFlipped = flippedBattle === i;
+              const h2h = battle.h2h;
+              // Extract stat lead from insight (bold the first number found)
+              const insightParts = battle.insight
+                ? battle.insight.replace(/(\d+(?:\.\d+)?(?:\s*%)?)/g, '|||$1|||').split('|||')
+                : null;
+
               return (
-                <div key={i} className="rounded-xl overflow-hidden border border-gray-700/25">
-                  {/* Duel row */}
-                  <div className="flex items-stretch">
-                    {/* Batter */}
-                    <div className="flex-1 p-3.5" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}18 0%, transparent 70%)` }}>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <BatIcon className="w-3 h-3 flex-shrink-0" style={{ color: bMeta.primaryColor }} />
-                        <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: bMeta.primaryColor }}>{bMeta.shortName} · Bat</span>
+                <div
+                  key={i}
+                  className="rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none"
+                  style={{ perspective: '1000px', minHeight: '96px' }}
+                  onClick={() => setFlippedBattle(isFlipped ? null : i)}
+                >
+                  {/* Flip container */}
+                  <div
+                    className="relative w-full h-full"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
+                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                      minHeight: '96px',
+                    }}
+                  >
+                    {/* ── FRONT FACE ─────────────────────────────── */}
+                    <div className="absolute inset-0 w-full" style={{ backfaceVisibility: 'hidden' }}>
+                      <div className="flex items-stretch h-full">
+                        {/* Batter */}
+                        <div className="flex-1 p-3.5" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}18 0%, transparent 70%)` }}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <BatIcon className="w-3 h-3 flex-shrink-0" style={{ color: bMeta.primaryColor }} />
+                            <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: bMeta.primaryColor }}>{bMeta.shortName} · Bat</span>
+                          </div>
+                          <p className="text-xl font-black text-white leading-none tracking-tight">{batterLast}</p>
+                          {batterStats ? (
+                            <p className="text-[8px] font-mono text-gray-400 mt-1.5">Avg {batterStats.batting_avg?.toFixed(0)} · SR {batterStats.batting_sr?.toFixed(0)}</p>
+                          ) : (
+                            <p className="text-[8px] text-gray-400 mt-1.5">{battle.batter_team}</p>
+                          )}
+                        </div>
+                        {/* VS divider */}
+                        <div className="flex flex-col items-center justify-center px-2 bg-gray-900/40 shrink-0 gap-1">
+                          <span className="text-[9px] font-black text-gray-500 tracking-widest">VS</span>
+                          {h2h && <span className="text-[7px] text-gray-600">{h2h.dismissals}W</span>}
+                        </div>
+                        {/* Bowler */}
+                        <div className="flex-1 p-3.5 text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}18 0%, transparent 70%)` }}>
+                          <div className="flex items-center justify-end gap-1.5 mb-1.5">
+                            <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: wMeta.primaryColor }}>{wMeta.shortName} · Bowl</span>
+                            <BowlIcon className="w-3 h-3 flex-shrink-0" style={{ color: wMeta.primaryColor }} />
+                          </div>
+                          <p className="text-xl font-black text-white leading-none tracking-tight">{bowlerLast}</p>
+                          {bowlerStats ? (
+                            <p className="text-[8px] font-mono text-gray-400 mt-1.5">{bowlerStats.bowling_wickets} wkts · Econ {bowlerStats.bowling_economy?.toFixed(1)}</p>
+                          ) : (
+                            <p className="text-[8px] text-gray-400 mt-1.5">{battle.bowler_team}</p>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xl font-black text-white leading-none tracking-tight">{batterLast}</p>
-                      {batterStats ? (
-                        <p className="text-[8px] font-mono text-gray-400 mt-1.5">Avg {batterStats.batting_avg?.toFixed(0)} · SR {batterStats.batting_sr?.toFixed(0)}</p>
-                      ) : (
-                        <p className="text-[8px] text-gray-400 mt-1.5">{battle.batter_team}</p>
+                      {/* Option A insight: stat-lead, no quotes */}
+                      {insightParts && (
+                        <div className="px-4 py-2.5 border-t border-gray-700/25 bg-gray-900/30">
+                          <p className="text-[9px] text-gray-300 leading-relaxed">
+                            ⚡ {insightParts.map((part, j) => {
+                              const isNum = /^\d/.test(part);
+                              return isNum
+                                ? <strong key={j} className="text-white font-bold">{part}</strong>
+                                : <span key={j}>{part}</span>;
+                            })}
+                          </p>
+                        </div>
                       )}
                     </div>
 
-                    {/* VS divider */}
-                    <div className="flex items-center px-2 bg-gray-900/40 shrink-0">
-                      <span className="text-[9px] font-black text-gray-500 tracking-widest">VS</span>
-                    </div>
-
-                    {/* Bowler */}
-                    <div className="flex-1 p-3.5 text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}18 0%, transparent 70%)` }}>
-                      <div className="flex items-center justify-end gap-1.5 mb-1.5">
-                        <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: wMeta.primaryColor }}>{wMeta.shortName} · Bowl</span>
-                        <BowlIcon className="w-3 h-3 flex-shrink-0" style={{ color: wMeta.primaryColor }} />
+                    {/* ── BACK FACE — H2H Matchup Stats ─────────── */}
+                    <div
+                      className="absolute inset-0 w-full rounded-xl overflow-hidden"
+                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                    >
+                      <div
+                        className="h-full p-4 flex flex-col justify-between"
+                        style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}14 0%, #111827 40%, ${wMeta.primaryColor}14 100%)` }}
+                      >
+                        {h2h ? (
+                          <>
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">H2H Matchup</span>
+                              <span className="text-[8px] font-mono text-gray-500">{batterLast} vs {bowlerLast}</span>
+                            </div>
+                            {/* Stats row */}
+                            <div className="grid grid-cols-4 gap-1 mb-2">
+                              {[
+                                { label: 'DISMISSALS', value: String(h2h.dismissals), accent: wMeta.primaryColor },
+                                { label: 'BALLS FACED', value: String(h2h.balls_faced), accent: '#9ca3af' },
+                                { label: 'DOT %', value: `${h2h.dot_pct}%`, accent: '#9ca3af' },
+                                { label: 'BDRY %', value: `${h2h.boundary_pct}%`, accent: bMeta.primaryColor },
+                              ].map(stat => (
+                                <div key={stat.label} className="bg-gray-900/50 rounded-lg p-2 text-center">
+                                  <p className="text-sm font-black leading-none" style={{ color: stat.accent }}>{stat.value}</p>
+                                  <p className="text-[6px] font-bold uppercase tracking-widest text-gray-500 mt-1">{stat.label}</p>
+                                </div>
+                              ))}
+                            </div>
+                            {/* Last 5 encounters */}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[7px] text-gray-500 uppercase tracking-wider shrink-0">Last 5</span>
+                              <div className="flex gap-1">
+                                {h2h.last_5.map((r, j) => (
+                                  <span
+                                    key={j}
+                                    className="w-5 h-5 rounded text-[7px] font-bold flex items-center justify-center"
+                                    style={{
+                                      background: r === 'W' ? `${wMeta.primaryColor}30` : `${bMeta.primaryColor}20`,
+                                      color: r === 'W' ? wMeta.primaryColor : bMeta.primaryColor,
+                                    }}
+                                  >{r === 'W' ? 'W' : '—'}</span>
+                                ))}
+                              </div>
+                              <span className="text-[7px] text-gray-600 ml-1">W = bowler got wicket</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-[9px] text-gray-500">No H2H data available</p>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-xl font-black text-white leading-none tracking-tight">{bowlerLast}</p>
-                      {bowlerStats ? (
-                        <p className="text-[8px] font-mono text-gray-400 mt-1.5">{bowlerStats.bowling_wickets} wkts · Econ {bowlerStats.bowling_economy?.toFixed(1)}</p>
-                      ) : (
-                        <p className="text-[8px] text-gray-400 mt-1.5">{battle.bowler_team}</p>
-                      )}
                     </div>
                   </div>
-
-                  {/* Insight — inline per battle */}
-                  {battle.insight && (
-                    <div className="px-4 py-2.5 border-t border-gray-700/25 bg-gray-900/30">
-                      <p className="text-[9px] text-gray-300 leading-relaxed italic">"{battle.insight}"</p>
-                    </div>
-                  )}
                 </div>
               );
             })}

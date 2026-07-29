@@ -368,9 +368,21 @@ const demoMatchEnrichment: MatchEnrichment[] = [
       { player: 'David Warner', team: 'Australia', status: 'Strong record at Wankhede; confirmed to open', confidence: 'confirmed' },
     ],
     key_players: [
-      { batter: 'Virat Kohli', batter_team: 'India', bowler: 'Pat Cummins', bowler_team: 'Australia', insight: 'Kohli averages 65 against Cummins in ODIs — one of cricket\'s great modern rivalries. If Cummins gets him early, Australia are firmly back in it.' },
-      { batter: 'Travis Head', batter_team: 'Australia', bowler: 'Jasprit Bumrah', bowler_team: 'India', insight: 'Head\'s aggressive powerplay approach runs straight into Bumrah\'s reverse swing at Wankhede — this battle in overs 1–10 sets the tone for the chase.' },
-      { batter: 'Shubman Gill', batter_team: 'India', bowler: 'Mitchell Starc', bowler_team: 'Australia', insight: 'Starc\'s left-arm angle targets Gill\'s off stump hard — if Gill survives the new ball, India can post 340+.' },
+      {
+        batter: 'Virat Kohli', batter_team: 'India', bowler: 'Pat Cummins', bowler_team: 'Australia',
+        insight: 'Kohli averages 65 against Cummins in ODIs — one of cricket\'s great modern rivalries. If Cummins gets him early, Australia are firmly back in it.',
+        h2h: { dismissals: 4, balls_faced: 112, runs_scored: 93, dot_pct: 41, boundary_pct: 19, last_5: ['NW', 'W', 'NW', 'W', 'NW'] },
+      },
+      {
+        batter: 'Travis Head', batter_team: 'Australia', bowler: 'Jasprit Bumrah', bowler_team: 'India',
+        insight: 'Head\'s aggressive powerplay approach runs straight into Bumrah\'s reverse swing at Wankhede — this battle in overs 1–10 sets the tone for the chase.',
+        h2h: { dismissals: 5, balls_faced: 67, runs_scored: 41, dot_pct: 55, boundary_pct: 13, last_5: ['W', 'W', 'NW', 'W', 'W'] },
+      },
+      {
+        batter: 'Shubman Gill', batter_team: 'India', bowler: 'Mitchell Starc', bowler_team: 'Australia',
+        insight: 'Starc\'s left-arm angle targets Gill\'s off stump hard — if Gill survives the new ball, India can post 340+.',
+        h2h: { dismissals: 3, balls_faced: 58, runs_scored: 47, dot_pct: 38, boundary_pct: 24, last_5: ['NW', 'NW', 'W', 'NW', 'W'] },
+      },
     ],
     expert_preview: 'India go into this ODI as clear favourites at Wankhede. Rohit\'s side have won 8 of their last 10 home ODIs and their spin-heavy attack on a turning track will trouble Australia\'s middle order. The danger for India is Australia\'s pace: Starc and Cummins with the new ball can make the first 10 overs treacherous. If India\'s top-3 navigate that phase, they should post 320+. The 10% AI Edge on India is the biggest value signal on today\'s card — book pricing hasn\'t fully adjusted for India\'s home dominance.',
     toss_insight: 'Chasing is slightly preferred at Wankhede in day-night ODIs. Dew arrives after 8pm and flattens the pitch for the team batting second — winning the toss and fielding first is the smart call.',

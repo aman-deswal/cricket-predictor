@@ -129,6 +129,14 @@ export interface MatchEnrichment {
     bowler?: string;
     bowler_team?: string;
     insight?: string;
+    h2h?: {
+      dismissals: number;
+      balls_faced: number;
+      runs_scored: number;
+      dot_pct: number;        // % of balls that were dots
+      boundary_pct: number;   // % of balls hit for 4/6
+      last_5: Array<'W' | 'NW'>; // W = wicket, NW = not out
+    };
   }>;
   expert_preview: string | null;
   toss_insight?: string | null;
