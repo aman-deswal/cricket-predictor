@@ -163,7 +163,7 @@ export function PredictDetails() {
 
   if (!matchId || !match) {
     return (
-      <motion.div {...fadeUp} className="text-center text-gray-500 py-16">
+      <motion.div {...fadeUp} className="text-center text-gray-300 py-16">
         <p className="text-xl">Match not found</p>
       </motion.div>
     );
@@ -253,13 +253,13 @@ export function PredictDetails() {
             <svg className="w-3 h-3 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
             <span className="font-mono">
               {countdown.days > 0 && <span className="text-white font-semibold">{countdown.days}</span>}
-              {countdown.days > 0 && <span className="text-gray-500">d </span>}
+              {countdown.days > 0 && <span className="text-gray-300">d </span>}
               <span className="text-white font-semibold">{String(countdown.hours).padStart(2, '0')}</span>
-              <span className="text-gray-500">h </span>
+              <span className="text-gray-300">h </span>
               <span className="text-white font-semibold">{String(countdown.mins).padStart(2, '0')}</span>
-              <span className="text-gray-500">m </span>
+              <span className="text-gray-300">m </span>
               <span className="text-white font-semibold">{String(countdown.secs).padStart(2, '0')}</span>
-              <span className="text-gray-500">s</span>
+              <span className="text-gray-300">s</span>
             </span>
           </div>
         )}
@@ -604,7 +604,7 @@ export function PredictDetails() {
                 <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
                 Who has the edge?
               </h2>
-              <span className="text-[9px] text-gray-500 bg-gray-800/60 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded-full">
                 SixSense Edge Score™
               </span>
             </div>
@@ -733,7 +733,7 @@ export function PredictDetails() {
             {espnData.toss_winner && (
               <div className="pt-1 border-t border-gray-800/50">
                 <p className="text-[10px] text-gray-300">
-                  <span className="text-gray-500">Toss:</span>{' '}
+                  <span className="text-gray-300">Toss:</span>{' '}
                   <span className="font-medium text-white">{espnData.toss_winner}</span>
                   {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
                 </p>
@@ -758,7 +758,7 @@ export function PredictDetails() {
               <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
               Sportsbook Odds
             </h2>
-            {odds.length > 0 && <span className="text-[9px] text-gray-500">{odds.length} bookmakers</span>}
+            {odds.length > 0 && <span className="text-[9px] text-gray-300">{odds.length} bookmakers</span>}
           </div>
           {odds.length > 0 ? (
             <div className="space-y-2">
@@ -782,19 +782,19 @@ export function PredictDetails() {
                         {decimalToAmerican(o.team1_odds)}
                         {isValue1 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
                       </span>
-                      <span className="text-gray-600 text-[10px]">|</span>
+                      <span className="text-gray-400 text-[10px]">|</span>
                       <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
                         {decimalToAmerican(o.team2_odds)}
                         {isValue2 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
                       </span>
-                      <svg className="w-3 h-3 text-gray-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
+                      <svg className="w-3 h-3 text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
                     </div>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 text-center py-4">No sportsbook odds available yet</p>
+            <p className="text-xs text-gray-300 text-center py-4">No sportsbook odds available yet</p>
           )}
         </motion.div>
 
@@ -846,8 +846,8 @@ export function PredictDetails() {
             transition={{ delay: 0.25 }}
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 flex flex-col items-center justify-center text-center"
           >
-            <p className="text-sm font-semibold text-gray-500">Prediction Pending</p>
-            <p className="text-gray-600 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
+            <p className="text-sm font-semibold text-gray-300">Prediction Pending</p>
+            <p className="text-gray-400 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
           </motion.div>
         )}
       </div>
@@ -885,7 +885,7 @@ export function PredictDetails() {
                         <span className="text-[10px] font-semibold text-white truncate">{battle.batter}</span>
                       </div>
                       {/* VS */}
-                      <span className="text-[8px] font-bold text-gray-500 flex-shrink-0">vs</span>
+                      <span className="text-[8px] font-bold text-gray-300 flex-shrink-0">vs</span>
                       {/* Bowler */}
                       <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
                         <span className="text-[10px] font-semibold text-white truncate text-right">{battle.bowler}</span>
@@ -913,7 +913,7 @@ export function PredictDetails() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-white truncate">{battle.name}</p>
-                      <p className="text-[8px] text-gray-500 truncate">{battle.team} · {battle.form_note}</p>
+                      <p className="text-[8px] text-gray-300 truncate">{battle.team} · {battle.form_note}</p>
                     </div>
                   </div>
                 );
@@ -921,13 +921,13 @@ export function PredictDetails() {
               {enrichment.key_players.some(b => b.insight) && (
                 <div className="mt-1 space-y-0.5">
                   {enrichment.key_players.filter(b => b.insight).map((b, i) => (
-                    <p key={i} className="text-[8px] text-gray-500 leading-tight">• {b.insight}</p>
+                    <p key={i} className="text-[8px] text-gray-300 leading-tight">• {b.insight}</p>
                   ))}
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 text-center py-4">Key battle data not available</p>
+            <p className="text-xs text-gray-300 text-center py-4">Key battle data not available</p>
           )}
         </motion.div>
 
@@ -958,17 +958,17 @@ export function PredictDetails() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-white truncate">{leader.player_name}</p>
-                      <p className="text-[8px] text-gray-500 truncate">{leader.team_abbr}</p>
+                      <p className="text-[8px] text-gray-300 truncate">{leader.team_abbr}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`text-[11px] font-bold ${isBatting ? 'text-cricket-400' : 'text-orange-400'}`}>{leader.value}</p>
-                      <p className="text-[7px] text-gray-500 uppercase">{leader.category}</p>
+                      <p className="text-[7px] text-gray-300 uppercase">{leader.category}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[7px] text-gray-600 mt-2 text-center">H2H career stats via ESPN Cricinfo</p>
+            <p className="text-[7px] text-gray-400 mt-2 text-center">H2H career stats via ESPN Cricinfo</p>
           </motion.div>
         )}
 
@@ -1030,7 +1030,7 @@ export function PredictDetails() {
               )}
             </>
           ) : (
-            <p className="text-xs text-gray-500 text-center py-4">Research data not available</p>
+            <p className="text-xs text-gray-300 text-center py-4">Research data not available</p>
           )}
         </motion.div>
       </div>
@@ -1052,7 +1052,7 @@ export function PredictDetails() {
               <p className="text-sm text-gray-300 leading-relaxed">
                 {prediction.toss_insight || enrichment?.toss_insight || 'Toss analysis not available for this match.'}
               </p>
-              <p className="text-[9px] text-gray-600 mt-2">AI analysis of {espnData?.venue_name || enrichment?.venue_name || match.venue || 'venue'}, format & team toss tendencies</p>
+              <p className="text-[9px] text-gray-400 mt-2">AI analysis of {espnData?.venue_name || enrichment?.venue_name || match.venue || 'venue'}, format & team toss tendencies</p>
             </motion.div>
           ) : (
             <motion.div
@@ -1061,7 +1061,7 @@ export function PredictDetails() {
               transition={{ delay: 0.35 }}
             >
               <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Toss Factor</h2>
-              <p className="text-xs text-gray-500 text-center py-4">Prediction pending</p>
+              <p className="text-xs text-gray-300 text-center py-4">Prediction pending</p>
             </motion.div>
           )}
         </div>
@@ -1080,7 +1080,7 @@ export function PredictDetails() {
               Squad
             </h2>
             {squads.length > 0 && (
-              <span className="text-[9px] text-gray-500 uppercase">
+              <span className="text-[9px] text-gray-300 uppercase">
                 {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
               </span>
             )}
@@ -1101,7 +1101,7 @@ export function PredictDetails() {
                         )}
                       </div>
                       <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
-                      <span className="text-[8px] text-gray-600">({(squad.players ?? []).length})</span>
+                      <span className="text-[8px] text-gray-400">({(squad.players ?? []).length})</span>
                     </div>
                     <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-1">
                       {(squad.players ?? []).slice(0, 11).map((player) => {
@@ -1121,7 +1121,7 @@ export function PredictDetails() {
                               />
                             ) : (
                               <span className="w-8 h-8 rounded-full bg-cricket-500/10 flex items-center justify-center">
-                                <RoleIcon className="w-4 h-4 text-gray-500" />
+                                <RoleIcon className="w-4 h-4 text-gray-300" />
                               </span>
                             )}
                             <span className="text-[8px] text-gray-300 text-center leading-tight truncate w-full">
@@ -1164,7 +1164,7 @@ export function PredictDetails() {
             ))}
           </div>
         ) : (
-          <p className="text-[10px] text-gray-500 text-center py-4">Squad not available yet</p>
+          <p className="text-[10px] text-gray-300 text-center py-4">Squad not available yet</p>
         )}
         </motion.div>
       </div>
@@ -1187,7 +1187,7 @@ export function PredictDetails() {
                   const winner = game.teams.find(t => t.winner);
                   return (
                     <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
-                      <span className="text-gray-500 w-16 shrink-0">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
+                      <span className="text-gray-300 w-16 shrink-0">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
                       <div className="flex-1 flex items-center gap-1">
                         {game.teams.map((t, j) => {
                           const isTeam1 = t.abbreviation === team1Meta.shortName || t.abbreviation === prediction?.team1;
