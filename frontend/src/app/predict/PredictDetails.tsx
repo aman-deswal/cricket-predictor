@@ -496,13 +496,9 @@ export function PredictDetails() {
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500">{impliedPct}% Book</span>
                 {isValue && (
-                  <motion.span
-                    className="ml-1 text-emerald-400 font-black"
-                    animate={{ opacity: [1, 0.6, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
+                  <span className="ml-1 text-emerald-400 font-black">
                     ↑ +{edgePct}% edge
-                  </motion.span>
+                  </span>
                 )}
               </div>
             </div>
