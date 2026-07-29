@@ -852,86 +852,82 @@ export function PredictDetails() {
         )}
       </div>
 
-      {/* 2. Key Battles | Key Players | Research Notes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {/* Key Battles */}
+      {/* Key Battles — full width, each duel is its own card */}
+      {enrichment?.key_players?.length ? (
         <motion.div
-          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
-            enrichment?.key_players?.length ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
-          }`}
+          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30 mb-4"
           {...fadeUp}
           transition={{ delay: 0.28 }}
         >
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12L12 4M4 4l8 8" /></svg>
-            Key Battles
-          </h2>
-          {enrichment?.key_players?.length ? (
-            <div className="space-y-2">
-              {enrichment.key_players.map((battle, i) => {
-                const isBattleFormat = battle.batter && battle.bowler;
-                if (isBattleFormat) {
-                  const batterImg = playerImageMap.get(battle.batter!.toLowerCase()) || playerImageMap.get(battle.batter!.split(' ').pop()?.toLowerCase() ?? '');
-                  const bowlerImg = playerImageMap.get(battle.bowler!.toLowerCase()) || playerImageMap.get(battle.bowler!.split(' ').pop()?.toLowerCase() ?? '');
-                  return (
-                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/30 border border-gray-800/50">
-                      {/* Batter */}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        {batterImg ? (
-                          <img src={batterImg} alt={battle.batter!} className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
-                        ) : (
-                          <span className="w-6 h-6 rounded-full bg-cricket-500/15 flex items-center justify-center flex-shrink-0"><BatIcon className="w-3 h-3 text-cricket-400" /></span>
-                        )}
-                        <span className="text-[10px] font-semibold text-white truncate">{battle.batter}</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12L12 4M4 4l8 8" /></svg>
+              Key Battles
+            </h2>
+            <span className="text-[9px] text-gray-400">{enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="space-y-2">
+            {enrichment.key_players.map((battle, i) => {
+              if (!battle.batter || !battle.bowler) return null;
+              const batterStats = playerStats.find(s => s.player_name === battle.batter);
+              const bowlerStats = playerStats.find(s => s.player_name === battle.bowler);
+              const bMeta = getTeamMeta(battle.batter_team ?? '');
+              const wMeta = getTeamMeta(battle.bowler_team ?? '');
+              const batterLast = battle.batter.split(' ').slice(-1)[0];
+              const bowlerLast = battle.bowler.split(' ').slice(-1)[0];
+              return (
+                <div key={i} className="rounded-xl overflow-hidden border border-gray-700/25">
+                  {/* Duel row */}
+                  <div className="flex items-stretch">
+                    {/* Batter */}
+                    <div className="flex-1 p-3.5" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}18 0%, transparent 70%)` }}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <BatIcon className="w-3 h-3 flex-shrink-0" style={{ color: bMeta.primaryColor }} />
+                        <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: bMeta.primaryColor }}>{bMeta.shortName} · Bat</span>
                       </div>
-                      {/* VS */}
-                      <span className="text-[8px] font-bold text-gray-300 flex-shrink-0">vs</span>
-                      {/* Bowler */}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                        <span className="text-[10px] font-semibold text-white truncate text-right">{battle.bowler}</span>
-                        {bowlerImg ? (
-                          <img src={bowlerImg} alt={battle.bowler!} className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
-                        ) : (
-                          <span className="w-6 h-6 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0"><BowlIcon className="w-3 h-3 text-orange-400" /></span>
-                        )}
-                      </div>
+                      <p className="text-xl font-black text-white leading-none tracking-tight">{batterLast}</p>
+                      {batterStats ? (
+                        <p className="text-[8px] font-mono text-gray-400 mt-1.5">Avg {batterStats.batting_avg?.toFixed(0)} · SR {batterStats.batting_sr?.toFixed(0)}</p>
+                      ) : (
+                        <p className="text-[8px] text-gray-400 mt-1.5">{battle.batter_team}</p>
+                      )}
                     </div>
-                  );
-                }
-                // Legacy key_players format fallback
-                const imgUrl = playerImageMap.get((battle.name || '').toLowerCase()) || playerImageMap.get((battle.name || '').split(' ').pop()?.toLowerCase() ?? '');
-                return (
-                  <div key={i} className="flex items-center gap-1.5 p-1.5 rounded-lg bg-gray-800/30 border border-gray-800/50">
-                    {imgUrl ? (
-                      <img src={imgUrl} alt={battle.name!} className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
-                    ) : (
-                      <span className="w-7 h-7 rounded-full bg-cricket-500/15 flex items-center justify-center text-cricket-400 flex-shrink-0">
-                        {battle.role === 'bat' ? <BatIcon className="w-3.5 h-3.5" /> :
-                         battle.role === 'bowl' ? <BowlIcon className="w-3.5 h-3.5" /> :
-                         <AllRounderIcon className="w-3.5 h-3.5" />}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold text-white truncate">{battle.name}</p>
-                      <p className="text-[8px] text-gray-300 truncate">{battle.team} · {battle.form_note}</p>
+
+                    {/* VS divider */}
+                    <div className="flex items-center px-2 bg-gray-900/40 shrink-0">
+                      <span className="text-[9px] font-black text-gray-500 tracking-widest">VS</span>
+                    </div>
+
+                    {/* Bowler */}
+                    <div className="flex-1 p-3.5 text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}18 0%, transparent 70%)` }}>
+                      <div className="flex items-center justify-end gap-1.5 mb-1.5">
+                        <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: wMeta.primaryColor }}>{wMeta.shortName} · Bowl</span>
+                        <BowlIcon className="w-3 h-3 flex-shrink-0" style={{ color: wMeta.primaryColor }} />
+                      </div>
+                      <p className="text-xl font-black text-white leading-none tracking-tight">{bowlerLast}</p>
+                      {bowlerStats ? (
+                        <p className="text-[8px] font-mono text-gray-400 mt-1.5">{bowlerStats.bowling_wickets} wkts · Econ {bowlerStats.bowling_economy?.toFixed(1)}</p>
+                      ) : (
+                        <p className="text-[8px] text-gray-400 mt-1.5">{battle.bowler_team}</p>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-              {enrichment.key_players.some(b => b.insight) && (
-                <div className="mt-1 space-y-0.5">
-                  {enrichment.key_players.filter(b => b.insight).map((b, i) => (
-                    <p key={i} className="text-[8px] text-gray-300 leading-tight">• {b.insight}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-300 text-center py-4">Key battle data not available</p>
-          )}
-        </motion.div>
 
-        {/* Key Players to Watch (ESPN H2H Leaders) */}
+                  {/* Insight — inline per battle */}
+                  {battle.insight && (
+                    <div className="px-4 py-2.5 border-t border-gray-700/25 bg-gray-900/30">
+                      <p className="text-[9px] text-gray-300 leading-relaxed italic">"{battle.insight}"</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      ) : null}
+
+      {/* Research Notes + Key Players to Watch */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">        {/* Key Players to Watch (ESPN H2H Leaders) */}
         {(espnData?.series_leaders?.length ?? 0) > 0 && (
           <motion.div
             className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
