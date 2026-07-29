@@ -26,7 +26,7 @@ DEFAULT_LEAGUE = "8048"
 # Scoring helpers
 # ---------------------------------------------------------------------------
 
-def _score_prediction(prediction: dict, actual_winner: str) -> dict:
+def _score_prediction(prediction: dict, actual_winner: str, result_text: Optional[str] = None) -> dict:
     """Score a prediction against the actual result."""
     predicted_winner = prediction["predicted_winner"]
     correct = predicted_winner == actual_winner
@@ -49,13 +49,14 @@ def _score_prediction(prediction: dict, actual_winner: str) -> dict:
             prediction["team1_win_probability"],
             prediction["team2_win_probability"],
         ),
+        "result_text": result_text,
         "scored_at": datetime.utcnow().isoformat(),
     }
 
 
-def _persist_score(client, prediction: dict, actual_winner: str) -> bool:
+def _persist_score(client, prediction: dict, actual_winner: str, result_text: Optional[str] = None) -> bool:
     """Score, persist result, and mark prediction as scored. Returns True on success."""
-    result = _score_prediction(prediction, actual_winner)
+    result = _score_prediction(prediction, actual_winner, result_text)
 
     client.table("prediction_results").upsert(
         result, on_conflict="prediction_id"
@@ -89,35 +90,46 @@ def _normalize(name: str) -> str:
     return name
 
 
-def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) -> Optional[str]:
-    """Fetch ESPN summary and extract winner. Returns team display name or None."""
+def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) -> tuple[Optional[str], Optional[str]]:
+    """Fetch ESPN summary and extract winner + result text.
+    Returns (team_display_name, result_text) or (None, None).
+    result_text is e.g. 'India won by 47 runs' from ESPN's status note.
+    """
     try:
         url = ESPN_SUMMARY_URL.format(league_id=league_id)
         r = requests.get(url, params={"event": event_id}, timeout=15)
         if r.status_code != 200:
-            return None
+            return None, None
         data = r.json()
         header = data.get("header", {})
-        comps = header.get("competitions", [{}])[0].get("competitors", [])
-        status = header.get("competitions", [{}])[0].get("status", {})
+        comp = header.get("competitions", [{}])[0]
+        comps = comp.get("competitors", [])
+        status = comp.get("status", {})
 
         # Only score if match is actually completed
         status_desc = status.get("type", {}).get("description", "")
         if status_desc not in ("Result", "Abandoned", "No Result"):
-            return None
+            return None, None
+
+        # ESPN puts the result margin in status.type.shortDetail or comp.note
+        result_text = (
+            status.get("type", {}).get("shortDetail")
+            or comp.get("note")
+            or status.get("shortDetail")
+        ) or None
 
         for c in comps:
             if c.get("winner"):
-                return c.get("team", {}).get("displayName")
+                return c.get("team", {}).get("displayName"), result_text
 
         # Abandoned / No Result — no winner
         if status_desc in ("Abandoned", "No Result"):
-            return "__no_result__"
+            return "__no_result__", result_text or status_desc
 
-        return None
+        return None, None
     except Exception as e:
         logger.debug(f"ESPN summary failed for event {event_id}: {e}")
-        return None
+        return None, None
 
 
 def _match_espn_winner_to_prediction(espn_winner: str, prediction: dict) -> Optional[str]:
@@ -218,11 +230,11 @@ def main(force: bool = False) -> None:
 
         if espn_eid:
             logger.info(f"Checking ESPN event {espn_eid} for {prediction['team1']} vs {prediction['team2']}...")
-            espn_winner = _espn_winner_from_summary(str(espn_eid))
+            espn_winner, result_text = _espn_winner_from_summary(str(espn_eid))
             if espn_winner and espn_winner != "__no_result__":
                 mapped = _match_espn_winner_to_prediction(espn_winner, prediction)
                 if mapped:
-                    _persist_score(client, prediction, mapped)
+                    _persist_score(client, prediction, mapped, result_text)
                     scored += 1
                     continue
             elif espn_winner == "__no_result__":
@@ -268,7 +280,7 @@ def main(force: bool = False) -> None:
 
                     mapped = _match_espn_winner_to_prediction(espn_match["winner"], prediction)
                     if mapped:
-                        _persist_score(client, prediction, mapped)
+                        _persist_score(client, prediction, mapped, espn_match.get("result_text"))
                         scored += 1
                         newly_scored.append(mid)
 

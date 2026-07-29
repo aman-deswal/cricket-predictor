@@ -34,13 +34,22 @@ export function TeamBadge({ teamName, size = 'md', showName = true, probability,
         whileHover={{ scale: 1.1 }}
         transition={{ type: 'spring', stiffness: 300 }}
       >
-        <img
-          src={getFlagUrl(meta.countryCode, flag)}
-          srcSet={`${getFlag2xUrl(meta.countryCode, flag)} 2x`}
-          alt={`${meta.name} flag`}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+        {meta.countryCode ? (
+          <img
+            src={getFlagUrl(meta.countryCode, flag)}
+            srcSet={`${getFlag2xUrl(meta.countryCode, flag)} 2x`}
+            alt={`${meta.name} flag`}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center font-bold text-white"
+            style={{ backgroundColor: meta.primaryColor, fontSize: flag * 0.28 }}
+          >
+            {meta.shortName.slice(0, 3)}
+          </div>
+        )}
       </motion.div>
 
       {showName && (

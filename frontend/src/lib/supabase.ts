@@ -13,8 +13,7 @@ import {
   getMockMatchSquads,
   getMockPlayerStats,
   getMockPrediction,
-  getMockPredictionHistory,
-  getMockUpcomingMatches,
+  getMockPredictionHistory,  getMockUpcomingMatches,
 } from './mock-data';
 
 const hasSupabaseConfig = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -87,7 +86,21 @@ export interface PredictionResult {
   correct: boolean;
   brier_score: number | null;
   predicted_probability: number;
+  result_text?: string | null;
   scored_at: string;
+}
+
+/** PredictionResult enriched with pre-match prediction details for the history drilldown. */
+export interface PredictionHistoryItem extends PredictionResult {
+  team1: string;
+  team2: string;
+  reasoning?: string;
+  toss_insight?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  team1_win_probability?: number;
+  team2_win_probability?: number;
+  toss_winner?: string | null;
+  toss_decision?: string | null;
 }
 
 export interface MatchEnrichment {
@@ -657,18 +670,76 @@ export async function getPlayerStats(playerNames: string[], format: string): Pro
   return data ?? [];
 }
 
-export async function getPredictionHistory(): Promise<PredictionResult[]> {
+export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
   if (isMockDataEnabled()) {
     return getMockPredictionHistory();
   }
 
-  const { data, error } = await supabase
+  const { data: results, error } = await supabase
     .from('prediction_results')
     .select('*')
     .order('scored_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  if (!results?.length) return [];
+
+  // Enrich with pre-match prediction details (team names, reasoning, probabilities)
+  const matchIds = results.map((r) => r.match_id);
+  const { data: predictions } = await supabase
+    .from('predictions')
+    .select('match_id, team1, team2, reasoning, toss_insight, confidence, team1_win_probability, team2_win_probability')
+    .in('match_id', matchIds);
+
+  // Pull toss data from espn_match_data
+  const { data: espnData } = await supabase
+    .from('espn_match_data')
+    .select('match_id, toss_winner, toss_decision')
+    .in('match_id', matchIds);
+
+  const predMap = Object.fromEntries((predictions ?? []).map((p) => [p.match_id, p]));
+  const tossMap = Object.fromEntries((espnData ?? []).map((e) => [e.match_id, e]));
+
+  return results.map((r) => ({
+    ...r,
+    team1: predMap[r.match_id]?.team1 ?? '',
+    team2: predMap[r.match_id]?.team2 ?? '',
+    reasoning: predMap[r.match_id]?.reasoning,
+    toss_insight: predMap[r.match_id]?.toss_insight,
+    confidence: predMap[r.match_id]?.confidence,
+    team1_win_probability: predMap[r.match_id]?.team1_win_probability,
+    team2_win_probability: predMap[r.match_id]?.team2_win_probability,
+    toss_winner: tossMap[r.match_id]?.toss_winner ?? null,
+    toss_decision: tossMap[r.match_id]?.toss_decision ?? null,
+  }));
+}
+
+export async function getAccuracyBySplit(): Promise<{
+  international: { total: number; correct: number; accuracy: number };
+  league: { total: number; correct: number; accuracy: number };
+}> {
+  const history = await getPredictionHistory();
+
+  const classify = (r: PredictionHistoryItem) => {
+    const t1 = r.team1 || r.predicted_winner;
+    const t2 = r.team2 || r.actual_winner;
+    return Boolean(getTeamMeta(t1).countryCode) && Boolean(getTeamMeta(t2).countryCode);
+  };
+
+  const intl = history.filter(classify);
+  const league = history.filter((r) => !classify(r));
+
+  return {
+    international: {
+      total: intl.length,
+      correct: intl.filter((r) => r.correct).length,
+      accuracy: intl.length > 0 ? intl.filter((r) => r.correct).length / intl.length : 0,
+    },
+    league: {
+      total: league.length,
+      correct: league.filter((r) => r.correct).length,
+      accuracy: league.length > 0 ? league.filter((r) => r.correct).length / league.length : 0,
+    },
+  };
 }
 
 export async function getDashboardStats(): Promise<{

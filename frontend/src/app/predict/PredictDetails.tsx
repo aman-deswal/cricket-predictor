@@ -281,12 +281,21 @@ export function PredictDetails() {
               style={{ ['--tw-ring-color' as string]: team1Meta.primaryColor }}
               whileHover={{ scale: 1.1 }}
             >
-              <img
-                src={getFlagUrl(team1Meta.countryCode, 80)}
-                srcSet={`${getFlag2xUrl(team1Meta.countryCode, 80)} 2x`}
-                alt={displayTeam1}
-                className="w-full h-full object-cover"
-              />
+              {team1Meta.countryCode ? (
+                <img
+                  src={getFlagUrl(team1Meta.countryCode, 80)}
+                  srcSet={`${getFlag2xUrl(team1Meta.countryCode, 80)} 2x`}
+                  alt={displayTeam1}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center font-bold text-white text-lg"
+                  style={{ backgroundColor: team1Meta.primaryColor }}
+                >
+                  {team1Meta.shortName.slice(0, 3)}
+                </div>
+              )}
             </motion.div>
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team1Meta.shortName}</h2>
             {/* Form strip — last 5 */}
@@ -375,12 +384,21 @@ export function PredictDetails() {
               style={{ ['--tw-ring-color' as string]: team2Meta.primaryColor }}
               whileHover={{ scale: 1.1 }}
             >
-              <img
-                src={getFlagUrl(team2Meta.countryCode, 80)}
-                srcSet={`${getFlag2xUrl(team2Meta.countryCode, 80)} 2x`}
-                alt={displayTeam2}
-                className="w-full h-full object-cover"
-              />
+              {team2Meta.countryCode ? (
+                <img
+                  src={getFlagUrl(team2Meta.countryCode, 80)}
+                  srcSet={`${getFlag2xUrl(team2Meta.countryCode, 80)} 2x`}
+                  alt={displayTeam2}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center font-bold text-white text-lg"
+                  style={{ backgroundColor: team2Meta.primaryColor }}
+                >
+                  {team2Meta.shortName.slice(0, 3)}
+                </div>
+              )}
             </motion.div>
             <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white">{team2Meta.shortName}</h2>
             {/* Form strip — last 5 */}
@@ -992,7 +1010,11 @@ export function PredictDetails() {
                   <div key={squad.team}>
                     <div className="flex items-center gap-1 mb-1.5">
                       <div className="w-4 h-4 rounded-full overflow-hidden">
-                        <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                        {meta.countryCode ? (
+                          <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full" style={{ backgroundColor: meta.primaryColor }} />
+                        )}
                       </div>
                       <span className="text-[10px] font-semibold text-white">{teamDisplay}</span>
                       <span className="text-[8px] text-gray-600">({(squad.players ?? []).length})</span>
@@ -1039,7 +1061,11 @@ export function PredictDetails() {
               <div key={team}>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <div className="w-4 h-4 rounded-full overflow-hidden">
-                    <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                    {meta.countryCode ? (
+                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full" style={{ backgroundColor: meta.primaryColor }} />
+                    )}
                   </div>
                   <span className="text-[10px] font-semibold text-white">{team}</span>
                 </div>

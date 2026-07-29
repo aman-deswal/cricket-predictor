@@ -58,6 +58,51 @@ const TEAMS: Record<string, TeamMeta> = {
   'Sunrisers Hyderabad': { name: 'Sunrisers Hyderabad', shortName: 'SRH', countryCode: 'in', primaryColor: '#FF822A', secondaryColor: '#000000' },
   'Gujarat Titans': { name: 'Gujarat Titans', shortName: 'GT', countryCode: 'in', primaryColor: '#1C1C1C', secondaryColor: '#A0E4F1' },
   'Lucknow Super Giants': { name: 'Lucknow Super Giants', shortName: 'LSG', countryCode: 'in', primaryColor: '#A72056', secondaryColor: '#FFCC00' },
+
+  // Lanka Premier League (current ESPN names)
+  'Dambulla Sixers': { name: 'Dambulla Sixers', shortName: 'DS', countryCode: '', primaryColor: '#E63946', secondaryColor: '#FFFFFF' },
+  'Kandy Royals': { name: 'Kandy Royals', shortName: 'KR', countryCode: '', primaryColor: '#9C27B0', secondaryColor: '#FFEB3B' },
+  'Kandy Falcons': { name: 'Kandy Falcons', shortName: 'KF', countryCode: '', primaryColor: '#9C27B0', secondaryColor: '#FFEB3B' },
+  'B-Love Kandy': { name: 'B-Love Kandy', shortName: 'BLK', countryCode: '', primaryColor: '#7B1FA2', secondaryColor: '#FFEB3B' },
+  'Galle Gallants': { name: 'Galle Gallants', shortName: 'GG', countryCode: '', primaryColor: '#2196F3', secondaryColor: '#FFEB3B' },
+  'Galle Titans': { name: 'Galle Titans', shortName: 'GT', countryCode: '', primaryColor: '#2196F3', secondaryColor: '#FFEB3B' },
+  'Colombo Kaps': { name: 'Colombo Kaps', shortName: 'CLK', countryCode: '', primaryColor: '#00BCD4', secondaryColor: '#FFFFFF' },
+  'Colombo Strikers': { name: 'Colombo Strikers', shortName: 'CS', countryCode: '', primaryColor: '#00BCD4', secondaryColor: '#FFFFFF' },
+
+  // The Hundred (current ESPN names for 2025 season)
+  'Sunrisers Leeds': { name: 'Sunrisers Leeds', shortName: 'SRL', countryCode: '', primaryColor: '#FF8F00', secondaryColor: '#1A237E' },
+  'Manchester Super Giants': { name: 'Manchester Super Giants', shortName: 'MSG', countryCode: '', primaryColor: '#6A1B9A', secondaryColor: '#FFEB3B' },
+  'Oval Invincibles': { name: 'Oval Invincibles', shortName: 'OI', countryCode: '', primaryColor: '#F4D03F', secondaryColor: '#1A1A2E' },
+  'London Spirit': { name: 'London Spirit', shortName: 'LS', countryCode: '', primaryColor: '#1565C0', secondaryColor: '#FFFFFF' },
+  'Southern Brave': { name: 'Southern Brave', shortName: 'SB', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
+  'Northern Superchargers': { name: 'Northern Superchargers', shortName: 'NS', countryCode: '', primaryColor: '#FF8F00', secondaryColor: '#1A237E' },
+  'Trent Rockets': { name: 'Trent Rockets', shortName: 'TR', countryCode: '', primaryColor: '#00838F', secondaryColor: '#FFFFFF' },
+  'Welsh Fire': { name: 'Welsh Fire', shortName: 'WF', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
+  'Birmingham Phoenix': { name: 'Birmingham Phoenix', shortName: 'BP', countryCode: '', primaryColor: '#00C853', secondaryColor: '#1A1A1A' },
+  'Manchester Originals': { name: 'Manchester Originals', shortName: 'MO', countryCode: '', primaryColor: '#6A1B9A', secondaryColor: '#FFEB3B' },
+
+  // Global Super League / Desert T20
+  'Desert Vipers': { name: 'Desert Vipers', shortName: 'DV', countryCode: '', primaryColor: '#C8A951', secondaryColor: '#1A2A1A' },
+  'Perth Scorchers XI': { name: 'Perth Scorchers XI', shortName: 'PS', countryCode: '', primaryColor: '#FF6600', secondaryColor: '#0047AB' },
+
+  // CPL
+  'Trinbago Knight Riders': { name: 'Trinbago Knight Riders', shortName: 'TKR', countryCode: '', primaryColor: '#3A225D', secondaryColor: '#B3A123' },
+  'Barbados Royals': { name: 'Barbados Royals', shortName: 'BR', countryCode: '', primaryColor: '#EA1A85', secondaryColor: '#254AA5' },
+  'Guyana Amazon Warriors': { name: 'Guyana Amazon Warriors', shortName: 'GAW', countryCode: '', primaryColor: '#007A33', secondaryColor: '#FFD700' },
+  'Jamaica Tallawahs': { name: 'Jamaica Tallawahs', shortName: 'JT', countryCode: '', primaryColor: '#FF6D00', secondaryColor: '#000000' },
+  'Saint Lucia Kings': { name: 'Saint Lucia Kings', shortName: 'SLK', countryCode: '', primaryColor: '#0D47A1', secondaryColor: '#FFD600' },
+  'St Kitts and Nevis Patriots': { name: 'St Kitts & Nevis Patriots', shortName: 'SNP', countryCode: '', primaryColor: '#B71C1C', secondaryColor: '#F9A825' },
+  'Antigua and Barbuda Falcons': { name: 'Antigua & Barbuda Falcons', shortName: 'ABF', countryCode: '', primaryColor: '#1B5E20', secondaryColor: '#FFEB3B' },
+
+  // Big Bash League
+  'Sydney Sixers': { name: 'Sydney Sixers', shortName: 'SIX', countryCode: '', primaryColor: '#FF69B4', secondaryColor: '#FFFFFF' },
+  'Sydney Thunder': { name: 'Sydney Thunder', shortName: 'THU', countryCode: '', primaryColor: '#FFCC00', secondaryColor: '#1A1A1A' },
+  'Melbourne Stars': { name: 'Melbourne Stars', shortName: 'STA', countryCode: '', primaryColor: '#00A651', secondaryColor: '#FFFFFF' },
+  'Melbourne Renegades': { name: 'Melbourne Renegades', shortName: 'REN', countryCode: '', primaryColor: '#CC2529', secondaryColor: '#FFFFFF' },
+  'Brisbane Heat': { name: 'Brisbane Heat', shortName: 'HEA', countryCode: '', primaryColor: '#FF6600', secondaryColor: '#1A1A1A' },
+  'Perth Scorchers': { name: 'Perth Scorchers', shortName: 'SCO', countryCode: '', primaryColor: '#FF6600', secondaryColor: '#0047AB' },
+  'Hobart Hurricanes': { name: 'Hobart Hurricanes', shortName: 'HUR', countryCode: '', primaryColor: '#9B59B6', secondaryColor: '#FFFFFF' },
+  'Adelaide Strikers': { name: 'Adelaide Strikers', shortName: 'STR', countryCode: '', primaryColor: '#003087', secondaryColor: '#E21E26' },
 };
 
 // Normalize team name for lookup (handles minor variations)
@@ -77,11 +122,11 @@ export function getTeamMeta(teamName: string): TeamMeta {
   );
   if (key) return TEAMS[key];
 
-  // Fallback
+  // Fallback — no flag; TeamBadge will render an initials badge using primaryColor
   return {
     name: teamName,
     shortName: teamName.slice(0, 3).toUpperCase(),
-    countryCode: 'un', // UN flag as fallback
+    countryCode: '',
     primaryColor: '#6B7280',
     secondaryColor: '#374151',
   };

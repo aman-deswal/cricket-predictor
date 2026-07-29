@@ -31,11 +31,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-[#0c0a09] text-white min-h-screen antialiased flex flex-col">
+      <body className="bg-[#111008] text-white min-h-screen antialiased flex flex-col">
         {/* Background gradient orbs — amber theme */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl" />
-          <div className="absolute top-1/2 -left-40 w-80 h-80 bg-yellow-600/5 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-500/8 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 -left-40 w-80 h-80 bg-yellow-600/8 rounded-full blur-3xl" />
         </div>
 
         <Navbar />
