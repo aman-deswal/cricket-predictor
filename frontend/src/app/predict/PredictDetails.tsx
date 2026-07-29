@@ -131,6 +131,12 @@ export function PredictDetails() {
     load();
   }, [matchId]);
 
+  const [edgeBarsReady, setEdgeBarsReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEdgeBarsReady(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
   // Live countdown timer
   const getCountdown = useCallback(() => {
     if (!match) return null;
@@ -482,13 +488,15 @@ export function PredictDetails() {
               <div className="flex-1 relative h-4 bg-gray-800/60 rounded-full overflow-hidden">
                 {/* Book implied — background track */}
                 <div className="absolute inset-y-0 left-0 rounded-full opacity-30" style={{ width: `${impliedPct}%`, backgroundColor: color }} />
-                {/* AI probability — foreground */}
-                <motion.div
+                {/* AI probability — foreground, CSS transition fires once on mount */}
+                <div
                   className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ backgroundColor: color, boxShadow: isValue ? `0 0 6px ${color}60` : undefined }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${aiPct}%` }}
-                  transition={{ duration: 0.9, ease: 'easeOut', delay: 0.4 }}
+                  style={{
+                    width: edgeBarsReady ? `${aiPct}%` : '0%',
+                    backgroundColor: color,
+                    boxShadow: isValue ? `0 0 6px ${color}60` : undefined,
+                    transition: 'width 0.9s ease-out 0.4s',
+                  }}
                 />
               </div>
               <div className="flex items-center gap-1.5 shrink-0 text-[9px] tabular-nums w-44">
