@@ -87,44 +87,29 @@ function getMatchTime(date: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-/** AI Edge badge: shown when our model meaningfully disagrees with bookmaker pricing */
-function AIEdgeBadge({ aiProb, bookOdds, teamName }: { aiProb: number; bookOdds: number; teamName: string }) {
-  const impliedProb = 1 / bookOdds;
-  const edgePct = Math.round((aiProb - impliedProb) * 100);
-  const absEdge = Math.abs(edgePct);
-
-  if (absEdge < 7) return null;
-
-  const isValue = edgePct > 0;
-  // e.g. "AI Edge: India +10%" or "AI Edge: Aus -8%"
-  const label = isValue ? `AI Edge +${edgePct}%` : `AI Edge ${edgePct}%`;
-  const tooltip = isValue
-    ? `Our AI gives ${teamName} a ${Math.round(aiProb * 100)}% chance — the bookmaker prices them at ${Math.round(impliedProb * 100)}%. That's a +${absEdge}% gap, suggesting value on ${teamName}.`
-    : `Our AI gives ${teamName} a ${Math.round(aiProb * 100)}% chance — the bookmaker prices them higher at ${Math.round(impliedProb * 100)}%. AI thinks they're overpriced.`;
+/** AI Edge badge — compact, always shows the value (positive) side */
+function AIEdgeBadge({ valueTeamName, edgePct, aiPct, impliedPct }: {
+  valueTeamName: string;
+  edgePct: number;   // always positive
+  aiPct: number;
+  impliedPct: number;
+}) {
+  const tooltip = `${valueTeamName}: AI says ${aiPct}% win chance, bookmaker implies ${impliedPct}%. Our model sees +${edgePct}% extra value here.`;
 
   return (
     <motion.div
-      className="relative flex items-center gap-1"
+      className="relative flex items-center"
       initial={{ scale: 0.6, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, delay: 0.5 }}
       title={tooltip}
     >
-      {/* Pulse ring */}
-      <span className={`absolute inset-0 rounded-full animate-ev-ping ${isValue ? 'bg-emerald-400/30' : 'bg-red-400/20'}`} />
-      <span
-        className={`relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide border cursor-help ${
-          isValue
-            ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
-            : 'bg-red-500/10 border-red-400/30 text-red-400'
-        }`}
-      >
-        <svg className="w-2 h-2" viewBox="0 0 8 8" fill="currentColor">
-          {isValue
-            ? <path d="M4 1L7 4H5v3H3V4H1L4 1z" />
-            : <path d="M4 7L1 4h2V1h2v3h2L4 7z" />}
+      <span className="absolute inset-0 rounded-full animate-ev-ping bg-emerald-400/25" />
+      <span className="relative flex items-center gap-0.5 px-1.5 py-[3px] rounded-full text-[9px] font-bold border cursor-help bg-emerald-500/15 border-emerald-400/35 text-emerald-300">
+        <svg className="w-[7px] h-[7px]" viewBox="0 0 8 8" fill="currentColor">
+          <path d="M4 1L7 4H5v3H3V4H1L4 1z" />
         </svg>
-        {label}
+        +{edgePct}%
       </span>
     </motion.div>
   );
@@ -250,20 +235,26 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                 )}
               </div>
 
-              {/* VS + EV signal */}
+              {/* VS + AI Edge signal — always shows the value (positive) side */}
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-[9px] font-black text-gray-700 uppercase tracking-widest">vs</span>
-                {/* EV badge — biggest edge of the two sides */}
                 {prediction && odds1 && odds2 && (() => {
-                  const showEV1 = Math.abs(ev1Pct) >= 7;
-                  const showEV2 = Math.abs(ev2Pct) >= 7;
-                  if (!showEV1 && !showEV2) return null;
-                  const useT1 = Math.abs(ev1Pct) >= Math.abs(ev2Pct);
+                  // Always pick whichever team has POSITIVE edge (AI > market)
+                  // If ev1 > 0 → Team 1 is underpriced; if ev2 > 0 → Team 2 is underpriced
+                  // Mathematically one will be positive and one negative (roughly), so prefer positive
+                  const valueIsT1 = ev1Pct >= ev2Pct && ev1Pct >= 7;
+                  const valueIsT2 = !valueIsT1 && ev2Pct >= 7;
+                  if (!valueIsT1 && !valueIsT2) return null;
+                  const edgePct = valueIsT1 ? ev1Pct : ev2Pct;
+                  const aiProb  = valueIsT1 ? aiProb1! : aiProb2!;
+                  const bOdds   = valueIsT1 ? odds1 : odds2;
+                  const vTeam   = valueIsT1 ? team1Meta.shortName : team2Meta.shortName;
                   return (
                     <AIEdgeBadge
-                      aiProb={useT1 ? aiProb1! : aiProb2!}
-                      bookOdds={useT1 ? odds1 : odds2}
-                      teamName={useT1 ? team1Meta.shortName : team2Meta.shortName}
+                      valueTeamName={vTeam}
+                      edgePct={edgePct}
+                      aiPct={Math.round(aiProb * 100)}
+                      impliedPct={Math.round((1 / bOdds) * 100)}
                     />
                   );
                 })()}
