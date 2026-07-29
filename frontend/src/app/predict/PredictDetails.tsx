@@ -484,31 +484,40 @@ export function PredictDetails() {
           const isValue = edgePct >= 7;
           return (
             <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-gray-300 w-10 shrink-0 tabular-nums">{shortName}</span>
-              <div className="flex-1 relative h-4 bg-gray-800/60 rounded-full overflow-hidden">
-                {/* Book implied — background track */}
-                <div className="absolute inset-y-0 left-0 rounded-full opacity-30" style={{ width: `${impliedPct}%`, backgroundColor: color }} />
-                {/* AI probability — foreground, CSS transition fires once on mount */}
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: edgeBarsReady ? `${aiPct}%` : '0%',
-                    backgroundColor: color,
-                    boxShadow: isValue ? `0 0 6px ${color}60` : undefined,
-                    transition: 'width 0.9s ease-out 0.4s',
-                  }}
-                />
+              <span className="text-[10px] font-bold text-gray-300 w-10 shrink-0">{shortName}</span>
+              <div className="flex-1 space-y-1.5">
+                {/* AI bar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2.5 bg-gray-800/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: edgeBarsReady ? `${aiPct}%` : '0%',
+                        backgroundColor: color,
+                        transition: 'width 0.9s ease-out 0.4s',
+                      }}
+                    />
+                  </div>
+                  <span className="text-[9px] font-bold tabular-nums w-7 text-right" style={{ color }}>{aiPct}%</span>
+                  <span className="text-[8px] text-gray-600 w-4">AI</span>
+                </div>
+                {/* Book bar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2.5 bg-gray-800/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full opacity-35"
+                      style={{ width: `${impliedPct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                  <span className="text-[9px] tabular-nums w-7 text-right text-gray-500">{impliedPct}%</span>
+                  <span className="text-[8px] text-gray-600 w-4">Bk</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 text-[9px] tabular-nums w-44">
-                <span className="font-bold" style={{ color }}>{aiPct}% AI</span>
-                <span className="text-gray-600">/</span>
-                <span className="text-gray-500">{impliedPct}% Book</span>
-                {isValue && (
-                  <span className="ml-1 text-emerald-400 font-black">
-                    ↑ +{edgePct}% edge
-                  </span>
-                )}
-              </div>
+              {isValue ? (
+                <span className="text-emerald-400 font-black text-[9px] shrink-0 w-14 text-right">↑ +{edgePct}%</span>
+              ) : (
+                <span className="w-14" />
+              )}
             </div>
           );
         };
@@ -533,7 +542,7 @@ export function PredictDetails() {
               <EdgeRow shortName={team2Meta.shortName} color={teamColor2} aiPct={ai2} impliedPct={implied2} edgePct={edge2} />
             </div>
             <p className="text-[8px] text-gray-600 leading-relaxed">
-              Solid bar = AI model probability · Faded track = bookmaker-implied probability · ↑ edge fires when gap ≥ 7 points
+              Top bar = AI model · Bottom bar (faded) = bookmaker implied · ↑ edge fires when gap ≥ 7 pts
             </p>
           </motion.div>
         );
