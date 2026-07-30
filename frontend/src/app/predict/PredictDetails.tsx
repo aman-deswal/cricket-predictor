@@ -378,14 +378,27 @@ export function PredictDetails() {
             transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
           >
             {prediction ? (
-              <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44">
-                <PredictionChart
-                  team1={prediction.team1}
-                  team2={prediction.team2}
-                  team1Prob={prediction.team1_win_probability}
-                  team2Prob={prediction.team2_win_probability}
-                  compact
-                />
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44">
+                  <PredictionChart
+                    team1={prediction.team1}
+                    team2={prediction.team2}
+                    team1Prob={prediction.team1_win_probability}
+                    team2Prob={prediction.team2_win_probability}
+                    compact
+                  />
+                </div>
+                {/* Color legend */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor1 }} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: teamColor1 }}>{team1Meta.shortName}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor2 }} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: teamColor2 }}>{team2Meta.shortName}</span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="w-12 h-12 rounded-full bg-cricket-900/80 border border-cricket-700/50 flex items-center justify-center">
