@@ -1,4 +1,4 @@
-"""Generate match predictions using a configurable LLM provider."""
+"""Generate match predictions using a configurable LLM router."""
 
 import argparse
 import json
@@ -8,9 +8,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Optional
 
-from openai import OpenAI
-
-from utils.llm import get_llm_client, LLM_MODEL as MODEL
+from utils.llm import LLMUnavailableError, create_chat_completion
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
 from utils.db import (
     get_client,
@@ -263,22 +261,22 @@ def build_context(match: dict) -> dict:
     }
 
 
-def call_openai(prompt: str) -> dict:
-    """Make a single prediction call via the configured LLM provider."""
-    client = get_llm_client()
-    response = client.chat.completions.create(
-        model=MODEL,
+def call_llm(prompt: str) -> dict:
+    """Make a single prediction call via the configured LLM router."""
+    response, route = create_chat_completion(
         messages=[{"role": "user", "content": prompt}],
         temperature=TEMPERATURE,
         response_format={"type": "json_object"},
     )
     content = response.choices[0].message.content
-    return json.loads(content)
+    parsed = json.loads(content)
+    parsed["_llm_model"] = route.model
+    return parsed
 
 
 def ensemble_predict(match: dict) -> dict:
     """
-    Generate ensemble prediction by calling OpenAI multiple times and averaging.
+    Generate ensemble prediction by calling the configured LLM router multiple times.
 
     Args:
         match: Match dict with team1, team2, venue, match_type, date
@@ -290,14 +288,22 @@ def ensemble_predict(match: dict) -> dict:
     prompt = PREDICTION_PROMPT.format(**context)
 
     predictions = []
+    used_models: list[str] = []
     for i in range(NUM_ENSEMBLE_CALLS):
         try:
-            pred = call_openai(prompt)
+            pred = call_llm(prompt)
             predictions.append(pred)
-            logger.info(f"  Call {i+1}/{NUM_ENSEMBLE_CALLS}: {pred.get('predicted_winner')} "
-                       f"({pred.get('team1_win_probability', 0):.2f} / {pred.get('team2_win_probability', 0):.2f})")
-        except Exception as e:
-            logger.warning(f"  Call {i+1} failed: {e}")
+            if pred.get("_llm_model"):
+                used_models.append(pred["_llm_model"])
+            logger.info(
+                f"  Call {i+1}/{NUM_ENSEMBLE_CALLS} via {pred.get('_llm_model', 'unknown model')}: "
+                f"{pred.get('predicted_winner')} "
+                f"({pred.get('team1_win_probability', 0):.2f} / {pred.get('team2_win_probability', 0):.2f})"
+            )
+        except LLMUnavailableError as exc:
+            logger.warning(f"  Call {i+1} exhausted all configured LLM routes: {exc}")
+        except Exception as exc:
+            logger.warning(f"  Call {i+1} failed: {exc}")
 
     if not predictions:
         raise RuntimeError("All prediction calls failed")
@@ -331,7 +337,7 @@ def ensemble_predict(match: dict) -> dict:
         "confidence": predictions[0].get("confidence", "medium"),
         "reasoning": combined_reasoning,
         "toss_insight": toss_insight,
-        "model": MODEL,
+        "model": ", ".join(dict.fromkeys(used_models)) if used_models else "unavailable",
         "ensemble_size": len(predictions),
         "edge_score": context.get("edge_score"),
     }

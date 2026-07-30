@@ -29,6 +29,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'openai/gpt-4o' }}
+          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
+          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
+          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
+          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
           LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
         run: python pipeline/predict.py

@@ -11,7 +11,6 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
-from openai import APIStatusError
 
 from utils.cricsheet import (
     get_head_to_head,
@@ -31,7 +30,7 @@ from utils.db import (
     get_recent_results,
 )
 from utils.espn import get_espn_enrichment_context, format_espn_context
-from utils.llm import get_llm_client, LLM_MODEL as MODEL
+from utils.llm import LLMUnavailableError, create_chat_completion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -509,7 +508,6 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
 
 
 def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = get_llm_client()
     prompt = ENRICHMENT_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -520,23 +518,16 @@ def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_result
         espn_context=espn_ctx or "No ESPN data available.",
         recent_results_context=recent_results_ctx or "",
     )
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            response_format={"type": "json_object"},
-        )
-    except APIStatusError as exc:
-        if exc.status_code in (410, 503):
-            logger.warning(f"LLM unavailable ({exc.status_code}): {exc.message} — falling back to data-backed enrichment")
-            raise
-        raise
+    response, route = create_chat_completion(
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        response_format={"type": "json_object"},
+    )
+    logger.info(f"  LLM enrichment route: {route.model}")
     return json.loads(response.choices[0].message.content)
 
 
 def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = get_llm_client()
     prompt = MODEL_FALLBACK_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -547,18 +538,12 @@ def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_res
         recent_results_context=recent_results_ctx or "",
         **stats,
     )
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-    except APIStatusError as exc:
-        if exc.status_code in (410, 503):
-            logger.warning(f"LLM unavailable ({exc.status_code}): {exc.message} — skipping model fallback")
-            raise
-        raise
+    response, route = create_chat_completion(
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    logger.info(f"  LLM fallback route: {route.model}")
     return json.loads(response.choices[0].message.content)
 
 
@@ -829,12 +814,9 @@ def enrich_match(match: dict, source_limit: int) -> dict:
                 call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
                 sources,
             )
-        except APIStatusError as exc:
-            if exc.status_code in (410, 503):
-                logger.warning("  LLM unavailable — using data-backed enrichment instead")
-                details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
-            else:
-                raise
+        except LLMUnavailableError:
+            logger.warning("  All configured LLM routes unavailable — using data-backed enrichment instead")
+            details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
     else:
         details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
 
