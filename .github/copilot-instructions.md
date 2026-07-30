@@ -43,5 +43,6 @@ Do **not** rewrite or invent the deterministic core without an explicit user req
 ## Operational guidance for garnish automation
 
 - Treat garnish as a **post-refresh pass** that runs after fixture, results, odds, and deterministic prediction data are fresh.
+- Default cadence should be **hourly**, using `python pipeline/select_garnish_candidates.py --format text` to target only the highest-priority upcoming matches.
 - If garnish cannot be generated, leave the deterministic core intact and preserve the existing fallback behavior.
 - If writing to live data stores, update only the intended garnish fields and preserve the existing row shape.

@@ -222,6 +222,17 @@ If you want to use **GitHub Copilot automations** for garnish instead of paid ru
 3. Use `.github/copilot-instructions.md` to constrain Copilot to garnish-only updates on top of the deterministic core.
 4. Treat Copilot as a **post-refresh narrative pass**, not as the source of truth for probabilities or edge math.
 
+### Recommended hourly garnish flow
+
+For a Copilot automation that keeps the app feeling AI-first without breaking deterministic freshness:
+
+1. Run the automation **hourly**
+2. Use `python pipeline/select_garnish_candidates.py --format text`
+3. Refresh only high-priority upcoming matches that are missing garnish, stale, or have newer odds / squads / ESPN context than their last garnish pass
+4. Update only garnish-style fields in `predictions` and `match_enrichment`
+
+The repository includes `.github/copilot-garnish-automation.md` as a ready-to-copy prompt template for that automation.
+
 ### Frontend (`frontend/.env.local`)
 | Variable | Description |
 |---|---|
