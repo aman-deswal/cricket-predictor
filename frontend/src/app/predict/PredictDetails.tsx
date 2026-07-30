@@ -841,7 +841,7 @@ export function PredictDetails() {
                             <div className="flex items-center gap-1 mt-auto pt-2">
                               <span className="text-[6.5px] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
                               {battle.batter_scores.slice(0, 5).map((score, fi) => (
-                                <span key={fi} className={`min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0 ${fi >= 3 ? 'hidden sm:flex' : ''}`} style={{
+                                <span key={fi} className="min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
                                   background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
                                   color: score >= 50 ? '#4ade80' : score >= 25 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${score >= 50 ? '#16a34a88' : score >= 25 ? '#d9770688' : '#dc262688'}`,
@@ -893,7 +893,7 @@ export function PredictDetails() {
                           {battle.bowler_figures && (
                             <div className="flex items-center justify-end gap-1 mt-auto pt-2">
                               {battle.bowler_figures.slice(0, 5).map((wkts, fi) => (
-                                <span key={fi} className={`min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0 ${fi >= 3 ? 'hidden sm:flex' : ''}`} style={{
+                                <span key={fi} className="min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
                                   background: wkts >= 3 ? '#16a34a55' : wkts >= 1 ? '#d9770655' : '#dc262655',
                                   color: wkts >= 3 ? '#4ade80' : wkts >= 1 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
