@@ -9,6 +9,19 @@ It is no longer just a simple “winner predictor” — current builds include:
 
 ---
 
+## Product Roadmap Status (GitHub issues)
+
+Current work is tracked in milestone-based sprints in GitHub Issues:
+- **Sprint 1 — Trust & Foundation (P0):** #40 (done), #41, #42, #43, #44
+- **Sprint 2 — Betting Intelligence (P1):** #45, #46, #47, #48, #49, #69, #72
+- **Sprint 3 — Cricket Context (P1):** #50, #51, #52, #53, #54, #55, #68, #70
+- **Sprint 4 — UX Polish (P2):** #56, #57, #58, #59, #60, #61
+- **Sprint 5 — Engagement Features (P3):** #62, #63, #64, #65, #71
+
+Roadmap alignment issue: **#72** (maps the master feature context into this backlog without resetting priorities).
+
+---
+
 ## Current Architecture (audited from latest code)
 
 ```mermaid
@@ -170,10 +183,18 @@ python pipeline/fetch_headshots.py --force
 cd frontend
 npm install
 cp .env.example .env.local
-npm run dev:mock
+npm run dev
 ```
 
-`npm run dev:mock` starts the local dev server with bundled mock fixtures, predictions, history, and dashboard data. Use `npm run dev` for live Supabase data. You can also flip demo/live data locally from the hidden menu toggle in the navbar.
+Set real values in `frontend/.env.local` for:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Data-mode behavior:
+- **Demo mode ON** (navbar toggle) → uses bundled mock fixtures/data
+- **Demo mode OFF** (navbar toggle) → uses live Supabase prod data
+
+`npm run dev:mock` is still available if you want to boot with mock mode enabled by default.
 
 ---
 
