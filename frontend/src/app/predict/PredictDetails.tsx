@@ -1072,23 +1072,23 @@ export function PredictDetails() {
               </div>
               <div className="h-8 rounded-full overflow-hidden flex bg-gray-800/40 border border-white/10 gap-[2px]">
                 <motion.div
-                  className="h-full rounded-l-full"
+                  className="h-full flex items-center justify-center relative rounded-l-full"
                   style={{ backgroundColor: barColor1, boxShadow: `0 0 8px ${barColor1}40` }}
                   initial={{ width: '50%' }}
                   animate={{ width: `${t1Pct}%` }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-                />
+                >
+                  <span className="text-[11px] font-bold text-white drop-shadow-lg px-1">{Math.round(t1Pct)}%</span>
+                </motion.div>
                 <motion.div
-                  className="h-full rounded-r-full"
+                  className="h-full flex items-center justify-center relative rounded-r-full"
                   style={{ backgroundColor: barColor2, boxShadow: `0 0 8px ${barColor2}40` }}
                   initial={{ width: '50%' }}
                   animate={{ width: `${100 - t1Pct}%` }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-                />
-              </div>
-              <div className="flex justify-between mt-1.5 px-0.5">
-                <span className="text-[11px] font-bold" style={{ color: barColor1 }}>{Math.round(t1Pct)}%</span>
-                <span className="text-[11px] font-bold" style={{ color: barColor2 }}>{Math.round(100 - t1Pct)}%</span>
+                >
+                  <span className="text-[11px] font-bold text-white drop-shadow-lg px-1">{Math.round(100 - t1Pct)}%</span>
+                </motion.div>
               </div>
             </div>
 
