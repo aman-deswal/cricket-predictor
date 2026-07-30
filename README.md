@@ -34,20 +34,21 @@ flowchart LR
     G[ESPN Cricinfo APIs] --> B
     H[The Odds API] --> B
     I[Cricsheet Historical Data] --> B
-    J[GitHub Models GPT-4o] --> B
+    J[Optional AI Garnish] --> B
 ```
 
 ### Data/Logic flow
 1. **Fixtures ingestion** uses ESPN Cricinfo exclusively (free, unlimited). ESPN match IDs (`espn-<id>`) are used as canonical fixture identifiers.
 2. **Stats caching** computes team/venue/H2H from Cricsheet and stores in `stats_cache`.
-3. **Predictions** run via GPT-4o (GitHub Models), using:
+3. **Predictions** are generated deterministically from structured cricket + market data, using:
    - cached form/H2H/venue stats,
    - enrichment notes,
    - ESPN context,
    - sportsbook signal,
    - proprietary **SixSense Edge Score™**.
-4. **Results scorer** marks completed matches and computes correctness + Brier score.
-5. **Calibration** periodically derives isotonic calibration bins.
+4. **Optional AI garnish** can layer narrative copy onto enrichment later, but is not required for core prediction freshness.
+5. **Results scorer** marks completed matches and computes correctness + Brier score.
+6. **Calibration** periodically derives isotonic calibration bins.
 6. Frontend reads Supabase directly and renders static-export pages.
 
 ---
@@ -107,8 +108,9 @@ flowchart LR
 | `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN; player stats + headshots (CricAPI optional) |
 | `fetch-headshots.yml` | monthly | Full headshot refresh pass |
 | `fetch-odds.yml` | every 2 hours | Pull bookmaker market data and map to matches |
-| `enrich-matches.yml` | every 6 hours + after results run | LLM web/news enrichment with ESPN context |
-| `run-predictions.yml` | daily (06:00 UTC) | Generate probabilities + reasoning + toss insight + edge score |
+| `enrich-matches.yml` | every 6 hours + after results run | Data-backed enrichment, with optional AI garnish when explicitly enabled |
+| `run-predictions.yml` | daily (06:00 UTC) | Generate deterministic probabilities, reasoning, toss insight, and edge score |
+| `copilot-setup-steps.yml` | on demand / changes to Copilot config | Prepare GitHub Copilot cloud agent with Python deps and deterministic pipeline tooling |
 | `calibrate.yml` | weekly | Compute isotonic calibration bins |
 | `deploy.yml` | on `main` push / manual | Build static frontend and deploy to GitHub Pages |
 
@@ -203,11 +205,33 @@ Data-mode behavior:
 ### Pipeline (`.env`)
 | Variable | Description |
 |---|---|
-| `GITHUB_TOKEN` | GitHub token (used for GitHub Models GPT-4o calls) |
+| `GITHUB_TOKEN` | GitHub token for repository/workflow operations |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_KEY` | Supabase service/anon key used by pipelines |
 | `CRICAPI_KEY` | *(Optional)* CricAPI key — enables pre-match squad data and player career stats. Not required for fixtures or results. |
 | `ODDS_API_KEY` | The Odds API key |
+| `ENABLE_LLM_GARNISH` | *(Optional)* Set to `true` only if you intentionally want runtime LLM garnish for enrichment and have a live provider path configured. Defaults to `false`. |
+| `LLM_PROFILE`, `LLM_PROFILE_MAP`, `LLM_ROUTE_MAP`, `LLM_FALLBACK_MODELS`, `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY` | *(Optional garnish only)* Runtime LLM routing for enrichment copy. Core predictions no longer depend on these. |
+
+### Copilot cloud agent / automation
+
+If you want to use **GitHub Copilot automations** for garnish instead of paid runtime model APIs:
+
+1. Keep the repo **private or internal** and enable Copilot cloud agent / automations in the repo settings.
+2. Add `SUPABASE_URL` and `SUPABASE_KEY` to the repository's **`copilot` environment** so the agent can read/write the same live data path the frontend uses.
+3. Use `.github/copilot-instructions.md` to constrain Copilot to garnish-only updates on top of the deterministic core.
+4. Treat Copilot as a **post-refresh narrative pass**, not as the source of truth for probabilities or edge math.
+
+### Recommended hourly garnish flow
+
+For a Copilot automation that keeps the app feeling AI-first without breaking deterministic freshness:
+
+1. Run the automation **hourly**
+2. Use `python pipeline/select_garnish_candidates.py --format text`
+3. Refresh only high-priority upcoming matches that are missing garnish, stale, or have newer odds / squads / ESPN context than their last garnish pass
+4. Update only garnish-style fields in `predictions` and `match_enrichment`
+
+The repository includes `.github/copilot-garnish-automation.md` as a ready-to-copy prompt template for that automation.
 
 ### Frontend (`frontend/.env.local`)
 | Variable | Description |
@@ -243,7 +267,7 @@ docs/screenshots/         Current UI screenshots used in this README
 
 - **Frontend:** Next.js 14, React 18, Tailwind CSS, Framer Motion, Recharts, Supabase JS
 - **Pipelines:** Python 3.11, OpenAI SDK, Requests, Pandas, scikit-learn, Supabase Python client
-- **LLM:** GitHub Models (`openai/gpt-4o`)
+- **LLM garnish:** optional only; disabled by default for the production pipeline
 - **Data sources:** ESPN Cricinfo APIs (primary, free/unlimited), The Odds API, Cricsheet, CricAPI (optional)
 - **Hosting:** GitHub Pages via Actions
 

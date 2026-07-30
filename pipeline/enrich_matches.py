@@ -11,7 +11,6 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
-from openai import OpenAI
 
 from utils.cricsheet import (
     get_head_to_head,
@@ -31,11 +30,11 @@ from utils.db import (
     get_recent_results,
 )
 from utils.espn import get_espn_enrichment_context, format_espn_context
+from utils.llm import LLMUnavailableError, create_chat_completion, llm_garnish_enabled
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-MODEL = "openai/gpt-4o"
 REPUTABLE_SOURCES = {
     "BBC Sport",
     "Cricbuzz",
@@ -509,10 +508,6 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
 
 
 def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = OpenAI(
-        base_url="https://models.github.ai/inference",
-        api_key=os.environ["GITHUB_TOKEN"],
-    )
     prompt = ENRICHMENT_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -523,20 +518,16 @@ def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_result
         espn_context=espn_ctx or "No ESPN data available.",
         recent_results_context=recent_results_ctx or "",
     )
-    response = client.chat.completions.create(
-        model=MODEL,
+    response, route = create_chat_completion(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
         response_format={"type": "json_object"},
     )
+    logger.info(f"  LLM enrichment route: {route.model}")
     return json.loads(response.choices[0].message.content)
 
 
 def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = OpenAI(
-        base_url="https://models.github.ai/inference",
-        api_key=os.environ["GITHUB_TOKEN"],
-    )
     prompt = MODEL_FALLBACK_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -547,12 +538,12 @@ def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_res
         recent_results_context=recent_results_ctx or "",
         **stats,
     )
-    response = client.chat.completions.create(
-        model=MODEL,
+    response, route = create_chat_completion(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         response_format={"type": "json_object"},
     )
+    logger.info(f"  LLM fallback route: {route.model}")
     return json.loads(response.choices[0].message.content)
 
 
@@ -655,33 +646,52 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
         "team2_squad": ", ".join(team2_squad) if team2_squad else "not available",
     }
 
-    try:
-        fallback = call_model_fallback(match, stats, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
-        venue_name = fallback.get("venue_name")
-        venue_confidence = fallback.get("venue_confidence", "unknown")
-        preview = fallback.get("expert_preview", "")
-        toss_insight = fallback.get("toss_insight")
-        possible_xi = filter_possible_xi_to_pools(
-            fallback.get("possible_xi", {"team1": [], "team2": []}),
-            team1_player_pool,
-            team2_player_pool,
-        )
-        player_updates = fallback.get("player_updates", [])
-        key_players = fallback.get("key_battles", fallback.get("key_players", []))
-        # Filter battles to only include players from confirmed squads
-        if team1_squad or team2_squad:
-            all_squad = set(n.lower() for n in team1_squad + team2_squad)
-            key_players = [
-                b for b in key_players
-                if (b.get("batter", b.get("name", "")).lower() in all_squad
-                    or not all_squad)
-                and (b.get("bowler", "").lower() in all_squad
-                     or not b.get("bowler")
-                     or not all_squad)
-            ]
-        confidence = fallback.get("confidence", "low")
-    except Exception as exc:
-        logger.warning(f"Model fallback failed: {exc}")
+    if llm_garnish_enabled():
+        try:
+            fallback = call_model_fallback(match, stats, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
+            venue_name = fallback.get("venue_name")
+            venue_confidence = fallback.get("venue_confidence", "unknown")
+            preview = fallback.get("expert_preview", "")
+            toss_insight = fallback.get("toss_insight")
+            possible_xi = filter_possible_xi_to_pools(
+                fallback.get("possible_xi", {"team1": [], "team2": []}),
+                team1_player_pool,
+                team2_player_pool,
+            )
+            player_updates = fallback.get("player_updates", [])
+            key_players = fallback.get("key_battles", fallback.get("key_players", []))
+            # Filter battles to only include players from confirmed squads
+            if team1_squad or team2_squad:
+                all_squad = set(n.lower() for n in team1_squad + team2_squad)
+                key_players = [
+                    b for b in key_players
+                    if (b.get("batter", b.get("name", "")).lower() in all_squad
+                        or not all_squad)
+                    and (b.get("bowler", "").lower() in all_squad
+                         or not b.get("bowler")
+                         or not all_squad)
+                ]
+            confidence = fallback.get("confidence", "low")
+        except Exception as exc:
+            logger.warning(f"Model fallback failed: {exc}")
+            venue_name = None
+            venue_confidence = "unknown"
+            toss_insight = None
+            possible_xi = {"team1": [], "team2": []}
+            player_updates = []
+            key_players = []
+            preview = (
+                f"No recent reputable article-backed updates were found for this fixture. "
+                f"Using stats cache: {team1} have won "
+                f"{team1_form.get('recent_wins', 0)} of their last {team1_form.get('matches_played', 0)} "
+                f"{match.get('match_type', '').upper()} matches, while {team2} have won "
+                f"{team2_form.get('recent_wins', 0)} of their last {team2_form.get('matches_played', 0)}. "
+                f"Their historical head-to-head has {h2h.get('total_matches', 0)} matches, "
+                f"with {team1} winning {h2h.get('team1_wins', 0)} and {team2} winning {h2h.get('team2_wins', 0)}. "
+                f"No source-backed XI or injury update is available yet."
+            )
+            confidence = "low"
+    else:
         venue_name = None
         venue_confidence = "unknown"
         toss_insight = None
@@ -689,8 +699,8 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
         player_updates = []
         key_players = []
         preview = (
-            f"No recent reputable article-backed updates were found for this fixture. "
-            f"Using stats cache: {team1} have won "
+            f"No recent reputable article-backed updates were generated for this fixture. "
+            f"Using structured stats only: {team1} have won "
             f"{team1_form.get('recent_wins', 0)} of their last {team1_form.get('matches_played', 0)} "
             f"{match.get('match_type', '').upper()} matches, while {team2} have won "
             f"{team2_form.get('recent_wins', 0)} of their last {team2_form.get('matches_played', 0)}. "
@@ -817,11 +827,15 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     # --- Run enrichment (source-backed or model fallback) ---
     sources = search_sources(match, limit=source_limit)
     has_article_text = any(source.get("article_text") for source in sources)
-    if sources and has_article_text:
-        details = sanitize_source_backed_details(
-            call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
-            sources,
-        )
+    if sources and has_article_text and llm_garnish_enabled():
+        try:
+            details = sanitize_source_backed_details(
+                call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
+                sources,
+            )
+        except LLMUnavailableError:
+            logger.warning("  All configured LLM routes unavailable — using data-backed enrichment instead")
+            details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
     else:
         details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
 
