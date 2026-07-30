@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { PredictionChart } from '@/components/PredictionChart';
-import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon } from '@/components/CricketIcons';
+import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon, SparkleIcon } from '@/components/CricketIcons';
 import { CricketLoader } from '@/components/CricketLoader';
 
 function toAmericanOdds(probability: number): string {
@@ -133,6 +133,7 @@ export function PredictDetails() {
 
   const [edgeBarsReady, setEdgeBarsReady] = useState(false);
   const [flippedBattle, setFlippedBattle] = useState<number | null>(null);
+  const [pressedBattle, setPressedBattle] = useState<number | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setEdgeBarsReady(true), 50);
     return () => clearTimeout(t);
@@ -613,7 +614,7 @@ export function PredictDetails() {
 
             {/* Tug-of-war bar */}
             <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold" style={{ color: isT1Edge && edgeAbs > 5 ? barColor1 : '#e5e7eb', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team1}</span>
                 <span className="text-xs font-bold" style={{ color: !isT1Edge && edgeAbs > 5 ? barColor2 : '#e5e7eb', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{prediction.team2}</span>
               </div>
@@ -861,13 +862,14 @@ export function PredictDetails() {
           transition={{ delay: 0.28 }}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12L12 4M4 4l8 8" /></svg>
+            <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <svg className="w-4 h-4 text-cricket-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 9.5L3 21M3 3l18 18M21 3L3 21" /><path d="M9.5 14.5L21 3" />
+              </svg>
               Key Battles
             </h2>
-            <span className="text-[9px] text-gray-400 flex items-center gap-1">
+            <span className="text-[10px] font-semibold text-gray-400 tracking-wide">
               {enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}
-              <span className="text-gray-600">· tap to flip</span>
             </span>
           </div>
           <div className="space-y-2">
@@ -883,130 +885,227 @@ export function PredictDetails() {
               const h2h = battle.h2h;
               const batterImg = playerImageMap.get(battle.batter.toLowerCase()) || playerImageMap.get(batterLast.toLowerCase());
               const bowlerImg = playerImageMap.get(battle.bowler.toLowerCase()) || playerImageMap.get(bowlerLast.toLowerCase());
-              // Extract stat lead from insight (bold the first number found)
-              const insightParts = battle.insight
-                ? battle.insight.replace(/(\d+(?:\.\d+)?(?:\s*%)?)/g, '|||$1|||').split('|||')
+              const insightSentence = battle.insight?.split(/(?<=[.!?])\s+/)[0]?.trim();
+              // Extract stat lead from first insight sentence (bold first number found)
+              const insightParts = insightSentence
+                ? insightSentence.replace(/(\d+(?:\.\d+)?(?:\s*%)?)/g, '|||$1|||').split('|||')
                 : null;
 
               return (
                 <div
                   key={i}
-                  className="rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none"
-                  style={{ perspective: '1000px', height: '180px' }}
+                  className="rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none transition-transform duration-150"
+                  style={{
+                    perspective: '1200px',
+                    transform: pressedBattle === i ? 'scale(0.985)' : 'scale(1)',
+                  }}
                   onClick={() => setFlippedBattle(isFlipped ? null : i)}
+                  onPointerDown={() => setPressedBattle(i)}
+                  onPointerUp={() => setPressedBattle(null)}
+                  onPointerCancel={() => setPressedBattle(null)}
+                  onPointerLeave={() => setPressedBattle(null)}
                 >
-                  {/* Flip container */}
+                  {/* Flip container — grid so both faces share height naturally */}
                   <div
-                    className="relative w-full"
                     style={{
-                      height: '180px',
+                      display: 'grid',
                       transformStyle: 'preserve-3d',
                       transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
                       transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
                     }}
                   >
                     {/* ── FRONT FACE ─────────────────────────────── */}
-                    <div className="absolute inset-0 w-full flex flex-col" style={{ backfaceVisibility: 'hidden' }}>
-                      <div className="flex items-stretch flex-1">
+                    <div className="w-full flex flex-col" style={{ backfaceVisibility: 'hidden', gridArea: '1 / 1' }}>
+                      <div className="flex items-stretch">
                         {/* Batter */}
-                        <div className="flex-1 p-3.5" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}18 0%, transparent 70%)` }}>
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <BatIcon className="w-3 h-3 flex-shrink-0" style={{ color: bMeta.primaryColor }} />
-                            <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: bMeta.primaryColor }}>{bMeta.shortName} · Bat</span>
+                        <div className="flex-1 p-3 flex flex-col" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}1a 0%, transparent 60%)` }}>
+                          {/* Team · Role pill */}
+                          <div className="mb-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                              background: `${bMeta.primaryColor}35`,
+                              border: `1px solid ${bMeta.primaryColor}80`,
+                            }}>
+                              <BatIcon className="w-2.5 h-2.5 text-white/90" />
+                              {bMeta.shortName} · Bat
+                            </span>
                           </div>
-                          {batterImg && (
-                            <img src={batterImg} alt={batterLast} className="w-10 h-10 rounded-full object-cover object-top mb-1.5 ring-2" style={{ ringColor: bMeta.primaryColor }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          )}
-                          <p className="text-xl font-black text-white leading-none tracking-tight">{batterLast}</p>
-                          {batterStats ? (
-                            <p className="text-[8px] font-mono text-gray-400 mt-1.5">Avg {batterStats.batting_avg?.toFixed(0)} · SR {batterStats.batting_sr?.toFixed(0)}</p>
-                          ) : (
-                            <p className="text-[8px] text-gray-400 mt-1.5">{battle.batter_team}</p>
+                          {/* Photo + Name row */}
+                          <div className="flex items-center gap-3 mb-2">
+                            {batterImg && (
+                              <img src={batterImg} alt={batterLast} className="w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight">{batterLast}</p>
+                              {batterStats ? (
+                                <p className="text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
+                              ) : null}
+                              {h2h && (
+                                <p className="text-[8px] font-mono text-cricket-300 mt-1 leading-none whitespace-nowrap">{h2h.runs_scored} runs vs {bowlerLast}</p>
+                              )}
+                            </div>
+                          </div>
+                          {/* Form strip — last 5 scores */}
+                          {battle.batter_scores && (
+                            <div className="flex items-center gap-1 mt-auto pt-2">
+                              <span className="text-[6.5px] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
+                              {battle.batter_scores.map((score, fi) => (
+                                <span key={fi} className="min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
+                                  background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
+                                  color: score >= 50 ? '#4ade80' : score >= 25 ? '#fb923c' : '#f87171',
+                                  border: `1px solid ${score >= 50 ? '#16a34a88' : score >= 25 ? '#d9770688' : '#dc262688'}`,
+                                }}>{score}</span>
+                              ))}
+                            </div>
                           )}
                         </div>
                         {/* VS divider */}
-                        <div className="flex flex-col items-center justify-center px-2 bg-gray-900/40 shrink-0 gap-1">
-                          <span className="text-[9px] font-black text-gray-500 tracking-widest">VS</span>
-                          {h2h && <span className="text-[7px] text-gray-600">{h2h.dismissals}W</span>}
+                        <div className="w-12 flex flex-col items-center justify-center bg-gray-900/50 shrink-0 gap-1 border-x border-gray-700/40">
+                          <span className="text-[8px] font-black text-gray-500 tracking-widest">VS</span>
+                          {h2h ? (
+                            <>
+                              <span className="text-[20px] font-black text-white leading-none">{h2h.dismissals}</span>
+                              <span className="text-[7px] font-black tracking-wider text-gray-300">WKT</span>
+                            </>
+                          ) : (
+                            <span className="text-[7px] text-gray-500">—</span>
+                          )}
                         </div>
                         {/* Bowler */}
-                        <div className="flex-1 p-3.5 text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}18 0%, transparent 70%)` }}>
-                          <div className="flex items-center justify-end gap-1.5 mb-1.5">
-                            <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: wMeta.primaryColor }}>{wMeta.shortName} · Bowl</span>
-                            <BowlIcon className="w-3 h-3 flex-shrink-0" style={{ color: wMeta.primaryColor }} />
+                        <div className="flex-1 p-3 flex flex-col text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}1a 0%, transparent 60%)` }}>
+                          {/* Team · Role pill */}
+                          <div className="mb-2 flex justify-end">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                              background: `${wMeta.primaryColor}35`,
+                              border: `1px solid ${wMeta.primaryColor}80`,
+                            }}>
+                              {wMeta.shortName} · Bowl
+                              <BowlIcon className="w-2.5 h-2.5 text-white/90" />
+                            </span>
                           </div>
-                          {bowlerImg && (
-                            <img src={bowlerImg} alt={bowlerLast} className="w-10 h-10 rounded-full object-cover object-top mb-1.5 ring-2 ml-auto" style={{ ringColor: wMeta.primaryColor }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          )}
-                          <p className="text-xl font-black text-white leading-none tracking-tight">{bowlerLast}</p>
-                          {bowlerStats ? (
-                            <p className="text-[8px] font-mono text-gray-400 mt-1.5">{bowlerStats.bowling_wickets} wkts · Econ {bowlerStats.bowling_economy?.toFixed(1)}</p>
-                          ) : (
-                            <p className="text-[8px] text-gray-400 mt-1.5">{battle.bowler_team}</p>
+                          {/* Photo + Name row */}
+                          <div className="flex items-center justify-end gap-3 mb-2">
+                            <div className="min-w-0 flex-1 text-right">
+                              <p className="text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight">{bowlerLast}</p>
+                              {bowlerStats ? (
+                                <p className="text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{bowlerStats.bowling_wickets} WKTS · {bowlerStats.bowling_economy?.toFixed(1)} ECO</p>
+                              ) : null}
+                              {h2h && (
+                                <p className="text-[8px] font-mono text-amber-300 mt-1 leading-none whitespace-nowrap">{h2h.dot_pct}% dot balls</p>
+                              )}
+                            </div>
+                            {bowlerImg && (
+                              <img src={bowlerImg} alt={bowlerLast} className="w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            )}
+                          </div>
+                          {/* Form strip — last 5 wicket hauls */}
+                          {battle.bowler_figures && (
+                            <div className="flex items-center justify-end gap-1 mt-auto pt-2">
+                              {battle.bowler_figures.map((wkts, fi) => (
+                                <span key={fi} className="min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
+                                  background: wkts >= 3 ? '#16a34a55' : wkts >= 1 ? '#d9770655' : '#dc262655',
+                                  color: wkts >= 3 ? '#4ade80' : wkts >= 1 ? '#fb923c' : '#f87171',
+                                  border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
+                                }}>{wkts}W</span>
+                              ))}
+                              <span className="text-[6.5px] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
+                            </div>
                           )}
                         </div>
                       </div>
-                      {/* Option A insight: stat-lead, no quotes */}
+                      {/* Insight strip — single row */}
                       {insightParts && (
-                        <div className="px-4 py-2.5 border-t border-gray-700/25 bg-gray-900/30">
-                          <p className="text-[9px] text-gray-300 leading-relaxed">
-                            ⚡ {insightParts.map((part, j) => {
+                        <div className="px-3 py-2 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2">
+                          <div className="text-[9px] text-gray-300 leading-tight flex-1 min-w-0 line-clamp-2 flex items-start gap-1">
+                            <SparkleIcon className="w-3 h-3 text-cricket-300 shrink-0 mt-px" />
+                            <span>{insightParts.map((part, j) => {
                               const isNum = /^\d/.test(part);
                               return isNum
                                 ? <strong key={j} className="text-white font-bold">{part}</strong>
                                 : <span key={j}>{part}</span>;
-                            })}
-                          </p>
+                            })}</span>
+                          </div>
+                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-2 py-0.5 text-[7px] font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap">
+                            <span className="relative mr-1 flex h-2 w-2">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cricket-300 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-cricket-200" />
+                            </span>
+                            Flip →
+                          </span>
                         </div>
                       )}
                     </div>
 
                     {/* ── BACK FACE — H2H Matchup Stats ─────────── */}
                     <div
-                      className="absolute inset-0 w-full rounded-xl overflow-hidden"
-                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                      className="w-full rounded-xl overflow-hidden"
+                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', gridArea: '1 / 1' }}
                     >
                       <div
-                        className="h-full p-4 flex flex-col justify-between"
-                        style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}14 0%, #111827 40%, ${wMeta.primaryColor}14 100%)` }}
+                        className="p-2.5 flex flex-col gap-1.5"
+                        style={{
+                          background: `radial-gradient(circle at 15% 20%, ${bMeta.primaryColor}33 0%, transparent 38%), radial-gradient(circle at 85% 80%, ${wMeta.primaryColor}33 0%, transparent 38%), linear-gradient(135deg, #0a1222 0%, #0f1a33 48%, #121a2c 100%)`,
+                        }}
                       >
                         {h2h ? (
                           <>
                             {/* Header */}
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">H2H Matchup</span>
-                              <span className="text-[8px] font-mono text-gray-500">{batterLast} vs {bowlerLast}</span>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[8px] font-bold uppercase tracking-widest text-white">H2H Matchup</span>
+                              <span className="text-[8px] font-mono text-gray-100">{batterLast} vs {bowlerLast}</span>
                             </div>
                             {/* Stats row */}
-                            <div className="grid grid-cols-4 gap-1 mb-2">
+                            <div className="grid grid-cols-4 gap-1 mb-1">
                               {[
                                 { label: 'DISMISSALS', value: String(h2h.dismissals), accent: wMeta.primaryColor },
-                                { label: 'BALLS FACED', value: String(h2h.balls_faced), accent: '#9ca3af' },
-                                { label: 'DOT %', value: `${h2h.dot_pct}%`, accent: '#9ca3af' },
+                                { label: 'BALLS FACED', value: String(h2h.balls_faced), accent: '#f8fafc' },
+                                { label: 'DOT %', value: `${h2h.dot_pct}%`, accent: '#f8fafc' },
                                 { label: 'BDRY %', value: `${h2h.boundary_pct}%`, accent: bMeta.primaryColor },
                               ].map(stat => (
-                                <div key={stat.label} className="bg-gray-900/50 rounded-lg p-2 text-center">
-                                  <p className="text-sm font-black leading-none" style={{ color: stat.accent }}>{stat.value}</p>
-                                  <p className="text-[6px] font-bold uppercase tracking-widest text-gray-500 mt-1">{stat.label}</p>
+                                <div key={stat.label} className="rounded-lg p-1 text-center border border-white/20 shadow-[inset_0_0_0.5px_rgba(255,255,255,0.35)]" style={{ background: 'rgba(10,20,42,0.92)' }}>
+                                  <p className="text-[19px] font-black leading-none drop-shadow-[0_0_8px_rgba(255,255,255,0.22)]" style={{ color: stat.accent }}>{stat.value}</p>
+                                  <p className="text-[6px] font-bold uppercase tracking-widest text-gray-100 mt-1">{stat.label}</p>
                                 </div>
                               ))}
                             </div>
+                            {/* Visual pressure bars */}
+                            <div className="grid grid-cols-2 gap-1.5 mb-1">
+                              <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[7px] font-bold uppercase tracking-wider text-white">Dot-ball pressure</span>
+                                  <span className="text-[9px] font-black text-white">{h2h.dot_pct}%</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-gray-700/70 overflow-hidden">
+                                  <div className="h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ width: `${Math.min(100, Math.max(0, h2h.dot_pct))}%`, backgroundColor: wMeta.primaryColor }} />
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[7px] font-bold uppercase tracking-wider text-white">Boundary threat</span>
+                                  <span className="text-[9px] font-black text-white">{h2h.boundary_pct}%</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-gray-700/70 overflow-hidden">
+                                  <div className="h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ width: `${Math.min(100, Math.max(0, h2h.boundary_pct))}%`, backgroundColor: bMeta.primaryColor }} />
+                                </div>
+                              </div>
+                            </div>
                             {/* Last 5 encounters */}
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[7px] text-gray-500 uppercase tracking-wider shrink-0">Last 5</span>
-                              <div className="flex gap-1">
+                            <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[7px] text-white font-bold uppercase tracking-wider shrink-0">Last 5</span>
+                                <span className="text-[7px] text-gray-100">W = bowler wicket</span>
+                              </div>
+                              <div className="flex gap-1.5">
                                 {h2h.last_5.map((r, j) => (
                                   <span
                                     key={j}
-                                    className="w-5 h-5 rounded text-[7px] font-bold flex items-center justify-center"
+                                    className="w-[22px] h-[22px] rounded-md text-[8px] font-black flex items-center justify-center border border-white/20 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
                                     style={{
-                                      background: r === 'W' ? `${wMeta.primaryColor}30` : `${bMeta.primaryColor}20`,
-                                      color: r === 'W' ? wMeta.primaryColor : bMeta.primaryColor,
+                                      background: r === 'W' ? `${wMeta.primaryColor}88` : `${bMeta.primaryColor}66`,
+                                      color: r === 'W' ? '#ffffff' : '#ffffff',
                                     }}
                                   >{r === 'W' ? 'W' : '—'}</span>
                                 ))}
                               </div>
-                              <span className="text-[7px] text-gray-600 ml-1">W = bowler got wicket</span>
                             </div>
                           </>
                         ) : (

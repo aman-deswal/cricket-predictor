@@ -129,6 +129,8 @@ export interface MatchEnrichment {
     bowler?: string;
     bowler_team?: string;
     insight?: string;
+    batter_scores?: number[];       // last 5 batting scores (newest last)
+    bowler_figures?: number[];      // last 5 wicket counts per game (newest last)
     h2h?: {
       dismissals: number;
       balls_faced: number;

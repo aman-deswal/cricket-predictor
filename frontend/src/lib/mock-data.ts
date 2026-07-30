@@ -371,16 +371,22 @@ const demoMatchEnrichment: MatchEnrichment[] = [
       {
         batter: 'Virat Kohli', batter_team: 'India', bowler: 'Pat Cummins', bowler_team: 'Australia',
         insight: 'Kohli averages 65 against Cummins in ODIs — one of cricket\'s great modern rivalries. If Cummins gets him early, Australia are firmly back in it.',
+        batter_scores: [76, 112, 58, 33, 89],
+        bowler_figures: [3, 1, 2, 0, 2],
         h2h: { dismissals: 4, balls_faced: 112, runs_scored: 93, dot_pct: 41, boundary_pct: 19, last_5: ['NW', 'W', 'NW', 'W', 'NW'] },
       },
       {
         batter: 'Travis Head', batter_team: 'Australia', bowler: 'Jasprit Bumrah', bowler_team: 'India',
         insight: 'Head\'s aggressive powerplay approach runs straight into Bumrah\'s reverse swing at Wankhede — this battle in overs 1–10 sets the tone for the chase.',
+        batter_scores: [72, 18, 4, 91, 44],
+        bowler_figures: [3, 3, 2, 1, 2],
         h2h: { dismissals: 5, balls_faced: 67, runs_scored: 41, dot_pct: 55, boundary_pct: 13, last_5: ['W', 'W', 'NW', 'W', 'W'] },
       },
       {
         batter: 'Shubman Gill', batter_team: 'India', bowler: 'Mitchell Starc', bowler_team: 'Australia',
         insight: 'Starc\'s left-arm angle targets Gill\'s off stump hard — if Gill survives the new ball, India can post 340+.',
+        batter_scores: [87, 56, 24, 103, 8],
+        bowler_figures: [1, 2, 2, 1, 3],
         h2h: { dismissals: 3, balls_faced: 58, runs_scored: 47, dot_pct: 38, boundary_pct: 24, last_5: ['NW', 'NW', 'W', 'NW', 'W'] },
       },
     ],
