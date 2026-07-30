@@ -824,22 +824,22 @@ export function PredictDetails() {
                           {/* Photo + Name row */}
                           <div className="flex items-center gap-2 sm:gap-3 mb-2">
                             {batterImg && (
-                              <img src={batterImg} alt={batterLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={batterImg} alt={batterLast} className="hidden sm:block w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="text-lg sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{batterLast}</p>
+                              <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{batterLast}</p>
                               {batterStats ? (
-                                <p className="text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
+                                <p className="hidden sm:block text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
                               ) : null}
                               {h2h && (
-                                <p className="text-[8px] font-mono text-cricket-300 mt-1 leading-none whitespace-nowrap">{h2h.runs_scored} runs vs {bowlerLast}</p>
+                                <p className="text-[8px] font-mono text-cricket-300 mt-1 leading-none">{h2h.runs_scored} runs vs {bowlerLast}</p>
                               )}
                             </div>
                           </div>
                           {/* Form strip — last 5 scores */}
                           {battle.batter_scores && (
                             <div className="flex items-center gap-1 mt-auto pt-2">
-                              <span className="text-[6.5px] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[6.5px] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
                               {battle.batter_scores.slice(0, 5).map((score, fi) => (
                                 <span key={fi} className="min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
                                   background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
@@ -877,16 +877,16 @@ export function PredictDetails() {
                           {/* Photo + Name row */}
                           <div className="flex items-center justify-end gap-2 sm:gap-3 mb-2">
                             <div className="min-w-0 flex-1 text-right">
-                              <p className="text-lg sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{bowlerLast}</p>
+                              <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{bowlerLast}</p>
                               {bowlerStats ? (
-                                <p className="text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{bowlerStats.bowling_wickets} WKTS · {bowlerStats.bowling_economy?.toFixed(1)} ECO</p>
+                                <p className="hidden sm:block text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{bowlerStats.bowling_wickets} WKTS · {bowlerStats.bowling_economy?.toFixed(1)} ECO</p>
                               ) : null}
                               {h2h && (
-                                <p className="text-[8px] font-mono text-amber-300 mt-1 leading-none whitespace-nowrap">{h2h.dot_pct}% dot balls</p>
+                                <p className="text-[8px] font-mono text-amber-300 mt-1 leading-none">{h2h.dot_pct}% dot balls</p>
                               )}
                             </div>
                             {bowlerImg && (
-                              <img src={bowlerImg} alt={bowlerLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={bowlerImg} alt={bowlerLast} className="hidden sm:block w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             )}
                           </div>
                           {/* Form strip — last 5 wicket hauls */}
@@ -899,7 +899,7 @@ export function PredictDetails() {
                                   border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
                                 }}>{wkts}W</span>
                               ))}
-                              <span className="text-[6.5px] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[6.5px] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
                             </div>
                           )}
                         </div>
@@ -933,7 +933,7 @@ export function PredictDetails() {
                       style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', gridArea: '1 / 1' }}
                     >
                       <div
-                        className="p-2.5 flex flex-col gap-1.5"
+                        className="p-3 sm:p-2.5 flex flex-col gap-1.5"
                         style={{
                           background: `radial-gradient(circle at 15% 20%, ${bMeta.primaryColor}33 0%, transparent 38%), radial-gradient(circle at 85% 80%, ${wMeta.primaryColor}33 0%, transparent 38%), linear-gradient(135deg, #0a1222 0%, #0f1a33 48%, #121a2c 100%)`,
                         }}
