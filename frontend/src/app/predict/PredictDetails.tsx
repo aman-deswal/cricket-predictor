@@ -210,7 +210,7 @@ export function PredictDetails() {
 
   const expertPreview = enrichment?.expert_preview?.trim() || '';
   const playerUpdates = enrichment?.player_updates ?? [];
-  const sourceLinks = enrichment?.source_links ?? [];
+  const sourceLinks = (enrichment?.source_links ?? []).filter((s) => s.source !== 'demo');
   const researchNeedsAccordion = expertPreview.length > 260 || playerUpdates.length > 2 || sourceLinks.length > 2;
   const visiblePreview = expandedSections.researchNotes || expertPreview.length <= 260
     ? expertPreview
