@@ -1,12 +1,17 @@
 """Supabase database client wrapper."""
 
 import os
+import re
 from typing import Optional
 
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
+
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 def get_client() -> Client:
@@ -155,7 +160,14 @@ def get_recent_results(days: int = 14) -> list[dict]:
     if not response.data:
         return []
 
-    match_ids = [row.get("match_id", "") for row in response.data if row.get("match_id")]
+    # predictions.match_id is UUID-typed in production; skip non-UUID IDs
+    # (e.g. espn-1547116), which otherwise trigger PostgREST 400s.
+    match_ids = []
+    for row in response.data:
+        mid = row.get("match_id", "")
+        if isinstance(mid, str) and UUID_RE.match(mid):
+            match_ids.append(mid)
+
     pred_map: dict[str, dict] = {}
     # Avoid PostgREST `in.(...)` parser/type issues for mixed match_id formats
     # (UUID-like and espn-* string IDs); fetch each row explicitly.
