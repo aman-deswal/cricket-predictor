@@ -267,6 +267,21 @@ export function PredictDetails() {
         )}
       </div>
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
+      <style>{`
+        @keyframes pickEntrance {
+          0%   { opacity: 0; box-shadow: 0 0 0 0 rgba(251,191,36,0); transform: scale(0.88); }
+          55%  { opacity: 1; box-shadow: 0 0 22px 5px rgba(251,191,36,0.45); transform: scale(1.06); }
+          100% { opacity: 1; box-shadow: 0 0 8px 1px rgba(251,191,36,0.22); transform: scale(1); }
+        }
+        @keyframes pickBreath {
+          0%, 100% { box-shadow: 0 0 6px 1px rgba(251,191,36,0.18); }
+          50%       { box-shadow: 0 0 14px 3px rgba(251,191,36,0.34); }
+        }
+        .pick-badge {
+          animation: pickEntrance 0.65s cubic-bezier(0.22,1,0.36,1) forwards,
+                     pickBreath 2.8s ease-in-out 0.65s infinite;
+        }
+      `}</style>
       <motion.div
         className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
         initial={{ opacity: 0, scale: 0.95 }}
@@ -284,9 +299,21 @@ export function PredictDetails() {
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
+            {/* Pick badge above flag */}
+            {prediction && prediction.team1_win_probability >= prediction.team2_win_probability ? (
+              <div className="mb-2 flex items-center justify-center">
+                <span className="pick-badge inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
+                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
+                  Our Pick
+                </span>
+              </div>
+            ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
-              style={{ ['--tw-ring-color' as string]: team1Meta.primaryColor }}
+              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
+              style={prediction && prediction.team1_win_probability >= prediction.team2_win_probability
+                ? { boxShadow: `0 0 0 3px ${teamColor1}, 0 0 0 5px ${teamColor1}44, 0 0 20px ${teamColor1}55`, outline: 'none' }
+                : { boxShadow: `0 0 0 2px ${team1Meta.primaryColor}55` }
+              }
               whileHover={{ scale: 1.1 }}
             >
               {team1Meta.countryCode ? (
@@ -366,18 +393,16 @@ export function PredictDetails() {
               </div>
             )}
             <span className="text-[10px] text-cricket-300 mt-1 uppercase tracking-wider font-semibold">AI Verdict</span>
-            {prediction && (
-              <div className="mt-1 flex items-center gap-3 text-[9px]">
-                <span className="inline-flex items-center gap-1 text-gray-300">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: teamColor1 }} />
-                  {team1Meta.shortName}
-                </span>
-                <span className="inline-flex items-center gap-1 text-gray-300">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: teamColor2 }} />
-                  {team2Meta.shortName}
-                </span>
-              </div>
-            )}
+            {prediction && (() => {
+              const isTeam1Pick = prediction.team1_win_probability >= prediction.team2_win_probability;
+              const pickColor = isTeam1Pick ? teamColor1 : teamColor2;
+              const pickName = isTeam1Pick ? team1Meta.shortName : team2Meta.shortName;
+              return (
+                <div className="mt-1 text-[11px] font-black uppercase tracking-wider" style={{ color: pickColor }}>
+                  {pickName}
+                </div>
+              );
+            })()}
           </motion.div>
 
           {/* Team 2 */}
@@ -387,9 +412,21 @@ export function PredictDetails() {
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
+            {/* Pick badge above flag */}
+            {prediction && prediction.team2_win_probability > prediction.team1_win_probability ? (
+              <div className="mb-2 flex items-center justify-center">
+                <span className="pick-badge inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
+                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
+                  Our Pick
+                </span>
+              </div>
+            ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden ring-3 ring-offset-2 ring-offset-cricket-950 shadow-xl"
-              style={{ ['--tw-ring-color' as string]: team2Meta.primaryColor }}
+              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
+              style={prediction && prediction.team2_win_probability > prediction.team1_win_probability
+                ? { boxShadow: `0 0 0 3px ${teamColor2}, 0 0 0 5px ${teamColor2}44, 0 0 20px ${teamColor2}55` }
+                : { boxShadow: `0 0 0 2px ${team2Meta.primaryColor}55` }
+              }
               whileHover={{ scale: 1.1 }}
             >
               {team2Meta.countryCode ? (
@@ -594,41 +631,44 @@ export function PredictDetails() {
         const EdgeRow = ({ shortName, color, aiPct, impliedPct, edgePct }: { shortName: string; color: string; aiPct: number; impliedPct: number; edgePct: number }) => {
           const isValue = edgePct >= 7;
           return (
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-white w-10 shrink-0">{shortName}</span>
-              <div className="flex-1 space-y-1.5">
-                {/* AI bar */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2.5 bg-gray-800/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: edgeBarsReady ? `${aiPct}%` : '0%',
-                        backgroundColor: color,
-                        transition: 'width 0.9s ease-out 0.4s',
-                      }}
-                    />
-                  </div>
-                  <span className="text-[9px] font-bold tabular-nums w-7 text-right" style={{ color }}>{aiPct}%</span>
-                  <span className="text-[8px] text-gray-400 w-4">AI</span>
-                </div>
-                {/* Book bar */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2.5 bg-gray-800/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full opacity-35"
-                      style={{ width: `${impliedPct}%`, backgroundColor: color }}
-                    />
-                  </div>
-                  <span className="text-[9px] tabular-nums w-7 text-right text-gray-300">{impliedPct}%</span>
-                  <span className="text-[8px] text-gray-400 w-4">Bk</span>
-                </div>
+            <div className="rounded-xl p-3.5" style={{ background: `${color}12`, border: `1px solid ${color}28` }}>
+              {/* Team name + edge badge */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-black text-white tracking-wider">{shortName}</span>
+                {isValue ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-400/10 border border-emerald-400/25 px-2 py-0.5 rounded-full">
+                    ↑ VALUE &nbsp;+{edgePct}%
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-gray-500 font-semibold">No edge</span>
+                )}
               </div>
-              {isValue ? (
-                <span className="text-emerald-400 font-black text-[9px] shrink-0 w-14 text-right">↑ +{edgePct}%</span>
-              ) : (
-                <span className="w-14" />
-              )}
+              {/* AI bar */}
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 w-7 shrink-0">AI</span>
+                <div className="flex-1 h-3 bg-gray-800/70 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: edgeBarsReady ? `${aiPct}%` : '0%',
+                      backgroundColor: color,
+                      transition: 'width 0.9s ease-out 0.4s',
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-black tabular-nums w-9 text-right" style={{ color }}>{aiPct}%</span>
+              </div>
+              {/* Market bar */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-500 w-7 shrink-0">MKT</span>
+                <div className="flex-1 h-3 bg-gray-800/70 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full opacity-40"
+                    style={{ width: `${impliedPct}%`, backgroundColor: color }}
+                  />
+                </div>
+                <span className="text-sm font-black tabular-nums w-9 text-right text-gray-400">{impliedPct}%</span>
+              </div>
             </div>
           );
         };
@@ -648,12 +688,12 @@ export function PredictDetails() {
                 via {o.bookmaker}
               </span>
             </div>
-            <div className="space-y-3 mb-3">
+            <div className="space-y-2.5 mb-3">
               <EdgeRow shortName={team1Meta.shortName} color={teamColor1} aiPct={ai1} impliedPct={implied1} edgePct={edge1} />
               <EdgeRow shortName={team2Meta.shortName} color={teamColor2} aiPct={ai2} impliedPct={implied2} edgePct={edge2} />
             </div>
-            <p className="text-[8px] text-gray-400 leading-relaxed">
-              Top bar = AI model · Bottom bar (faded) = bookmaker implied · ↑ edge fires when gap ≥ 7 pts
+            <p className="text-[9px] text-gray-500 leading-relaxed">
+              AI bar vs Market bar · ↑ Value fires when gap ≥ 7 pts
             </p>
           </motion.div>
         );
