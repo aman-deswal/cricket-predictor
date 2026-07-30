@@ -51,7 +51,7 @@ export function Navbar() {
               <span className="text-white">Sense</span>
             </span>
             {demoEnabled && (
-              <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-amber-500/10 text-amber-300 border border-amber-500/20">
                 Demo
               </span>
             )}
