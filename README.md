@@ -108,8 +108,9 @@ flowchart LR
 | `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN; player stats + headshots (CricAPI optional) |
 | `fetch-headshots.yml` | monthly | Full headshot refresh pass |
 | `fetch-odds.yml` | every 2 hours | Pull bookmaker market data and map to matches |
-| `enrich-matches.yml` | every 6 hours + after results run | LLM web/news enrichment with ESPN context |
-| `run-predictions.yml` | daily (06:00 UTC) | Generate probabilities + reasoning + toss insight + edge score |
+| `enrich-matches.yml` | every 6 hours + after results run | Data-backed enrichment, with optional AI garnish when explicitly enabled |
+| `run-predictions.yml` | daily (06:00 UTC) | Generate deterministic probabilities, reasoning, toss insight, and edge score |
+| `copilot-setup-steps.yml` | on demand / changes to Copilot config | Prepare GitHub Copilot cloud agent with Python deps and deterministic pipeline tooling |
 | `calibrate.yml` | weekly | Compute isotonic calibration bins |
 | `deploy.yml` | on `main` push / manual | Build static frontend and deploy to GitHub Pages |
 
@@ -211,6 +212,15 @@ Data-mode behavior:
 | `ODDS_API_KEY` | The Odds API key |
 | `ENABLE_LLM_GARNISH` | *(Optional)* Set to `true` only if you intentionally want runtime LLM garnish for enrichment and have a live provider path configured. Defaults to `false`. |
 | `LLM_PROFILE`, `LLM_PROFILE_MAP`, `LLM_ROUTE_MAP`, `LLM_FALLBACK_MODELS`, `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY` | *(Optional garnish only)* Runtime LLM routing for enrichment copy. Core predictions no longer depend on these. |
+
+### Copilot cloud agent / automation
+
+If you want to use **GitHub Copilot automations** for garnish instead of paid runtime model APIs:
+
+1. Keep the repo **private or internal** and enable Copilot cloud agent / automations in the repo settings.
+2. Add `SUPABASE_URL` and `SUPABASE_KEY` to the repository's **`copilot` environment** so the agent can read/write the same live data path the frontend uses.
+3. Use `.github/copilot-instructions.md` to constrain Copilot to garnish-only updates on top of the deterministic core.
+4. Treat Copilot as a **post-refresh narrative pass**, not as the source of truth for probabilities or edge math.
 
 ### Frontend (`frontend/.env.local`)
 | Variable | Description |
