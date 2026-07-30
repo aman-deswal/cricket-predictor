@@ -156,13 +156,22 @@ def get_recent_results(days: int = 14) -> list[dict]:
         return []
 
     match_ids = [row.get("match_id", "") for row in response.data if row.get("match_id")]
-    pred_response = (
-        client.table("predictions")
-        .select("match_id, team1, team2, match_type")
-        .in_("match_id", match_ids)
-        .execute()
-    ) if match_ids else None
-    pred_map = {row.get("match_id"): row for row in (pred_response.data or [])} if pred_response else {}
+    pred_map: dict[str, dict] = {}
+    # Avoid PostgREST `in.(...)` parser/type issues for mixed match_id formats
+    # (UUID-like and espn-* string IDs); fetch each row explicitly.
+    for mid in match_ids:
+        try:
+            pred_response = (
+                client.table("predictions")
+                .select("match_id, team1, team2, match_type")
+                .eq("match_id", mid)
+                .limit(1)
+                .execute()
+            )
+            if pred_response.data:
+                pred_map[mid] = pred_response.data[0]
+        except Exception:
+            continue
 
     results = []
     for p in response.data:
