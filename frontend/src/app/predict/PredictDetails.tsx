@@ -472,6 +472,115 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
+      {/* 1. Sportsbook Odds | Reasoning — side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Sportsbook Odds */}
+        <motion.div
+          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
+            odds.length > 0 ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+          }`}
+          {...fadeUp}
+          transition={{ delay: 0.22 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
+              Sportsbook Odds
+            </h2>
+            {odds.length > 0 && <span className="text-[9px] text-gray-300">{odds.length} bookmakers</span>}
+          </div>
+          {odds.length > 0 ? (
+            <div className="space-y-2">
+              {odds.slice(0, 4).map((o) => {
+                const aiProb1 = prediction?.team1_win_probability;
+                const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
+                const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
+                const isValue1 = diff1 && Number(diff1) > 10;
+                const isValue2 = diff1 && Number(diff1) < -10;
+
+                return (
+                  <button
+                    key={`${o.bookmaker}-${o.fetched_at}`}
+                    type="button"
+                    onClick={() => openExternalMarket(getBookmakerMarketUrl(o.bookmaker, match, o.market))}
+                    className="w-full appearance-none flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-cricket-500/40 hover:bg-gray-800/65 transition-colors text-left"
+                  >
+                    <span className="text-[10px] text-gray-300 font-medium w-24 truncate">{o.bookmaker}</span>
+                    <div className="flex items-center gap-2.5">
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
+                        {decimalToAmerican(o.team1_odds)}
+                        {isValue1 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
+                      </span>
+                      <span className="text-gray-400 text-[10px]">|</span>
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
+                        {decimalToAmerican(o.team2_odds)}
+                        {isValue2 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
+                      </span>
+                      <svg className="w-3 h-3 text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-300 text-center py-4">No sportsbook odds available yet</p>
+          )}
+        </motion.div>
+
+        {/* Our Take */}
+        {prediction ? (
+          <motion.div
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
+            {...fadeUp}
+            transition={{ delay: 0.25 }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
+                Our Take
+              </h2>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  prediction.confidence === 'high'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : prediction.confidence === 'medium'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-red-500/20 text-red-300'
+                }`}
+              >
+                {prediction.confidence} confidence
+              </span>
+            </div>
+            <ul className="space-y-2">
+              {visibleReasoning.map((sentence: string, i: number) => (
+                  <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
+                    <span className="mt-1.5 w-1 h-1 rounded-full bg-cricket-400 flex-shrink-0" />
+                    <span>{sentence.trim()}</span>
+                  </li>
+                ))}
+            </ul>
+            {reasoningSentences.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
+                className="mt-3 text-[10px] font-medium text-cricket-300 hover:text-cricket-200 transition-colors"
+              >
+                {expandedSections.ourTake ? 'Show less' : 'Show more'}
+              </button>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            {...fadeUp}
+            transition={{ delay: 0.25 }}
+            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 flex flex-col items-center justify-center text-center"
+          >
+            <p className="text-sm font-semibold text-gray-300">Prediction Pending</p>
+            <p className="text-gray-400 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
+          </motion.div>
+        )}
+      </div>
+
       {/* AI vs Market Edge — the betting value signal */}
       {odds.length > 0 && prediction && (() => {
         const o = odds[0];
@@ -699,160 +808,6 @@ export function PredictDetails() {
           </motion.div>
         );
       })()}
-
-      {/* Series context (moved higher for relevance) */}
-      {espnData && (espnData.series_scoreline || espnData.series_note || espnData.standings.length > 0 || espnData.toss_winner) && (
-        <motion.div
-          className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-cricket-800/30 mb-4"
-          {...fadeUp}
-          transition={{ delay: 0.2 }}
-        >
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h12v10H2z" /><path d="M2 6h12" /><path d="M5 3v3" /></svg>
-            Series
-          </h2>
-          <div className="space-y-2">
-            {espnData.series_scoreline && (
-              <p className="text-xs text-cricket-400 font-semibold">{espnData.series_scoreline}</p>
-            )}
-            {espnData.series_note && !espnData.series_scoreline && (
-              <p className="text-xs text-cricket-400 font-medium">{espnData.series_note}</p>
-            )}
-            {espnData.standings.length > 0 && (
-              <div className="space-y-1 mt-1">
-                {espnData.standings.slice(0, 4).map((team, i) => (
-                  <div key={i} className="flex items-center justify-between text-[10px] py-0.5 px-1.5 rounded bg-gray-800/30">
-                    <span className="text-white font-medium">{team.team_name}</span>
-                    <div className="flex gap-2 text-gray-400">
-                      {team.stats.matchesPlayed && <span>P:{team.stats.matchesPlayed}</span>}
-                      {team.stats.matchesWon && <span className="text-green-400">W:{team.stats.matchesWon}</span>}
-                      {team.stats.matchesLost && <span className="text-red-400">L:{team.stats.matchesLost}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {espnData.toss_winner && (
-              <div className="pt-1 border-t border-gray-800/50">
-                <p className="text-[10px] text-gray-300">
-                  <span className="text-gray-300">Toss:</span>{' '}
-                  <span className="font-medium text-white">{espnData.toss_winner}</span>
-                  {espnData.toss_decision && <> elected to <span className="text-cricket-400">{espnData.toss_decision}</span></>}
-                </p>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {/* 1. Sportsbook Odds | Reasoning — side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Sportsbook Odds */}
-        <motion.div
-          className={`bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border transition-all ${
-            odds.length > 0 ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
-          }`}
-          {...fadeUp}
-          transition={{ delay: 0.22 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
-              Sportsbook Odds
-            </h2>
-            {odds.length > 0 && <span className="text-[9px] text-gray-300">{odds.length} bookmakers</span>}
-          </div>
-          {odds.length > 0 ? (
-            <div className="space-y-2">
-              {odds.slice(0, 4).map((o) => {
-                const aiProb1 = prediction?.team1_win_probability;
-                const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
-                const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
-                const isValue1 = diff1 && Number(diff1) > 10;
-                const isValue2 = diff1 && Number(diff1) < -10;
-
-                return (
-                  <button
-                    key={`${o.bookmaker}-${o.fetched_at}`}
-                    type="button"
-                    onClick={() => openExternalMarket(getBookmakerMarketUrl(o.bookmaker, match, o.market))}
-                    className="w-full appearance-none flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-cricket-500/40 hover:bg-gray-800/65 transition-colors text-left"
-                  >
-                    <span className="text-[10px] text-gray-300 font-medium w-24 truncate">{o.bookmaker}</span>
-                    <div className="flex items-center gap-2.5">
-                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                        {decimalToAmerican(o.team1_odds)}
-                        {isValue1 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
-                      </span>
-                      <span className="text-gray-400 text-[10px]">|</span>
-                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                        {decimalToAmerican(o.team2_odds)}
-                        {isValue2 && <span className="ml-1 text-[8px] text-yellow-400">↑</span>}
-                      </span>
-                      <svg className="w-3 h-3 text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-300 text-center py-4">No sportsbook odds available yet</p>
-          )}
-        </motion.div>
-
-        {/* Our Take */}
-        {prediction ? (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-cricket-800/30"
-            {...fadeUp}
-            transition={{ delay: 0.25 }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
-                Our Take
-              </h2>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                  prediction.confidence === 'high'
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : prediction.confidence === 'medium'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'bg-red-500/20 text-red-300'
-                }`}
-              >
-                {prediction.confidence} confidence
-              </span>
-            </div>
-            <ul className="space-y-2">
-              {visibleReasoning.map((sentence: string, i: number) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
-                    <span className="mt-1.5 w-1 h-1 rounded-full bg-cricket-400 flex-shrink-0" />
-                    <span>{sentence.trim()}</span>
-                  </li>
-                ))}
-            </ul>
-            {reasoningSentences.length > 3 && (
-              <button
-                type="button"
-                onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
-                className="mt-3 text-[10px] font-medium text-cricket-300 hover:text-cricket-200 transition-colors"
-              >
-                {expandedSections.ourTake ? 'Show less' : 'Show more'}
-              </button>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            {...fadeUp}
-            transition={{ delay: 0.25 }}
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-800/20 opacity-50 flex flex-col items-center justify-center text-center"
-          >
-            <p className="text-sm font-semibold text-gray-300">Prediction Pending</p>
-            <p className="text-gray-400 text-xs mt-1">Pipeline hasn&apos;t run yet</p>
-          </motion.div>
-        )}
-      </div>
 
       {/* Key Battles — flip cards */}
       {enrichment?.key_players?.length ? (
