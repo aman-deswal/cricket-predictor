@@ -1388,8 +1388,8 @@ export function PredictDetails() {
                                   style={{ boxShadow: `0 0 0 2px ${roleColor}66` }}
                                 />
                               ) : (
-                                <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${roleColor}15`, boxShadow: `0 0 0 2px ${roleColor}44` }}>
-                                  <RoleIcon className="w-4 h-4" style={{ color: roleColor }} />
+                                <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${roleColor}15`, boxShadow: `0 0 0 2px ${roleColor}44`, color: roleColor }}>
+                                  <RoleIcon className="w-4 h-4" />
                                 </span>
                               )}
                               {player.is_captain && (
