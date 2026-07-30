@@ -786,7 +786,7 @@ export function PredictDetails() {
               return (
                 <div
                   key={i}
-                  className="rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none transition-transform duration-150"
+                  className="mx-1 sm:mx-0 rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none transition-transform duration-150"
                   style={{
                     perspective: '1200px',
                     transform: pressedBattle === i ? 'scale(0.985)' : 'scale(1)',
@@ -813,18 +813,18 @@ export function PredictDetails() {
                         <div className="flex-1 p-3 flex flex-col" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-white" style={{
                               background: `${bMeta.primaryColor}35`,
                               border: `1px solid ${bMeta.primaryColor}80`,
                             }}>
-                              <BatIcon className="w-2.5 h-2.5 text-white/90" />
+                              <BatIcon className="hidden sm:block w-2.5 h-2.5 text-white/90" />
                               {bMeta.shortName} · Bat
                             </span>
                           </div>
                           {/* Photo + Name row */}
                           <div className="flex items-center gap-2 sm:gap-3 mb-2">
                             {batterImg && (
-                              <img src={batterImg} alt={batterLast} className="hidden sm:block w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={batterImg} alt={batterLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             )}
                             <div className="min-w-0 flex-1">
                               <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{batterLast}</p>
@@ -866,12 +866,12 @@ export function PredictDetails() {
                         <div className="flex-1 p-3 flex flex-col text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2 flex justify-end">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-white" style={{
                               background: `${wMeta.primaryColor}35`,
                               border: `1px solid ${wMeta.primaryColor}80`,
                             }}>
                               {wMeta.shortName} · Bowl
-                              <BowlIcon className="w-2.5 h-2.5 text-white/90" />
+                              <BowlIcon className="hidden sm:block w-2.5 h-2.5 text-white/90" />
                             </span>
                           </div>
                           {/* Photo + Name row */}
@@ -886,7 +886,7 @@ export function PredictDetails() {
                               )}
                             </div>
                             {bowlerImg && (
-                              <img src={bowlerImg} alt={bowlerLast} className="hidden sm:block w-16 h-16 rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={bowlerImg} alt={bowlerLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             )}
                           </div>
                           {/* Form strip — last 5 wicket hauls */}
@@ -906,7 +906,7 @@ export function PredictDetails() {
                       </div>
                       {/* Insight strip — single row */}
                       {insightParts && (
-                        <div className="px-3 py-2 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2">
+                        <div className="px-2.5 sm:px-3 py-2 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2">
                           <div className="text-[9px] text-gray-300 leading-tight flex-1 min-w-0 line-clamp-2 flex items-start gap-1">
                             <SparkleIcon className="w-3 h-3 text-cricket-300 shrink-0 mt-px" />
                             <span>{insightParts.map((part, j) => {
@@ -916,12 +916,13 @@ export function PredictDetails() {
                                 : <span key={j}>{part}</span>;
                             })}</span>
                           </div>
-                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap cursor-pointer">
+                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap cursor-pointer">
                             <span className="relative mr-1 flex h-2 w-2">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cricket-300 opacity-75" />
                               <span className="relative inline-flex h-2 w-2 rounded-full bg-cricket-200" />
                             </span>
-                            Flip →
+                            <span className="sm:hidden">Flip</span>
+                            <span className="hidden sm:inline">Flip →</span>
                           </span>
                         </div>
                       )}
