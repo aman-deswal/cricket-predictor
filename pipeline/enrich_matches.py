@@ -11,7 +11,7 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
-from openai import OpenAI
+from openai import APIStatusError
 
 from utils.cricsheet import (
     get_head_to_head,
@@ -31,11 +31,11 @@ from utils.db import (
     get_recent_results,
 )
 from utils.espn import get_espn_enrichment_context, format_espn_context
+from utils.llm import get_llm_client, LLM_MODEL as MODEL
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-MODEL = "openai/gpt-4o"
 REPUTABLE_SOURCES = {
     "BBC Sport",
     "Cricbuzz",
@@ -509,10 +509,7 @@ def sanitize_source_backed_details(details: dict, sources: list[dict]) -> dict:
 
 
 def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = OpenAI(
-        base_url="https://models.github.ai/inference",
-        api_key=os.environ["GITHUB_TOKEN"],
-    )
+    client = get_llm_client()
     prompt = ENRICHMENT_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -523,20 +520,23 @@ def call_llm(match: dict, sources: list[dict], espn_ctx: str = "", recent_result
         espn_context=espn_ctx or "No ESPN data available.",
         recent_results_context=recent_results_ctx or "",
     )
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.1,
-        response_format={"type": "json_object"},
-    )
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
+    except APIStatusError as exc:
+        if exc.status_code in (410, 503):
+            logger.warning(f"LLM unavailable ({exc.status_code}): {exc.message} — falling back to data-backed enrichment")
+            raise
+        raise
     return json.loads(response.choices[0].message.content)
 
 
 def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
-    client = OpenAI(
-        base_url="https://models.github.ai/inference",
-        api_key=os.environ["GITHUB_TOKEN"],
-    )
+    client = get_llm_client()
     prompt = MODEL_FALLBACK_PROMPT.format(
         team1=match.get("team1", ""),
         team2=match.get("team2", ""),
@@ -547,12 +547,18 @@ def call_model_fallback(match: dict, stats: dict, espn_ctx: str = "", recent_res
         recent_results_context=recent_results_ctx or "",
         **stats,
     )
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
+    except APIStatusError as exc:
+        if exc.status_code in (410, 503):
+            logger.warning(f"LLM unavailable ({exc.status_code}): {exc.message} — skipping model fallback")
+            raise
+        raise
     return json.loads(response.choices[0].message.content)
 
 
@@ -818,10 +824,17 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     sources = search_sources(match, limit=source_limit)
     has_article_text = any(source.get("article_text") for source in sources)
     if sources and has_article_text:
-        details = sanitize_source_backed_details(
-            call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
-            sources,
-        )
+        try:
+            details = sanitize_source_backed_details(
+                call_llm(match, sources, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx),
+                sources,
+            )
+        except APIStatusError as exc:
+            if exc.status_code in (410, 503):
+                logger.warning("  LLM unavailable — using data-backed enrichment instead")
+                details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
+            else:
+                raise
     else:
         details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
 

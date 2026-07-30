@@ -1,4 +1,4 @@
-"""Generate match predictions using GitHub Models (GPT-4o)."""
+"""Generate match predictions using a configurable LLM provider."""
 
 import argparse
 import json
@@ -10,6 +10,7 @@ from typing import Optional
 
 from openai import OpenAI
 
+from utils.llm import get_llm_client, LLM_MODEL as MODEL
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
 from utils.db import (
     get_client,
@@ -90,7 +91,6 @@ Respond in JSON format:
 
 NUM_ENSEMBLE_CALLS = int(os.getenv("NUM_ENSEMBLE_CALLS", "5"))
 TEMPERATURE = 0.3
-MODEL = "openai/gpt-4o"
 
 
 def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
@@ -264,11 +264,8 @@ def build_context(match: dict) -> dict:
 
 
 def call_openai(prompt: str) -> dict:
-    """Make a single prediction call via GitHub Models API."""
-    client = OpenAI(
-        base_url="https://models.github.ai/inference",
-        api_key=os.environ["GITHUB_TOKEN"],
-    )
+    """Make a single prediction call via the configured LLM provider."""
+    client = get_llm_client()
     response = client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
