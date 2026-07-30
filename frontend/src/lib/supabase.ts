@@ -521,8 +521,22 @@ export async function getMatchEnrichment(matchId: string): Promise<MatchEnrichme
     .eq('match_id', matchId)
     .single();
 
-  if (error) return null;
-  return data;
+  if (error || !data) return null;
+
+  // Defensively parse JSON fields that Supabase may return as strings (TEXT vs JSONB)
+  const parseJSON = <T>(val: unknown, fallback: T): T => {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val !== 'string') return val as T;
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  };
+
+  return {
+    ...data,
+    possible_xi: parseJSON(data.possible_xi, { team1: [], team2: [] }),
+    player_updates: parseJSON(data.player_updates, []),
+    key_players: parseJSON(data.key_players, []),
+    source_links: parseJSON(data.source_links, []),
+  };
 }
 
 export async function getMatchSquads(matchId: string): Promise<MatchSquad[]> {
@@ -535,8 +549,19 @@ export async function getMatchSquads(matchId: string): Promise<MatchSquad[]> {
     .select('*')
     .eq('match_id', matchId);
 
-  if (error) return [];
-  return data ?? [];
+  if (error || !data) return [];
+
+  // Defensively parse players JSON field (may be stored as string in some envs)
+  const parseJSON = <T>(val: unknown, fallback: T): T => {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val !== 'string') return val as T;
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  };
+
+  return data.map((squad) => ({
+    ...squad,
+    players: parseJSON(squad.players, []),
+  }));
 }
 
 // ---------- ESPN Cricinfo Data ----------

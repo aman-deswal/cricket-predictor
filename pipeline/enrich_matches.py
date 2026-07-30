@@ -13,7 +13,14 @@ from urllib.parse import urljoin, urlparse
 import requests
 from openai import OpenAI
 
-from utils.cricsheet import get_head_to_head, get_recent_player_pool, get_team_recent_form
+from utils.cricsheet import (
+    get_head_to_head,
+    get_recent_player_pool,
+    get_team_recent_form,
+    get_player_recent_batting_scores,
+    get_player_recent_bowling_figures,
+    get_player_h2h_stats,
+)
 from utils.db import (
     get_client,
     get_upcoming_matches,
@@ -705,6 +712,59 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
     }
 
 
+def enrich_key_battles(battles: list[dict], match_type: str) -> list[dict]:
+    """Enrich LLM-generated key battles with real ball-by-ball stats from Cricsheet.
+
+    For each batter/bowler pair, attempts to populate:
+    - batter_scores: last 5 innings scores (oldest → newest)
+    - bowler_figures: last 5 wicket tallies per match (oldest → newest)
+    - h2h: {dismissals, balls_faced, runs_scored, dot_pct, boundary_pct, last_5}
+
+    Silently skips enrichment if delivery data is unavailable (CSVs not yet generated).
+    Only adds fields that have meaningful data to avoid replacing existing values with empty lists.
+    """
+    if not battles:
+        return battles
+
+    cricsheet_type = get_cricsheet_type(match_type)
+    enriched = []
+
+    for battle in battles:
+        batter = battle.get("batter", "")
+        bowler = battle.get("bowler", "")
+
+        if not batter or not bowler:
+            enriched.append(battle)
+            continue
+
+        battle = dict(battle)  # copy so we don't mutate the original
+
+        try:
+            scores = get_player_recent_batting_scores(batter, cricsheet_type, n=5)
+            if scores:
+                battle["batter_scores"] = scores
+        except Exception as exc:
+            logger.debug(f"batter_scores failed for {batter}: {exc}")
+
+        try:
+            figures = get_player_recent_bowling_figures(bowler, cricsheet_type, n=5)
+            if figures:
+                battle["bowler_figures"] = figures
+        except Exception as exc:
+            logger.debug(f"bowler_figures failed for {bowler}: {exc}")
+
+        try:
+            h2h = get_player_h2h_stats(batter, bowler, cricsheet_type)
+            if h2h.get("balls_faced", 0) >= 3:
+                battle["h2h"] = h2h
+        except Exception as exc:
+            logger.debug(f"h2h failed for {batter} vs {bowler}: {exc}")
+
+        enriched.append(battle)
+
+    return enriched
+
+
 def enrich_match(match: dict, source_limit: int) -> dict:
     match_id = match.get("match_id", "")
 
@@ -771,6 +831,17 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         details["venue_name"] = espn_venue
         details["venue_confidence"] = "confirmed"
 
+    # Enrich key battles with real ball-by-ball stats from Cricsheet deliveries
+    raw_battles = details.get("key_battles", details.get("key_players", []))
+    match_type = match.get("match_type", "")
+    enriched_battles = enrich_key_battles(raw_battles, match_type)
+    if enriched_battles != raw_battles:
+        battles_enriched = sum(
+            1 for b in enriched_battles
+            if b.get("batter_scores") or b.get("bowler_figures") or b.get("h2h")
+        )
+        logger.info(f"  Enriched {battles_enriched}/{len(enriched_battles)} key battles with cricsheet stats")
+
     return {
         "match_id": match_id,
         "venue_name": details.get("venue_name"),
@@ -778,7 +849,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "toss_insight": details.get("toss_insight"),
         "possible_xi": details.get("possible_xi", {"team1": [], "team2": []}),
         "player_updates": details.get("player_updates", []),
-        "key_players": details.get("key_battles", details.get("key_players", [])),
+        "key_players": enriched_battles,
         "expert_preview": details.get("expert_preview", ""),
         "source_links": sources,
         "confidence": details.get("confidence", "low"),
@@ -863,7 +934,9 @@ def _get_espn_venue(match_id: str) -> Optional[str]:
 
 
 def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
-    matches = [match for match in get_upcoming_matches() if is_future_match(match)]
+    # Trust backend status='upcoming' rather than strict client-side date filtering.
+    # Some providers keep scheduled fixtures with stale/incorrect timestamps.
+    matches = get_upcoming_matches()
     if match_id is not None:
         matches = [match for match in matches if match.get("match_id") == match_id]
     matches = sorted(matches, key=match_priority)

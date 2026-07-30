@@ -1,4 +1,4 @@
-"""Download Cricsheet JSON archives and build local match-level CSVs."""
+"""Download Cricsheet JSON archives and build local match-level and delivery-level CSVs."""
 
 import argparse
 import json
@@ -74,8 +74,42 @@ def parse_players(match_id: str, payload: dict) -> list[dict]:
     return records
 
 
+def parse_deliveries(match_id: str, date: str, payload: dict) -> list[dict]:
+    """Parse ball-by-ball delivery records from one Cricsheet JSON match.
+
+    Output columns per row:
+        match_id, date, batter, bowler, runs_batter, is_boundary, is_wicket, wicket_batter
+    """
+    records = []
+    for innings in payload.get("innings", []):
+        for over_data in innings.get("overs", []):
+            for delivery in over_data.get("deliveries", []):
+                runs = delivery.get("runs", {})
+                runs_batter = runs.get("batter", 0)
+                # A boundary is 4 or 6 runs off the bat
+                is_boundary = runs_batter in (4, 6)
+
+                # Wickets: may be a list (rare multi-wicket wides) or absent
+                wickets = delivery.get("wickets", [])
+                is_wicket = len(wickets) > 0
+                # The dismissed batter (first wicket if multiple)
+                wicket_batter = wickets[0].get("player_out", "") if wickets else ""
+
+                records.append({
+                    "match_id": match_id,
+                    "date": date,
+                    "batter": delivery.get("batter", ""),
+                    "bowler": delivery.get("bowler", ""),
+                    "runs_batter": runs_batter,
+                    "is_boundary": is_boundary,
+                    "is_wicket": is_wicket,
+                    "wicket_batter": wicket_batter,
+                })
+    return records
+
+
 def build_match_csv(match_type: str, data_dir: Path) -> int:
-    """Download and convert a Cricsheet archive into a match-level CSV."""
+    """Download and convert a Cricsheet archive into match-level and delivery-level CSVs."""
     data_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -84,6 +118,7 @@ def build_match_csv(match_type: str, data_dir: Path) -> int:
 
         match_records = []
         player_records = []
+        delivery_records = []
         with zipfile.ZipFile(archive_path) as archive:
             json_files = [name for name in archive.namelist() if name.endswith(".json")]
             logger.info(f"Parsing {len(json_files)} {match_type} matches...")
@@ -92,8 +127,10 @@ def build_match_csv(match_type: str, data_dir: Path) -> int:
                 match_id = Path(filename).stem
                 with archive.open(filename) as file_handle:
                     payload = json.load(file_handle)
-                match_records.append(parse_match(match_id, payload))
+                match_row = parse_match(match_id, payload)
+                match_records.append(match_row)
                 player_records.extend(parse_players(match_id, payload))
+                delivery_records.extend(parse_deliveries(match_id, match_row["date"], payload))
 
     output_path = data_dir / f"{match_type}_matches.csv"
     pd.DataFrame(match_records).sort_values("date").to_csv(output_path, index=False)
@@ -102,6 +139,11 @@ def build_match_csv(match_type: str, data_dir: Path) -> int:
     player_output_path = data_dir / f"{match_type}_players.csv"
     pd.DataFrame(player_records).sort_values(["date", "match_id", "team", "player"]).to_csv(player_output_path, index=False)
     logger.info(f"Wrote {len(player_records)} rows to {player_output_path}")
+
+    delivery_output_path = data_dir / f"{match_type}_deliveries.csv"
+    pd.DataFrame(delivery_records).sort_values(["date", "match_id"]).to_csv(delivery_output_path, index=False)
+    logger.info(f"Wrote {len(delivery_records)} delivery rows to {delivery_output_path}")
+
     return len(match_records)
 
 

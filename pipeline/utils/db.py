@@ -1,12 +1,17 @@
 """Supabase database client wrapper."""
 
 import os
+import re
 from typing import Optional
 
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
+
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 def get_client() -> Client:
@@ -142,19 +147,47 @@ def get_recent_results(days: int = 14) -> list[dict]:
 
     client = get_client()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    # Query prediction_results which has scored_at, actual_winner, correct
-    # Join match context via predictions(match_id)
+    # Query prediction_results first, then fetch prediction context in a second query.
+    # Avoids PostgREST embedded-select failures when FK metadata is missing/ambiguous.
     response = (
         client.table("prediction_results")
-        .select("match_id, predicted_winner, actual_winner, correct, scored_at, predictions(team1, team2, match_type)")
+        .select("match_id, predicted_winner, actual_winner, correct, scored_at")
         .gte("scored_at", cutoff)
         .order("scored_at", desc=True)
         .limit(20)
         .execute()
     )
+    if not response.data:
+        return []
+
+    # predictions.match_id is UUID-typed in production; skip non-UUID IDs
+    # (e.g. espn-1547116), which otherwise trigger PostgREST 400s.
+    match_ids = []
+    for row in response.data:
+        mid = row.get("match_id", "")
+        if isinstance(mid, str) and UUID_RE.match(mid):
+            match_ids.append(mid)
+
+    pred_map: dict[str, dict] = {}
+    # Avoid PostgREST `in.(...)` parser/type issues for mixed match_id formats
+    # (UUID-like and espn-* string IDs); fetch each row explicitly.
+    for mid in match_ids:
+        try:
+            pred_response = (
+                client.table("predictions")
+                .select("match_id, team1, team2, match_type")
+                .eq("match_id", mid)
+                .limit(1)
+                .execute()
+            )
+            if pred_response.data:
+                pred_map[mid] = pred_response.data[0]
+        except Exception:
+            continue
+
     results = []
     for p in response.data:
-        pred = p.get("predictions") or {}
+        pred = pred_map.get(p.get("match_id"), {})
         results.append({
             "team1": pred.get("team1", ""),
             "team2": pred.get("team2", ""),
