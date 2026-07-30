@@ -22,6 +22,43 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _status_rank(status: str) -> int:
+    """Higher rank = more progressed match state."""
+    if status == "post":
+        return 3
+    if status == "in":
+        return 2
+    if status == "pre":
+        return 1
+    return 0
+
+
+def _merge_fixtures_by_event(fixtures: list[dict]) -> list[dict]:
+    """Deduplicate fixtures by ESPN event ID, keeping the best-quality row."""
+    merged: dict[str, dict] = {}
+    for fixture in fixtures:
+        event_id = fixture.get("espn_event_id")
+        if not event_id:
+            continue
+
+        current = merged.get(event_id)
+        if current is None:
+            merged[event_id] = fixture
+            continue
+
+        current_rank = _status_rank(current.get("status", ""))
+        incoming_rank = _status_rank(fixture.get("status", ""))
+        if incoming_rank > current_rank:
+            merged[event_id] = fixture
+            continue
+
+        # Same status: prefer row with venue populated.
+        if incoming_rank == current_rank and fixture.get("venue") and not current.get("venue"):
+            merged[event_id] = fixture
+
+    return list(merged.values())
+
+
 def _score_prediction(prediction: dict, actual_winner: str) -> dict:
     """Score a single prediction against the actual winner."""
     predicted_winner = prediction["predicted_winner"]
@@ -172,8 +209,21 @@ def main(match_types: Optional[list[str]] = None) -> None:
     espn_fixtures = get_espn_fixtures()
     logger.info(f"ESPN header: found {len(espn_fixtures)} fixtures")
 
+    # Header feed is often current-day biased; expand via league scoreboards.
+    league_ids = sorted({f.get("league_id", "") for f in espn_fixtures if f.get("league_id")})
+    series_fixtures: list[dict] = []
+    for league_id in league_ids:
+        league_rows = get_series_fixtures(league_id)
+        if league_rows:
+            series_fixtures.extend(league_rows)
+    if series_fixtures:
+        logger.info(f"ESPN series scoreboards: found {len(series_fixtures)} fixtures across {len(league_ids)} leagues")
+
+    all_fixtures = _merge_fixtures_by_event([*espn_fixtures, *series_fixtures])
+    logger.info(f"ESPN merged fixture set: {len(all_fixtures)} unique events")
+
     # --- Phase 2: Upsert upcoming fixtures ---
-    espn_upcoming = _espn_fixtures_to_matches(espn_fixtures)
+    espn_upcoming = _espn_fixtures_to_matches(all_fixtures)
     if espn_upcoming:
         logger.info(f"Upserting {len(espn_upcoming)} upcoming ESPN fixtures...")
         replace_upcoming_matches(espn_upcoming)
@@ -201,10 +251,10 @@ def main(match_types: Optional[list[str]] = None) -> None:
         logger.warning("No upcoming fixtures from ESPN header.")
 
     # --- Phase 3: Score completed matches ---
-    espn_completed = [f for f in espn_fixtures if f.get("status") == "post" and f.get("winner")]
+    espn_completed = [f for f in all_fixtures if f.get("status") == "post" and f.get("winner")]
     if espn_completed:
         logger.info(f"Scoring from ESPN: {len(espn_completed)} completed matches...")
-        total_scored = _score_espn_completed(espn_fixtures)
+        total_scored = _score_espn_completed(all_fixtures)
         if total_scored:
             logger.info(f"Total scored: {total_scored} predictions")
 
