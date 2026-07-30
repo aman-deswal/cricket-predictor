@@ -29,6 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
           LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
           LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
           LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}

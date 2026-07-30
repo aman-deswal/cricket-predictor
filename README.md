@@ -34,20 +34,21 @@ flowchart LR
     G[ESPN Cricinfo APIs] --> B
     H[The Odds API] --> B
     I[Cricsheet Historical Data] --> B
-    J[GitHub Models GPT-4o] --> B
+    J[Optional AI Garnish] --> B
 ```
 
 ### Data/Logic flow
 1. **Fixtures ingestion** uses ESPN Cricinfo exclusively (free, unlimited). ESPN match IDs (`espn-<id>`) are used as canonical fixture identifiers.
 2. **Stats caching** computes team/venue/H2H from Cricsheet and stores in `stats_cache`.
-3. **Predictions** run via GPT-4o (GitHub Models), using:
+3. **Predictions** are generated deterministically from structured cricket + market data, using:
    - cached form/H2H/venue stats,
    - enrichment notes,
    - ESPN context,
    - sportsbook signal,
    - proprietary **SixSense Edge Score™**.
-4. **Results scorer** marks completed matches and computes correctness + Brier score.
-5. **Calibration** periodically derives isotonic calibration bins.
+4. **Optional AI garnish** can layer narrative copy onto enrichment later, but is not required for core prediction freshness.
+5. **Results scorer** marks completed matches and computes correctness + Brier score.
+6. **Calibration** periodically derives isotonic calibration bins.
 6. Frontend reads Supabase directly and renders static-export pages.
 
 ---
@@ -203,11 +204,13 @@ Data-mode behavior:
 ### Pipeline (`.env`)
 | Variable | Description |
 |---|---|
-| `GITHUB_TOKEN` | GitHub token (used for GitHub Models GPT-4o calls) |
+| `GITHUB_TOKEN` | GitHub token for repository/workflow operations |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_KEY` | Supabase service/anon key used by pipelines |
 | `CRICAPI_KEY` | *(Optional)* CricAPI key — enables pre-match squad data and player career stats. Not required for fixtures or results. |
 | `ODDS_API_KEY` | The Odds API key |
+| `ENABLE_LLM_GARNISH` | *(Optional)* Set to `true` only if you intentionally want runtime LLM garnish for enrichment and have a live provider path configured. Defaults to `false`. |
+| `LLM_PROFILE`, `LLM_PROFILE_MAP`, `LLM_ROUTE_MAP`, `LLM_FALLBACK_MODELS`, `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY` | *(Optional garnish only)* Runtime LLM routing for enrichment copy. Core predictions no longer depend on these. |
 
 ### Frontend (`frontend/.env.local`)
 | Variable | Description |
@@ -243,7 +246,7 @@ docs/screenshots/         Current UI screenshots used in this README
 
 - **Frontend:** Next.js 14, React 18, Tailwind CSS, Framer Motion, Recharts, Supabase JS
 - **Pipelines:** Python 3.11, OpenAI SDK, Requests, Pandas, scikit-learn, Supabase Python client
-- **LLM:** GitHub Models (`openai/gpt-4o`)
+- **LLM garnish:** optional only; disabled by default for the production pipeline
 - **Data sources:** ESPN Cricinfo APIs (primary, free/unlimited), The Odds API, Cricsheet, CricAPI (optional)
 - **Hosting:** GitHub Pages via Actions
 

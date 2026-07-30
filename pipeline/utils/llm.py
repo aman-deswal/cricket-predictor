@@ -1,4 +1,4 @@
-"""Shared LLM routing for OpenAI-compatible chat APIs.
+"""Shared optional LLM routing for OpenAI-compatible chat APIs.
 
 Preferred configuration is policy-based rather than vendor-first:
 
@@ -7,7 +7,7 @@ Preferred configuration is policy-based rather than vendor-first:
     LLM_ROUTE_MAP={"balanced-primary":"gpt-4o|https://example.com/v1|GITHUB_TOKEN"}
     LLM_FALLBACK_MODELS=balanced-secondary,cheap-backup
 
-Direct override still works:
+Direct override still works when runtime garnish is enabled:
 
     LLM_MODEL=<model>
     LLM_BASE_URL=<base_url>
@@ -51,6 +51,10 @@ class LLMRoute:
     model: str
     base_url: str
     api_key_env: str
+
+
+def llm_garnish_enabled() -> bool:
+    return os.getenv("ENABLE_LLM_GARNISH", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _normalize_name(value: str) -> str:
@@ -152,6 +156,9 @@ def create_chat_completion(
     temperature: float,
     response_format: dict[str, str],
 ) -> tuple[Any, LLMRoute]:
+    if not llm_garnish_enabled():
+        raise LLMUnavailableError("Runtime LLM garnish is disabled")
+
     attempts: list[str] = []
     last_error: Exception | None = None
 

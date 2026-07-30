@@ -1,14 +1,12 @@
-"""Generate match predictions using a configurable LLM router."""
+"""Generate deterministic match predictions with optional AI garnish downstream."""
 
 import argparse
-import json
 import logging
-import os
 import sys
+from math import exp
 from datetime import datetime, timezone
 from typing import Optional
 
-from utils.llm import LLMUnavailableError, create_chat_completion
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
 from utils.db import (
     get_client,
@@ -27,69 +25,6 @@ from enrich_matches import enrich_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-PREDICTION_PROMPT = """You are an expert cricket analyst. Predict the outcome of the following cricket match.
-
-**Match Details:**
-- {team1} vs {team2}
-- Format: {match_type}
-- Venue: {venue}
-- Date: {date}
-
-**Team 1 ({team1}) Recent Form (VERIFIED DATA — use these exact numbers):**
-- Win rate (last 10): {team1_win_rate:.1%}
-- Recent matches played: {team1_matches}
-- Recent wins: {team1_wins}
-
-**Team 2 ({team2}) Recent Form (VERIFIED DATA — use these exact numbers):**
-- Win rate (last 10): {team2_win_rate:.1%}
-- Recent matches played: {team2_matches}
-- Recent wins: {team2_wins}
-
-**Head-to-Head Record:**
-- Total matches: {h2h_total}
-- {team1} wins: {h2h_team1_wins}
-- {team2} wins: {h2h_team2_wins}
-
-**Venue Stats:**
-- Matches at venue: {venue_matches}
-- Toss-bat-first win rate: {toss_bat_win_rate:.1%}
-
-**Source-backed Match Notes:**
-{enrichment_notes}
-
-**ESPN Cricinfo Context (H2H results, news, series data):**
-{espn_context}
-
-**SixSense Edge Score™ (proprietary multi-factor analysis):**
-{edge_score_context}
-
-**Sportsbook Odds (market signal):**
-{odds_context}
-
-Based on all available information, predict the winner and provide win probabilities.
-IMPORTANT: When referencing win rates in your reasoning, use the EXACT percentages provided above. Do not estimate or round differently.
-The SixSense Edge Score factors in form, momentum, pressure context, and market odds — use it as an anchor but apply your cricket expertise to adjust.
-Reference specific ESPN data (series scoreline, recent match results, key player form, injury/retirement news) in your reasoning to make it substantive and contextual.
-
-Also analyze the toss factor for this specific match. Consider:
-- Historical toss impact at this venue (pitch type, dew factor, day/night)
-- Each team's preference and record when batting/bowling first
-- Format-specific toss tendencies
-
-Respond in JSON format:
-{{
-    "predicted_winner": "<team name>",
-    "team1_win_probability": <float 0-1>,
-    "team2_win_probability": <float 0-1>,
-    "confidence": "<low|medium|high>",
-    "reasoning": "<3-5 sentence analysis referencing specific data: series scoreline, recent match scores, key player form (names + stats), injury/retirement news, and venue conditions. Be specific, not generic.>",
-    "toss_insight": "<single sentence: which team benefits more from winning the toss and what they should choose, with a percentage edge if possible>"
-}}"""
-
-NUM_ENSEMBLE_CALLS = int(os.getenv("NUM_ENSEMBLE_CALLS", "5"))
-TEMPERATURE = 0.3
-
 
 def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
     """Return neutral stats when historical data is unavailable."""
@@ -257,88 +192,127 @@ def build_context(match: dict) -> dict:
         "espn_context": espn_ctx,
         "edge_score_context": edge_score_context,
         "odds_context": odds_context,
+        "odds_data": odds_data,
+        "series_scoreline": espn_series_scoreline,
         "edge_score": edge,
     }
 
 
-def call_llm(prompt: str) -> dict:
-    """Make a single prediction call via the configured LLM router."""
-    response, route = create_chat_completion(
-        messages=[{"role": "user", "content": prompt}],
-        temperature=TEMPERATURE,
-        response_format={"type": "json_object"},
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _probability_from_edge(context: dict) -> tuple[float, float]:
+    """Convert the structured edge score into a calibrated probability pair.
+
+    The edge score already blends form, momentum, pressure, and market signal.
+    We convert the net edge into a probability while damping confidence when the
+    recent-data sample is thin.
+    """
+    edge = context["edge_score"]
+    gap = edge["team1_score"] - edge["team2_score"]
+    raw_team1 = 1 / (1 + exp(-(gap / 12.0)))
+
+    data_strength = min(1.0, max(context["team1_matches"], context["team2_matches"]) / 8.0)
+    h2h_strength = min(1.0, context["h2h_total"] / 5.0)
+    shrink = max(0.45, min(1.0, data_strength * 0.8 + h2h_strength * 0.2))
+    adjusted_team1 = 0.5 + (raw_team1 - 0.5) * shrink
+
+    team1_prob = round(_clamp(adjusted_team1, 0.18, 0.82), 4)
+    team2_prob = round(1 - team1_prob, 4)
+    return team1_prob, team2_prob
+
+
+def _confidence_from_context(context: dict, team1_prob: float) -> str:
+    edge_gap = abs(team1_prob - 0.5)
+    data_strength = min(1.0, max(context["team1_matches"], context["team2_matches"]) / 8.0)
+    if edge_gap >= 0.10 and data_strength >= 0.8:
+        return "high"
+    if edge_gap >= 0.06 and data_strength >= 0.5:
+        return "medium"
+    return "low"
+
+
+def _build_reasoning(context: dict, predicted_winner: str, team1_prob: float, team2_prob: float) -> str:
+    team1 = context["team1"]
+    team2 = context["team2"]
+    edge = context["edge_score"]
+    favorite_prob = team1_prob if predicted_winner == team1 else team2_prob
+    underdog = team2 if predicted_winner == team1 else team1
+
+    sentences = [
+        (
+            f"{predicted_winner} rate as the deterministic SixSense pick at {favorite_prob:.0%} win probability, "
+            f"driven by the structured edge score: {edge['narrative']}."
+        ),
+        (
+            f"Recent form favors {team1} at {context['team1_win_rate']:.0%} from {context['team1_matches']} matches "
+            f"versus {team2} at {context['team2_win_rate']:.0%} from {context['team2_matches']}, "
+            f"while the head-to-head sits {context['h2h_team1_wins']}-{context['h2h_team2_wins']} across {context['h2h_total']} meetings."
+        ),
+    ]
+
+    if context["odds_data"]:
+        sentences.append(
+            f"Market pricing remains in the mix: {context['odds_context'].splitlines()[0]}, "
+            f"but SixSense still grades {predicted_winner} ahead of {underdog} on the structured edge score."
+        )
+    else:
+        sentences.append(
+            f"No live sportsbook line was available, so the projection leans on form, pressure, and venue context rather than market confirmation."
+        )
+
+    venue_name = context["venue"] or "the venue"
+    sentences.append(
+        f"At {venue_name}, teams batting first have won {context['toss_bat_win_rate']:.0%} of tracked matches, "
+        f"so venue conditions are a secondary tiebreaker rather than the main driver of the pick."
     )
-    content = response.choices[0].message.content
-    parsed = json.loads(content)
-    parsed["_llm_model"] = route.model
-    return parsed
+    return " ".join(sentences)
 
 
-def ensemble_predict(match: dict) -> dict:
-    """
-    Generate ensemble prediction by calling the configured LLM router multiple times.
+def _build_toss_insight(context: dict, predicted_winner: str) -> str:
+    venue_name = context["venue"] or "this venue"
+    bat_first_rate = context["toss_bat_win_rate"]
+    edge_pct = abs(round((bat_first_rate - 0.5) * 100))
+    match_type = context["match_type"].upper()
 
-    Args:
-        match: Match dict with team1, team2, venue, match_type, date
+    if bat_first_rate >= 0.56:
+        return (
+            f"Toss edge leans batting first at {venue_name}: teams setting a total have won about {bat_first_rate:.0%} "
+            f"of tracked {match_type} matches here, so {predicted_winner} should prefer to bat if they win the toss."
+        )
+    if bat_first_rate <= 0.44:
+        return (
+            f"Toss edge leans chasing at {venue_name}: sides batting second have won about {(1 - bat_first_rate):.0%} "
+            f"of tracked {match_type} matches here, so {predicted_winner} should look to bowl first if they win the toss."
+        )
+    return (
+        f"Toss looks close to neutral at {venue_name}, with only about a {edge_pct}% swing away from a 50/50 split; "
+        f"{predicted_winner} should choose based more on conditions on the day than a fixed bat-or-bowl rule."
+    )
 
-    Returns:
-        Averaged prediction dict
-    """
+
+def build_prediction(match: dict) -> dict:
+    """Generate a fully deterministic prediction from structured data."""
     context = build_context(match)
-    prompt = PREDICTION_PROMPT.format(**context)
-
-    predictions = []
-    used_models: list[str] = []
-    for i in range(NUM_ENSEMBLE_CALLS):
-        try:
-            pred = call_llm(prompt)
-            predictions.append(pred)
-            if pred.get("_llm_model"):
-                used_models.append(pred["_llm_model"])
-            logger.info(
-                f"  Call {i+1}/{NUM_ENSEMBLE_CALLS} via {pred.get('_llm_model', 'unknown model')}: "
-                f"{pred.get('predicted_winner')} "
-                f"({pred.get('team1_win_probability', 0):.2f} / {pred.get('team2_win_probability', 0):.2f})"
-            )
-        except LLMUnavailableError as exc:
-            logger.warning(f"  Call {i+1} exhausted all configured LLM routes: {exc}")
-        except Exception as exc:
-            logger.warning(f"  Call {i+1} failed: {exc}")
-
-    if not predictions:
-        raise RuntimeError("All prediction calls failed")
-
-    # Average probabilities
-    avg_team1_prob = sum(p.get("team1_win_probability", 0.5) for p in predictions) / len(predictions)
-    avg_team2_prob = sum(p.get("team2_win_probability", 0.5) for p in predictions) / len(predictions)
-
-    # Normalize to sum to 1
-    total = avg_team1_prob + avg_team2_prob
-    avg_team1_prob /= total
-    avg_team2_prob /= total
-
-    predicted_winner = context["team1"] if avg_team1_prob > avg_team2_prob else context["team2"]
-
-    # Collect reasoning from all calls
-    reasonings = [p.get("reasoning", "") for p in predictions if p.get("reasoning")]
-    combined_reasoning = reasonings[0] if reasonings else "No reasoning available."
-
-    # Pick the longest (most detailed) toss insight
-    toss_insights = [p.get("toss_insight", "") for p in predictions if p.get("toss_insight")]
-    toss_insight = max(toss_insights, key=len) if toss_insights else None
+    team1_prob, team2_prob = _probability_from_edge(context)
+    predicted_winner = context["team1"] if team1_prob >= team2_prob else context["team2"]
+    confidence = _confidence_from_context(context, team1_prob)
+    reasoning = _build_reasoning(context, predicted_winner, team1_prob, team2_prob)
+    toss_insight = _build_toss_insight(context, predicted_winner)
 
     return {
         "match_id": match["match_id"],
         "team1": context["team1"],
         "team2": context["team2"],
         "predicted_winner": predicted_winner,
-        "team1_win_probability": round(avg_team1_prob, 4),
-        "team2_win_probability": round(avg_team2_prob, 4),
-        "confidence": predictions[0].get("confidence", "medium"),
-        "reasoning": combined_reasoning,
+        "team1_win_probability": team1_prob,
+        "team2_win_probability": team2_prob,
+        "confidence": confidence,
+        "reasoning": reasoning,
         "toss_insight": toss_insight,
-        "model": ", ".join(dict.fromkeys(used_models)) if used_models else "unavailable",
-        "ensemble_size": len(predictions),
+        "model": "deterministic-core",
+        "ensemble_size": 1,
         "edge_score": context.get("edge_score"),
     }
 
@@ -371,7 +345,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
     for match in matches:
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
-            prediction = ensemble_predict(match)
+            prediction = build_prediction(match)
             edge = prediction.pop("edge_score", None)
             store_prediction(prediction)
             if edge:
