@@ -415,7 +415,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     };
   });
 
-  return sortMatchesByPriority(matchesWithForm.filter(isFutureMatch));
+  return sortMatchesByPriority(matchesWithForm);
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
