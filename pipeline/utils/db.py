@@ -142,19 +142,31 @@ def get_recent_results(days: int = 14) -> list[dict]:
 
     client = get_client()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    # Query prediction_results which has scored_at, actual_winner, correct
-    # Join match context via predictions(match_id)
+    # Query prediction_results first, then fetch prediction context in a second query.
+    # Avoids PostgREST embedded-select failures when FK metadata is missing/ambiguous.
     response = (
         client.table("prediction_results")
-        .select("match_id, predicted_winner, actual_winner, correct, scored_at, predictions(team1, team2, match_type)")
+        .select("match_id, predicted_winner, actual_winner, correct, scored_at")
         .gte("scored_at", cutoff)
         .order("scored_at", desc=True)
         .limit(20)
         .execute()
     )
+    if not response.data:
+        return []
+
+    match_ids = [row.get("match_id", "") for row in response.data if row.get("match_id")]
+    pred_response = (
+        client.table("predictions")
+        .select("match_id, team1, team2, match_type")
+        .in_("match_id", match_ids)
+        .execute()
+    ) if match_ids else None
+    pred_map = {row.get("match_id"): row for row in (pred_response.data or [])} if pred_response else {}
+
     results = []
     for p in response.data:
-        pred = p.get("predictions") or {}
+        pred = pred_map.get(p.get("match_id"), {})
         results.append({
             "team1": pred.get("team1", ""),
             "team2": pred.get("team2", ""),
