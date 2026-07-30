@@ -1003,7 +1003,10 @@ export function PredictDetails() {
                           </>
                         ) : (
                           <div className="flex items-center justify-center h-full">
-                            <p className="text-[9px] text-gray-500">No H2H data available</p>
+                            <div className="text-center px-2">
+                              <p className="text-[10px] font-bold text-gray-400 mb-1">Stats loading</p>
+                              <p className="text-[8px] text-gray-600 leading-tight">H2H data will appear once<br/>Cricsheet delivery data is fetched</p>
+                            </div>
                           </div>
                         )}
                       </div>

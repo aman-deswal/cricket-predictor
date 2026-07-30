@@ -173,3 +173,137 @@ def get_head_to_head(team1: str, team2: str, match_type: str = "t20s") -> dict:
         "team1_wins": int((h2h["winner"] == team1).sum()),
         "team2_wins": int((h2h["winner"] == team2).sum()),
     }
+
+
+def load_delivery_data(match_type: str = "t20s") -> pd.DataFrame:
+    """Load Cricsheet ball-by-ball delivery data.
+
+    Columns: match_id, date, batter, bowler, runs_batter, is_boundary, is_wicket, wicket_batter
+    """
+    filepath = DATA_DIR / f"{match_type}_deliveries.csv"
+    if not filepath.exists():
+        raise FileNotFoundError(f"Cricsheet delivery data not found at {filepath}. Run fetch_cricsheet.py first.")
+    return pd.read_csv(filepath)
+
+
+def get_player_recent_batting_scores(
+    player_name: str,
+    match_type: str = "t20s",
+    n: int = 5,
+) -> list[int]:
+    """Return the last N innings scores for a batter, oldest → newest.
+
+    Computes per-match run totals from ball-by-ball data so each entry
+    represents one innings, not one ball.
+    """
+    try:
+        df = load_delivery_data(match_type)
+    except FileNotFoundError:
+        return []
+
+    batter_df = df[df["batter"].str.lower() == player_name.lower()].copy()
+    if batter_df.empty:
+        return []
+
+    # Sum runs per match_id → one score per innings appearance
+    scores_by_match = (
+        batter_df.groupby(["match_id", "date"])["runs_batter"]
+        .sum()
+        .reset_index()
+        .sort_values("date")
+    )
+    return [int(r) for r in scores_by_match["runs_batter"].tail(n)]
+
+
+def get_player_recent_bowling_figures(
+    player_name: str,
+    match_type: str = "t20s",
+    n: int = 5,
+) -> list[int]:
+    """Return the last N wicket tallies for a bowler, oldest → newest."""
+    try:
+        df = load_delivery_data(match_type)
+    except FileNotFoundError:
+        return []
+
+    bowler_df = df[df["bowler"].str.lower() == player_name.lower()].copy()
+    if bowler_df.empty:
+        return []
+
+    # A wicket is credited to the bowler when wicket_batter matches the batter
+    # (i.e. not run-outs where the fielder gets credit)
+    bowler_df["bowler_wicket"] = (
+        bowler_df["is_wicket"]
+        & (bowler_df["wicket_batter"] == bowler_df["batter"])
+    )
+    wickets_by_match = (
+        bowler_df.groupby(["match_id", "date"])["bowler_wicket"]
+        .sum()
+        .reset_index()
+        .sort_values("date")
+    )
+    return [int(w) for w in wickets_by_match["bowler_wicket"].tail(n)]
+
+
+def get_player_h2h_stats(
+    batter: str,
+    bowler: str,
+    match_type: str = "t20s",
+) -> dict:
+    """Compute head-to-head stats between a specific batter and bowler.
+
+    Returns:
+        {
+            dismissals: int,
+            balls_faced: int,
+            runs_scored: int,
+            dot_pct: float,        # 0-100
+            boundary_pct: float,   # 0-100
+            last_5: list['W' | 'NW'],  # 5 most-recent match outcomes
+        }
+        Empty dict if no data found.
+    """
+    try:
+        df = load_delivery_data(match_type)
+    except FileNotFoundError:
+        return {}
+
+    matchup = df[
+        (df["batter"].str.lower() == batter.lower())
+        & (df["bowler"].str.lower() == bowler.lower())
+    ].copy()
+
+    if matchup.empty:
+        return {}
+
+    balls_faced = len(matchup)
+    runs_scored = int(matchup["runs_batter"].sum())
+    dot_balls = int((matchup["runs_batter"] == 0).sum())
+    boundaries = int(matchup["is_boundary"].sum())
+
+    # Dismissals: wicket where dismissed player is this batter
+    dismissals_df = matchup[matchup["is_wicket"] & (matchup["wicket_batter"] == matchup["batter"])]
+    dismissals = len(dismissals_df)
+
+    # last_5: one result per match, ordered by date
+    per_match = (
+        matchup.groupby(["match_id", "date"])
+        .agg(
+            match_wickets=("is_wicket", "sum"),
+            match_wicket_batters=("wicket_batter", lambda x: (x == batter).any()),
+        )
+        .reset_index()
+        .sort_values("date")
+    )
+    # W = bowler dismissed this batter in that match
+    outcomes = ["W" if row["match_wicket_batters"] else "NW" for _, row in per_match.iterrows()]
+    last_5 = outcomes[-5:]
+
+    return {
+        "dismissals": dismissals,
+        "balls_faced": balls_faced,
+        "runs_scored": runs_scored,
+        "dot_pct": round(dot_balls / balls_faced * 100, 1) if balls_faced else 0,
+        "boundary_pct": round(boundaries / balls_faced * 100, 1) if balls_faced else 0,
+        "last_5": last_5,
+    }
