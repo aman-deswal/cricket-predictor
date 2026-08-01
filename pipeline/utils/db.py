@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import datetime, timezone
 from typing import Optional
 
 from supabase import create_client, Client
@@ -39,12 +40,14 @@ def replace_upcoming_matches(matches: list[dict]) -> None:
         client.table("matches").upsert(matches, on_conflict="match_id").execute()
 
 
-def get_upcoming_matches(date: Optional[str] = None) -> list[dict]:
+def get_upcoming_matches(date: Optional[str] = None, future_only: bool = False) -> list[dict]:
     """Fetch upcoming matches, optionally constrained to a single date."""
     client = get_client()
     query = client.table("matches").select("*").eq("status", "upcoming")
     if date is not None:
         query = query.eq("date", date)
+    if future_only:
+        query = query.gte("date", datetime.now(timezone.utc).isoformat())
     response = query.order("date", desc=False).execute()
     return response.data
 

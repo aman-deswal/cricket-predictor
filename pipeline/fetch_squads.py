@@ -213,7 +213,7 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
             if resp.data:
                 matches.extend(resp.data)
     else:
-        matches = get_upcoming_matches()
+        matches = get_upcoming_matches(future_only=True)
 
     if not matches:
         print("No upcoming matches found.")

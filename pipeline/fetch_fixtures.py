@@ -114,7 +114,34 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
 
         match_id = espn_rec.data[0]["match_id"]
 
-        # Look up unscored prediction
+        match_resp = (
+            client.table("matches")
+            .select("match_id, team1, team2")
+            .eq("match_id", match_id)
+            .execute()
+        )
+        if not match_resp.data:
+            continue
+
+        # Map ESPN winner name to our team names
+        from utils.espn import _normalize_team
+        norm_winner = _normalize_team(espn_winner)
+        match = match_resp.data[0]
+        actual = None
+        if _normalize_team(match["team1"]) == norm_winner or norm_winner in _normalize_team(match["team1"]):
+            actual = match["team1"]
+        elif _normalize_team(match["team2"]) == norm_winner or norm_winner in _normalize_team(match["team2"]):
+            actual = match["team2"]
+        else:
+            logger.warning(f"ESPN winner '{espn_winner}' doesn't match {match['team1']}/{match['team2']}")
+            continue
+
+        client.table("matches").update({
+            "status": "completed",
+            "winner": actual,
+        }).eq("match_id", match_id).execute()
+
+        # Look up unscored prediction, if one exists.
         pred_resp = (
             client.table("predictions")
             .select("*")
@@ -123,28 +150,10 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
             .execute()
         )
         if not pred_resp.data:
+            logger.info(f"ESPN completed: {match['team1']} vs {match['team2']} → winner={actual} (no prediction to score)")
             continue
 
         prediction = pred_resp.data[0]
-
-        # Map ESPN winner name to our team names
-        from utils.espn import _normalize_team
-        norm_winner = _normalize_team(espn_winner)
-        actual = None
-        if _normalize_team(prediction["team1"]) == norm_winner or norm_winner in _normalize_team(prediction["team1"]):
-            actual = prediction["team1"]
-        elif _normalize_team(prediction["team2"]) == norm_winner or norm_winner in _normalize_team(prediction["team2"]):
-            actual = prediction["team2"]
-        else:
-            logger.warning(f"ESPN winner '{espn_winner}' doesn't match {prediction['team1']}/{prediction['team2']}")
-            continue
-
-        # Update match status
-        client.table("matches").update({
-            "status": "completed",
-            "winner": actual,
-        }).eq("match_id", match_id).execute()
-
         result = _score_prediction(prediction, actual)
         client.table("prediction_results").upsert(result, on_conflict="prediction_id").execute()
         client.table("predictions").update({"scored_at": datetime.utcnow().isoformat()}).eq("match_id", match_id).execute()

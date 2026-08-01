@@ -62,7 +62,7 @@ def build_candidates(
     client = get_client()
 
     matches = [
-        match for match in get_upcoming_matches()
+        match for match in get_upcoming_matches(future_only=True)
         if (parsed := parse_timestamp(match.get("date"))) is not None and now < parsed <= deadline
     ]
 

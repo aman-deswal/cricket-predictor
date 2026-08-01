@@ -112,7 +112,15 @@ def parse_odds_events(events: list[dict]) -> list[dict]:
 def match_odds_to_matches(odds_rows: list[dict]) -> list[dict]:
     """Try to link odds to our matches table by team names and date."""
     client = get_client()
-    matches = client.table("matches").select("match_id, team1, team2, date").eq("status", "upcoming").execute().data or []
+    matches = (
+        client.table("matches")
+        .select("match_id, team1, team2, date")
+        .eq("status", "upcoming")
+        .gte("date", datetime.now(timezone.utc).isoformat())
+        .execute()
+        .data
+        or []
+    )
 
     def normalize(name: str) -> str:
         return name.lower().strip().replace(" women", "").replace(" men", "")

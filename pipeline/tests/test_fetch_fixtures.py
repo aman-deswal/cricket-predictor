@@ -187,6 +187,12 @@ class TestScoreEspnCompleted(unittest.TestCase):
             t.upsert.return_value = t
             if name == "espn_match_data":
                 t.execute.return_value = MagicMock(data=[{"match_id": "espn-42"}])
+            elif name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-42",
+                    "team1": "India",
+                    "team2": "Australia",
+                }])
             elif name == "predictions":
                 t.execute.return_value = MagicMock(data=[prediction])
             else:
@@ -197,6 +203,42 @@ class TestScoreEspnCompleted(unittest.TestCase):
 
         scored = _score_espn_completed([self._make_espn_fixture("42", "India")])
         self.assertEqual(scored, 1)
+
+    @patch("fetch_fixtures.get_client")
+    def test_marks_completed_without_prediction(self, mock_get_client):
+        client = MagicMock()
+        mock_get_client.return_value = client
+        tables = {}
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.is_.return_value = t
+            t.update.return_value = t
+            t.upsert.return_value = t
+            if name == "espn_match_data":
+                t.execute.return_value = MagicMock(data=[{"match_id": "espn-42"}])
+            elif name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-42",
+                    "team1": "India",
+                    "team2": "Australia",
+                }])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            tables[name] = t
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        scored = _score_espn_completed([self._make_espn_fixture("42", "India")])
+
+        self.assertEqual(scored, 0)
+        tables["matches"].update.assert_called_once_with({
+            "status": "completed",
+            "winner": "India",
+        })
 
     @patch("fetch_fixtures.get_client")
     def test_skips_when_no_espn_match_data(self, mock_get_client):
