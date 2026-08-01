@@ -330,7 +330,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
 
     now = datetime.now(timezone.utc)
     matches = [
-        match for match in get_upcoming_matches()
+        match for match in get_upcoming_matches(future_only=True)
         if parse_match_datetime(match["date"]) > now
     ]
     if match_id:

@@ -313,8 +313,8 @@ function sortMatchesByPriority(matches: MatchWithPredictions[]): MatchWithPredic
   });
 }
 
-function isFutureMatch(match: Match): boolean {
-  return getMatchTimestamp(match) > Date.now();
+function isFutureMatch(match: Match, now = Date.now()): boolean {
+  return getMatchTimestamp(match) > now;
 }
 
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
@@ -322,11 +322,14 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     return getMockUpcomingMatches();
   }
 
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
   const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
       .eq('status', 'upcoming')
+      .gte('date', nowIso)
       .order('date', { ascending: true }),
     supabase
       .from('stats_cache')
@@ -415,7 +418,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     };
   });
 
-  return sortMatchesByPriority(matchesWithForm);
+  return sortMatchesByPriority(matchesWithForm.filter((match) => isFutureMatch(match, now)));
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {

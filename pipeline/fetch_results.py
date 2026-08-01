@@ -166,6 +166,78 @@ def _match_espn_winner_to_prediction(espn_winner: str, prediction: dict) -> Opti
     return None
 
 
+def _mark_stale_upcoming_completed(client, now: datetime) -> int:
+    """Finalize stale upcoming matches from stored ESPN event IDs without scoring."""
+    stale_resp = (
+        client.table("matches")
+        .select("match_id,team1,team2,date,espn_event_id")
+        .eq("status", "upcoming")
+        .lt("date", now.isoformat())
+        .execute()
+    )
+    stale_matches = stale_resp.data or []
+    if not stale_matches:
+        return 0
+
+    event_ids = {
+        match["match_id"]: match.get("espn_event_id")
+        for match in stale_matches
+        if match.get("espn_event_id")
+    }
+    missing_event_match_ids = [
+        match["match_id"] for match in stale_matches if not event_ids.get(match["match_id"])
+    ]
+    if missing_event_match_ids:
+        espn_resp = (
+            client.table("espn_match_data")
+            .select("match_id,espn_event_id")
+            .in_("match_id", missing_event_match_ids)
+            .execute()
+        )
+        for row in espn_resp.data or []:
+            if row.get("espn_event_id"):
+                event_ids[row["match_id"]] = row["espn_event_id"]
+
+    marked = 0
+    for match in stale_matches:
+        event_id = event_ids.get(match["match_id"])
+        if not event_id:
+            logger.info(
+                f"  Stale upcoming {match['team1']} vs {match['team2']} has no ESPN event ID; leaving unchanged"
+            )
+            continue
+
+        espn_winner, result_text = _espn_winner_from_summary(str(event_id))
+        if espn_winner == "__no_result__":
+            client.table("matches").update({
+                "status": "completed",
+                "winner": None,
+            }).eq("match_id", match["match_id"]).execute()
+            logger.info(
+                f"  Marked stale completed: {match['team1']} vs {match['team2']} — {result_text or 'No Result'}"
+            )
+            marked += 1
+            continue
+
+        if not espn_winner:
+            continue
+
+        actual = _match_espn_winner_to_prediction(espn_winner, match)
+        if not actual:
+            continue
+
+        client.table("matches").update({
+            "status": "completed",
+            "winner": actual,
+        }).eq("match_id", match["match_id"]).execute()
+        logger.info(
+            f"  Marked stale completed: {match['team1']} vs {match['team2']} → winner={actual}"
+        )
+        marked += 1
+
+    return marked
+
+
 # ---------------------------------------------------------------------------
 # Main scoring pipeline
 # ---------------------------------------------------------------------------
@@ -186,7 +258,11 @@ def main(force: bool = False) -> None:
     unscored = response.data
     logger.info(f"Found {len(unscored)} unscored predictions")
 
+    now = datetime.now(timezone.utc)
+
     if not unscored:
+        finalized = _mark_stale_upcoming_completed(client, now)
+        logger.info(f"Marked {finalized} stale upcoming matches completed")
         return
 
     # Get match dates from matches table
@@ -195,7 +271,6 @@ def main(force: bool = False) -> None:
     date_map = {m["match_id"]: m["date"] for m in matches_resp.data}
 
     # Filter to past matches only (date < now)
-    now = datetime.now(timezone.utc)
     past_unscored = []
     for p in unscored:
         date_str = date_map.get(p["match_id"], "")
@@ -215,6 +290,8 @@ def main(force: bool = False) -> None:
 
     if not past_unscored:
         logger.info("No past-date unscored predictions to check.")
+        finalized = _mark_stale_upcoming_completed(client, now)
+        logger.info(f"Marked {finalized} stale upcoming matches completed")
         return
 
     # --- Phase 1: Score via ESPN (stored event IDs) ---
@@ -300,6 +377,8 @@ def main(force: bool = False) -> None:
         except Exception as e:
             logger.warning(f"ESPN header scoring failed: {e}")
 
+    finalized = _mark_stale_upcoming_completed(client, now)
+    logger.info(f"Marked {finalized} stale upcoming matches completed")
     logger.info(f"Total scored this run: {scored}")
 
 

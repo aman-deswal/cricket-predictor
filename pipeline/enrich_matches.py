@@ -948,9 +948,7 @@ def _get_espn_venue(match_id: str) -> Optional[str]:
 
 
 def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
-    # Trust backend status='upcoming' rather than strict client-side date filtering.
-    # Some providers keep scheduled fixtures with stale/incorrect timestamps.
-    matches = get_upcoming_matches()
+    matches = get_upcoming_matches(future_only=True)
     if match_id is not None:
         matches = [match for match in matches if match.get("match_id") == match_id]
     matches = sorted(matches, key=match_priority)

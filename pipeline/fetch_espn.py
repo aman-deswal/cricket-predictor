@@ -160,7 +160,7 @@ def process_match(client, match: dict) -> bool:
 
 def main(limit: int = 50, match_id: Optional[str] = None) -> None:
     client = get_client()
-    matches = get_upcoming_matches()
+    matches = get_upcoming_matches(future_only=True)
 
     if match_id:
         matches = [m for m in matches if m.get("match_id") == match_id]

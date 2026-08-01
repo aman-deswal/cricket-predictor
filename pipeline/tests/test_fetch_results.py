@@ -8,7 +8,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import unittest
 from unittest.mock import MagicMock, patch
 
-from fetch_results import _normalize, _match_espn_winner_to_prediction, _score_prediction
+from datetime import datetime, timezone
+
+from fetch_results import (
+    _mark_stale_upcoming_completed,
+    _match_espn_winner_to_prediction,
+    _normalize,
+    _score_prediction,
+)
 
 
 class TestNormalize(unittest.TestCase):
@@ -119,6 +126,45 @@ class TestScorePrediction(unittest.TestCase):
         result = _score_prediction(self._pred(), "India")
         self.assertIsNotNone(result["scored_at"])
         self.assertIsInstance(result["scored_at"], str)
+
+
+class TestMarkStaleUpcomingCompleted(unittest.TestCase):
+    @patch("fetch_results._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
+    def test_marks_stale_match_completed_without_scoring(self, _mock_summary):
+        client = MagicMock()
+        tables = {}
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.lt.return_value = t
+            t.in_.return_value = t
+            t.update.return_value = t
+            if name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-42",
+                    "team1": "India",
+                    "team2": "Australia",
+                    "date": "2026-07-30T10:00:00+00:00",
+                    "espn_event_id": "42",
+                }])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            tables[name] = t
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        marked = _mark_stale_upcoming_completed(client, datetime(2026, 8, 1, tzinfo=timezone.utc))
+
+        self.assertEqual(marked, 1)
+        tables["matches"].update.assert_called_once_with({
+            "status": "completed",
+            "winner": "India",
+        })
+        client.table.assert_any_call("matches")
+        self.assertNotIn("prediction_results", tables)
 
 
 if __name__ == "__main__":
