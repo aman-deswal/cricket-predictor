@@ -934,7 +934,7 @@ export function PredictDetails() {
                       style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', gridArea: '1 / 1' }}
                     >
                       <div
-                        className="p-3 sm:p-2.5 flex flex-col gap-1.5"
+                        className="p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3"
                         style={{
                           background: `radial-gradient(circle at 15% 20%, ${bMeta.primaryColor}33 0%, transparent 38%), radial-gradient(circle at 85% 80%, ${wMeta.primaryColor}33 0%, transparent 38%), linear-gradient(135deg, #0a1222 0%, #0f1a33 48%, #121a2c 100%)`,
                         }}
@@ -943,55 +943,55 @@ export function PredictDetails() {
                           <>
                             {/* Header */}
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-[8px] font-bold uppercase tracking-widest text-white">H2H Matchup</span>
-                              <span className="text-[8px] font-mono text-gray-100">{batterLast} vs {bowlerLast}</span>
+                              <span className="text-[10px] sm:text-sm font-bold uppercase tracking-widest text-white">H2H Matchup</span>
+                              <span className="text-[10px] sm:text-sm font-mono text-gray-100">{batterLast} vs {bowlerLast}</span>
                             </div>
                             {/* Stats row */}
-                            <div className="grid grid-cols-4 gap-1 mb-1">
+                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-1">
                               {[
                                 { label: 'DISMISSALS', value: String(h2h.dismissals), accent: wMeta.primaryColor },
                                 { label: 'BALLS FACED', value: String(h2h.balls_faced), accent: '#f8fafc' },
                                 { label: 'DOT %', value: `${h2h.dot_pct}%`, accent: '#f8fafc' },
                                 { label: 'BDRY %', value: `${h2h.boundary_pct}%`, accent: bMeta.primaryColor },
                               ].map(stat => (
-                                <div key={stat.label} className="rounded-lg p-1 text-center border border-white/20 shadow-[inset_0_0_0.5px_rgba(255,255,255,0.35)]" style={{ background: 'rgba(10,20,42,0.92)' }}>
-                                  <p className="text-[19px] font-black leading-none drop-shadow-[0_0_8px_rgba(255,255,255,0.22)]" style={{ color: stat.accent }}>{stat.value}</p>
-                                  <p className="text-[6px] font-bold uppercase tracking-widest text-gray-100 mt-1">{stat.label}</p>
+                                <div key={stat.label} className="rounded-lg p-1.5 sm:p-2 text-center border border-white/20 shadow-[inset_0_0_0.5px_rgba(255,255,255,0.35)]" style={{ background: 'rgba(10,20,42,0.92)' }}>
+                                  <p className="text-[clamp(1.25rem,2.2vw,2rem)] font-black leading-none drop-shadow-[0_0_8px_rgba(255,255,255,0.22)]" style={{ color: stat.accent }}>{stat.value}</p>
+                                  <p className="text-[clamp(0.48rem,0.7vw,0.75rem)] font-bold uppercase tracking-widest text-gray-100 mt-1.5">{stat.label}</p>
                                 </div>
                               ))}
                             </div>
                             {/* Visual pressure bars */}
-                            <div className="grid grid-cols-2 gap-1.5 mb-1">
-                              <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[7px] font-bold uppercase tracking-wider text-white">Dot-ball pressure</span>
-                                  <span className="text-[9px] font-black text-white">{h2h.dot_pct}%</span>
+                            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-1">
+                              <div className="rounded-lg border border-white/20 p-1.5 sm:p-2" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[clamp(0.55rem,0.8vw,0.8rem)] font-bold uppercase tracking-wider text-white">Dot-ball pressure</span>
+                                  <span className="text-[clamp(0.7rem,1vw,1rem)] font-black text-white">{h2h.dot_pct}%</span>
                                 </div>
-                                <div className="h-2 rounded-full bg-gray-700/70 overflow-hidden">
+                                <div className="h-2 sm:h-3 rounded-full bg-gray-700/70 overflow-hidden">
                                   <div className="h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ width: `${Math.min(100, Math.max(0, h2h.dot_pct))}%`, backgroundColor: wMeta.primaryColor }} />
                                 </div>
                               </div>
-                              <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[7px] font-bold uppercase tracking-wider text-white">Boundary threat</span>
-                                  <span className="text-[9px] font-black text-white">{h2h.boundary_pct}%</span>
+                              <div className="rounded-lg border border-white/20 p-1.5 sm:p-2" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[clamp(0.55rem,0.8vw,0.8rem)] font-bold uppercase tracking-wider text-white">Boundary threat</span>
+                                  <span className="text-[clamp(0.7rem,1vw,1rem)] font-black text-white">{h2h.boundary_pct}%</span>
                                 </div>
-                                <div className="h-2 rounded-full bg-gray-700/70 overflow-hidden">
+                                <div className="h-2 sm:h-3 rounded-full bg-gray-700/70 overflow-hidden">
                                   <div className="h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ width: `${Math.min(100, Math.max(0, h2h.boundary_pct))}%`, backgroundColor: bMeta.primaryColor }} />
                                 </div>
                               </div>
                             </div>
                             {/* Last 5 encounters */}
-                            <div className="rounded-lg border border-white/20 p-1" style={{ background: 'rgba(10,20,42,0.9)' }}>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[7px] text-white font-bold uppercase tracking-wider shrink-0">Last 5</span>
-                                <span className="text-[7px] text-gray-100">W = bowler wicket</span>
+                            <div className="rounded-lg border border-white/20 p-1.5 sm:p-2" style={{ background: 'rgba(10,20,42,0.9)' }}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[clamp(0.55rem,0.8vw,0.8rem)] text-white font-bold uppercase tracking-wider shrink-0">Last 5</span>
+                                <span className="text-[clamp(0.55rem,0.8vw,0.8rem)] text-gray-100">W = bowler wicket</span>
                               </div>
                               <div className="flex gap-1.5">
                                 {h2h.last_5.map((r, j) => (
                                   <span
                                     key={j}
-                                    className="w-[22px] h-[22px] rounded-md text-[8px] font-black flex items-center justify-center border border-white/20 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
+                                    className="w-[22px] sm:w-8 h-[22px] sm:h-8 rounded-md text-[8px] sm:text-sm font-black flex items-center justify-center border border-white/20 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
                                     style={{
                                       background: r === 'W' ? `${wMeta.primaryColor}88` : `${bMeta.primaryColor}66`,
                                       color: r === 'W' ? '#ffffff' : '#ffffff',
