@@ -132,12 +132,15 @@ export function PredictDetails() {
   }, [matchId]);
 
   const [edgeBarsReady, setEdgeBarsReady] = useState(false);
-  const [flippedBattle, setFlippedBattle] = useState<number | null>(null);
+  const [flippedBattles, setFlippedBattles] = useState<Set<number>>(() => new Set());
   const [pressedBattle, setPressedBattle] = useState<number | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setEdgeBarsReady(true), 50);
     return () => clearTimeout(t);
   }, []);
+  useEffect(() => {
+    setFlippedBattles(new Set());
+  }, [matchId]);
 
   // Live countdown timer
   const getCountdown = useCallback(() => {
@@ -773,7 +776,7 @@ export function PredictDetails() {
               const wMeta = getTeamMeta(battle.bowler_team ?? '');
               const batterLast = battle.batter.split(' ').slice(-1)[0];
               const bowlerLast = battle.bowler.split(' ').slice(-1)[0];
-              const isFlipped = flippedBattle === i;
+              const isFlipped = flippedBattles.has(i);
               const h2h = battle.h2h;
               const batterImg = playerImageMap.get(battle.batter.toLowerCase()) || playerImageMap.get(batterLast.toLowerCase());
               const bowlerImg = playerImageMap.get(battle.bowler.toLowerCase()) || playerImageMap.get(bowlerLast.toLowerCase());
@@ -791,7 +794,15 @@ export function PredictDetails() {
                     perspective: '1200px',
                     transform: pressedBattle === i ? 'scale(0.985)' : 'scale(1)',
                   }}
-                  onClick={() => setFlippedBattle(isFlipped ? null : i)}
+                  onClick={() => setFlippedBattles((current) => {
+                    const next = new Set(current);
+                    if (next.has(i)) {
+                      next.delete(i);
+                    } else {
+                      next.add(i);
+                    }
+                    return next;
+                  })}
                   onPointerDown={() => setPressedBattle(i)}
                   onPointerUp={() => setPressedBattle(null)}
                   onPointerCancel={() => setPressedBattle(null)}
