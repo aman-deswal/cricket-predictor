@@ -1178,52 +1178,10 @@ export function PredictDetails() {
         );
       })()}
 
-      {/* Research Notes + Key Players to Watch */}
+      {/* Research Notes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {/* Key Players to Watch (ESPN H2H Leaders) */}
-        {(espnData?.series_leaders?.length ?? 0) > 0 && (
-          <motion.div
-            className={detailTileClass}
-            {...fadeUp}
-            transition={{ delay: 0.29 }}
-          >
-            <h2 className={`${detailTileTitleClass} mb-3`}>
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3 3-5 6-5s6 2 6 5" /></svg>
-              Key Players to Watch
-            </h2>
-            <div className="space-y-1.5">
-              {espnData!.series_leaders.map((leader, i) => {
-                const isBatting = leader.category.toLowerCase().includes('run');
-                const localImg = playerImageMap.get(leader.player_name.toLowerCase()) || playerImageMap.get(leader.player_name.split(' ').pop()?.toLowerCase() ?? '');
-                const imgUrl = localImg || leader.headshot_url;
-                return (
-                  <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-gray-800/30 border border-gray-800/50">
-                    {imgUrl ? (
-                      <img src={imgUrl} alt={leader.player_name} className="w-8 h-8 rounded-full object-cover ring-1 ring-gray-700 flex-shrink-0" />
-                    ) : (
-                      <span className="w-8 h-8 rounded-full bg-cricket-500/15 flex items-center justify-center flex-shrink-0">
-                        {isBatting ? <BatIcon className="w-3.5 h-3.5 text-cricket-400" /> : <BowlIcon className="w-3.5 h-3.5 text-orange-400" />}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[clamp(0.75rem,0.95vw,0.95rem)] font-semibold text-white truncate">{leader.player_name}</p>
-                      <p className={`${detailTileMetaClass} text-gray-300 truncate`}>{leader.team_abbr}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className={`text-[clamp(0.85rem,1vw,1rem)] font-bold ${isBatting ? 'text-cricket-400' : 'text-orange-400'}`}>{leader.value}</p>
-                      <p className={`${detailTileMetaClass} text-gray-300 uppercase`}>{leader.category}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className={`${detailTileMetaClass} text-gray-400 mt-2 text-center`}>H2H career stats via ESPN Cricinfo</p>
-          </motion.div>
-        )}
-
-        {/* Research Notes */}
         <motion.div
-          className={`${detailTileClass} transition-all ${(espnData?.series_leaders?.length ?? 0) > 0 ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-3'} ${
+          className={`${detailTileClass} transition-all md:col-span-2 lg:col-span-3 ${
             enrichment ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
           }`}
           {...fadeUp}
