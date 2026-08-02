@@ -813,7 +813,7 @@ export function PredictDetails() {
                         <div className="flex-1 p-3 flex flex-col" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2">
-                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[7px] sm:text-[clamp(0.65rem,0.75vw,0.8rem)] font-bold uppercase tracking-wider text-white" style={{
                               background: `${bMeta.primaryColor}35`,
                               border: `1px solid ${bMeta.primaryColor}80`,
                             }}>
@@ -829,19 +829,19 @@ export function PredictDetails() {
                             <div className="min-w-0 flex-1">
                               <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{batterLast}</p>
                               {batterStats ? (
-                                <p className="hidden sm:block text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
+                                <p className="hidden sm:block text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-gray-200 mt-2 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
                               ) : null}
                               {h2h && (
-                                <p className="text-[8px] font-mono text-cricket-300 mt-1 leading-none">{h2h.runs_scored} runs vs {bowlerLast}</p>
+                                <p className="text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-cricket-300 mt-1.5 leading-none">{h2h.runs_scored} runs vs {bowlerLast}</p>
                               )}
                             </div>
                           </div>
                           {/* Form strip — last 5 scores */}
                           {battle.batter_scores && (
                             <div className="flex items-center gap-1 mt-auto pt-2">
-                              <span className="hidden sm:inline text-[6.5px] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
                               {battle.batter_scores.slice(0, 5).map((score, fi) => (
-                                <span key={fi} className="min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
+                                <span key={fi} className="min-w-[20px] sm:min-w-[28px] px-1 h-5 sm:h-7 rounded text-[8px] sm:text-xs font-black flex items-center justify-center shrink-0" style={{
                                   background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
                                   color: score >= 50 ? '#4ade80' : score >= 25 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${score >= 50 ? '#16a34a88' : score >= 25 ? '#d9770688' : '#dc262688'}`,
@@ -866,7 +866,7 @@ export function PredictDetails() {
                         <div className="flex-1 p-3 flex flex-col text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2 flex justify-end">
-                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-white" style={{
+                            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[7px] sm:text-[clamp(0.65rem,0.75vw,0.8rem)] font-bold uppercase tracking-wider text-white" style={{
                               background: `${wMeta.primaryColor}35`,
                               border: `1px solid ${wMeta.primaryColor}80`,
                             }}>
@@ -879,10 +879,10 @@ export function PredictDetails() {
                             <div className="min-w-0 flex-1 text-right">
                               <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{bowlerLast}</p>
                               {bowlerStats ? (
-                                <p className="hidden sm:block text-[8px] font-mono text-gray-200 mt-1 leading-none whitespace-nowrap">{bowlerStats.bowling_wickets} WKTS · {bowlerStats.bowling_economy?.toFixed(1)} ECO</p>
+                                <p className="hidden sm:block text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-gray-200 mt-2 leading-none whitespace-nowrap">{bowlerStats.bowling_wickets} WKTS · {bowlerStats.bowling_economy?.toFixed(1)} ECO</p>
                               ) : null}
                               {h2h && (
-                                <p className="text-[8px] font-mono text-amber-300 mt-1 leading-none">{h2h.dot_pct}% dot balls</p>
+                                <p className="text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-amber-300 mt-1.5 leading-none">{h2h.dot_pct}% dot balls</p>
                               )}
                             </div>
                             {bowlerImg && (
@@ -893,22 +893,22 @@ export function PredictDetails() {
                           {battle.bowler_figures && (
                             <div className="flex items-center justify-end gap-1 mt-auto pt-2">
                               {battle.bowler_figures.slice(0, 5).map((wkts, fi) => (
-                                <span key={fi} className="min-w-[20px] sm:min-w-[22px] px-1 h-5 rounded text-[8px] font-black flex items-center justify-center shrink-0" style={{
+                                <span key={fi} className="min-w-[20px] sm:min-w-[28px] px-1 h-5 sm:h-7 rounded text-[8px] sm:text-xs font-black flex items-center justify-center shrink-0" style={{
                                   background: wkts >= 3 ? '#16a34a55' : wkts >= 1 ? '#d9770655' : '#dc262655',
                                   color: wkts >= 3 ? '#4ade80' : wkts >= 1 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
                                 }}>{wkts}W</span>
                               ))}
-                              <span className="hidden sm:inline text-[6.5px] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
                             </div>
                           )}
                         </div>
                       </div>
                       {/* Insight strip — single row */}
                       {insightParts && (
-                        <div className="px-2.5 sm:px-3 py-2 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2">
-                          <div className="text-[9px] text-gray-300 leading-tight flex-1 min-w-0 line-clamp-2 flex items-start gap-1">
-                            <SparkleIcon className="w-3 h-3 text-cricket-300 shrink-0 mt-px" />
+                        <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2.5 sm:gap-3">
+                          <div className="text-[clamp(0.72rem,2.8vw,0.875rem)] md:text-[clamp(0.95rem,1.15vw,1.125rem)] text-gray-300 leading-snug flex-1 min-w-0 line-clamp-2 flex items-start gap-1.5 sm:gap-2">
+                            <SparkleIcon className="w-[clamp(0.85rem,3vw,1rem)] md:w-4 h-[clamp(0.85rem,3vw,1rem)] md:h-4 text-cricket-300 shrink-0 mt-px" />
                             <span>{insightParts.map((part, j) => {
                               const isNum = /^\d/.test(part);
                               return isNum
@@ -916,7 +916,7 @@ export function PredictDetails() {
                                 : <span key={j}>{part}</span>;
                             })}</span>
                           </div>
-                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap cursor-pointer">
+                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-2 sm:px-4 py-0.5 sm:py-1.5 text-[8px] sm:text-xs font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap cursor-pointer">
                             <span className="relative mr-1 flex h-2 w-2">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cricket-300 opacity-75" />
                               <span className="relative inline-flex h-2 w-2 rounded-full bg-cricket-200" />
