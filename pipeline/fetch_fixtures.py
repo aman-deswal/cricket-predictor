@@ -1,18 +1,20 @@
 """Fetch upcoming cricket fixtures and store in Supabase.
 
-Uses ESPN Cricinfo exclusively — free, unlimited. Fetches all upcoming and
-recently completed matches from the ESPN header endpoint.
+Uses ESPN Cricinfo as the primary source and Cricbuzz JSON-LD as a fallback
+for upcoming fixtures when ESPN's header feed is too current-day biased.
 
 Also detects completed matches and scores any pending predictions.
 """
 
 import argparse
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from utils.db import get_client, replace_upcoming_matches
+from utils.cricbuzz import get_cricbuzz_upcoming_fixtures
 from utils.espn import (
+    _normalize_team,
     get_espn_fixtures,
     get_espn_match_winner,
     get_series_fixtures,
@@ -57,6 +59,184 @@ def _merge_fixtures_by_event(fixtures: list[dict]) -> list[dict]:
             merged[event_id] = fixture
 
     return list(merged.values())
+
+
+def _fixture_identity(fixture: dict) -> tuple[str, str, str]:
+    """Return a cross-source fixture identity for exact same-match de-duping."""
+    teams = sorted([
+        _normalize_team(fixture.get("team1", "")),
+        _normalize_team(fixture.get("team2", "")),
+    ])
+    return (teams[0], teams[1], fixture.get("date", ""))
+
+
+def _parse_fixture_date(value: str) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return parsed
+
+
+def _same_fixture_window(left: dict, right: dict, tolerance: timedelta = timedelta(hours=2)) -> bool:
+    left_teams = sorted([
+        _normalize_team(left.get("team1", "")),
+        _normalize_team(left.get("team2", "")),
+    ])
+    right_teams = sorted([
+        _normalize_team(right.get("team1", "")),
+        _normalize_team(right.get("team2", "")),
+    ])
+    if left_teams != right_teams:
+        return False
+
+    left_date = _parse_fixture_date(left.get("date", ""))
+    right_date = _parse_fixture_date(right.get("date", ""))
+    if left_date is None or right_date is None:
+        return left.get("date", "") == right.get("date", "")
+
+    return abs(left_date - right_date) <= tolerance
+
+
+def _merge_fixtures_by_identity(fixtures: list[dict]) -> list[dict]:
+    """Deduplicate same match from multiple sources, preferring ESPN rows."""
+    merged: dict[tuple[str, str, str], dict] = {}
+    for fixture in fixtures:
+        key = _fixture_identity(fixture)
+        current = merged.get(key)
+        if current is None:
+            merged[key] = fixture
+            continue
+
+        current_source = current.get("source", "espn")
+        incoming_source = fixture.get("source", "espn")
+        if current_source != "espn" and incoming_source == "espn":
+            merged[key] = fixture
+            continue
+
+        if fixture.get("venue") and not current.get("venue"):
+            merged[key] = fixture
+
+    return list(merged.values())
+
+
+def _target_exists(client, table: str, match_id: str, select_field: str = "match_id") -> bool:
+    response = (
+        client.table(table)
+        .select(select_field)
+        .eq(select_field, match_id)
+        .execute()
+    )
+    return bool(response.data)
+
+
+def _migrate_single_match_id_table(
+    client,
+    table: str,
+    old_match_id: str,
+    new_match_id: str,
+    update_payload: Optional[dict] = None,
+    target_field: str = "match_id",
+) -> None:
+    if _target_exists(client, table, new_match_id, select_field=target_field):
+        logger.info("Skipping %s migration for %s; target %s already exists", table, old_match_id, new_match_id)
+        return
+
+    payload = update_payload or {"match_id": new_match_id}
+    client.table(table).update(payload).eq(target_field, old_match_id).execute()
+
+
+def _migrate_match_squads(client, old_match_id: str, new_match_id: str) -> None:
+    squads = (
+        client.table("match_squads")
+        .select("team")
+        .eq("match_id", old_match_id)
+        .execute()
+        .data
+        or []
+    )
+    for squad in squads:
+        team = squad.get("team")
+        existing = (
+            client.table("match_squads")
+            .select("id")
+            .eq("match_id", new_match_id)
+            .eq("team", team)
+            .execute()
+            .data
+            or []
+        )
+        if existing:
+            continue
+        client.table("match_squads").update({"match_id": new_match_id}).eq(
+            "match_id", old_match_id
+        ).eq("team", team).execute()
+
+
+def _migrate_links_to_canonical_match(client, old_match_id: str, new_match_id: str) -> None:
+    """Move provisional Cricbuzz-linked data to the canonical ESPN match ID."""
+    migration_ops = [
+        lambda: _migrate_single_match_id_table(client, "predictions", old_match_id, new_match_id),
+        lambda: _migrate_single_match_id_table(
+            client,
+            "prediction_results",
+            old_match_id,
+            new_match_id,
+            update_payload={"prediction_id": new_match_id, "match_id": new_match_id},
+            target_field="prediction_id",
+        ),
+        lambda: _migrate_single_match_id_table(client, "match_edge_scores", old_match_id, new_match_id),
+        lambda: _migrate_single_match_id_table(client, "match_enrichment", old_match_id, new_match_id),
+        lambda: _migrate_single_match_id_table(client, "espn_match_data", old_match_id, new_match_id),
+        lambda: _migrate_match_squads(client, old_match_id, new_match_id),
+        lambda: client.table("match_odds").update({"match_id": new_match_id}).eq("match_id", old_match_id).execute(),
+    ]
+    for migrate in migration_ops:
+        try:
+            migrate()
+        except Exception as exc:
+            logger.debug("Provisional fixture link migration skipped: %s", exc)
+
+
+def _reconcile_provisional_fixtures(client, espn_fixtures: list[dict]) -> int:
+    """Replace provisional Cricbuzz match rows with canonical ESPN rows."""
+    cricbuzz_matches = (
+        client.table("matches")
+        .select("match_id, team1, team2, date")
+        .like("match_id", "cricbuzz-%")
+        .eq("status", "upcoming")
+        .execute()
+        .data
+        or []
+    )
+    if not cricbuzz_matches:
+        return 0
+
+    reconciled = 0
+    for espn_fixture in espn_fixtures:
+        if espn_fixture.get("status") != "pre":
+            continue
+        espn_id = espn_fixture.get("espn_event_id")
+        if not espn_id:
+            continue
+        new_match_id = f"espn-{espn_id}"
+
+        for provisional in cricbuzz_matches:
+            old_match_id = provisional["match_id"]
+            if not _same_fixture_window(espn_fixture, provisional):
+                continue
+
+            try:
+                _migrate_links_to_canonical_match(client, old_match_id, new_match_id)
+                client.table("matches").delete().eq("match_id", old_match_id).execute()
+                logger.info("Reconciled provisional fixture %s -> %s", old_match_id, new_match_id)
+                reconciled += 1
+            except Exception as exc:
+                logger.warning("Failed to reconcile provisional fixture %s -> %s: %s", old_match_id, new_match_id, exc)
+
+    return reconciled
 
 
 def _score_prediction(prediction: dict, actual_winner: str) -> dict:
@@ -175,25 +355,33 @@ def _infer_match_type(league_name: str) -> str:
     return "T20"
 
 
-def _espn_fixtures_to_matches(espn_fixtures: list[dict]) -> list[dict]:
-    """Convert ESPN 'pre' (upcoming) fixtures to matches-table rows.
+def _fixture_source_id(fixture: dict) -> Optional[str]:
+    source = fixture.get("source", "espn")
+    if source == "espn":
+        return fixture.get("espn_event_id", "")
+    return fixture.get("source_id", "")
 
-    Uses 'espn-<event_id>' as a stable match_id so these records can coexist
-    with CricAPI-sourced rows without collisions.
+
+def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
+    """Convert 'pre' (upcoming) fixtures to matches-table rows.
+
+    Uses '<source>-<source_id>' as a stable match_id so records from multiple
+    fixture sources can coexist without collisions.
     """
     matches = []
-    for f in espn_fixtures:
+    for f in fixtures:
         if f.get("status") != "pre":
             continue
-        espn_id = f.get("espn_event_id", "")
-        if not espn_id:
+        source = f.get("source", "espn")
+        source_id = _fixture_source_id(f)
+        if not source_id:
             continue
         team1 = f.get("team1", "")
         team2 = f.get("team2", "")
         if not team1 or not team2:
             continue
         matches.append({
-            "match_id": f"espn-{espn_id}",
+            "match_id": f"{source}-{source_id}",
             "name": f"{team1} vs {team2}",
             "team1": team1,
             "team2": team2,
@@ -203,6 +391,11 @@ def _espn_fixtures_to_matches(espn_fixtures: list[dict]) -> list[dict]:
             "status": "upcoming",
         })
     return matches
+
+
+def _espn_fixtures_to_matches(espn_fixtures: list[dict]) -> list[dict]:
+    """Backward-compatible wrapper for ESPN fixture conversion."""
+    return _fixtures_to_matches(espn_fixtures)
 
 
 def main(match_types: Optional[list[str]] = None) -> None:
@@ -228,18 +421,25 @@ def main(match_types: Optional[list[str]] = None) -> None:
     if series_fixtures:
         logger.info(f"ESPN series scoreboards: found {len(series_fixtures)} fixtures across {len(league_ids)} leagues")
 
-    all_fixtures = _merge_fixtures_by_event([*espn_fixtures, *series_fixtures])
-    logger.info(f"ESPN merged fixture set: {len(all_fixtures)} unique events")
+    cricbuzz_fixtures = get_cricbuzz_upcoming_fixtures()
+    if cricbuzz_fixtures:
+        logger.info(f"Cricbuzz fallback: found {len(cricbuzz_fixtures)} future fixtures")
+
+    espn_merged = _merge_fixtures_by_event([*espn_fixtures, *series_fixtures])
+    all_fixtures = _merge_fixtures_by_identity([*espn_merged, *cricbuzz_fixtures])
+    logger.info(f"Merged fixture set: {len(all_fixtures)} unique events")
 
     # --- Phase 2: Upsert upcoming fixtures ---
-    espn_upcoming = _espn_fixtures_to_matches(all_fixtures)
-    if espn_upcoming:
-        logger.info(f"Upserting {len(espn_upcoming)} upcoming ESPN fixtures...")
-        replace_upcoming_matches(espn_upcoming)
+    upcoming_matches = _fixtures_to_matches(all_fixtures)
+    if upcoming_matches:
+        logger.info(f"Upserting {len(upcoming_matches)} upcoming fixtures...")
+        replace_upcoming_matches(upcoming_matches)
 
         # Stamp espn_event_id on matches row and create espn_match_data stubs
         client = get_client()
-        for m in espn_upcoming:
+        for m in upcoming_matches:
+            if not m["match_id"].startswith("espn-"):
+                continue
             espn_eid = m["match_id"].removeprefix("espn-")
             try:
                 client.table("matches").update({
@@ -256,8 +456,11 @@ def main(match_types: Optional[list[str]] = None) -> None:
                     }).execute()
             except Exception:
                 pass
+        reconciled = _reconcile_provisional_fixtures(client, all_fixtures)
+        if reconciled:
+            logger.info(f"Reconciled {reconciled} provisional Cricbuzz fixtures to ESPN IDs")
     else:
-        logger.warning("No upcoming fixtures from ESPN header.")
+        logger.warning("No upcoming fixtures found from ESPN or Cricbuzz.")
 
     # --- Phase 3: Score completed matches ---
     espn_completed = [f for f in all_fixtures if f.get("status") == "post" and f.get("winner")]
