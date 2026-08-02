@@ -1179,7 +1179,8 @@ export function PredictDetails() {
       })()}
 
       {/* Research Notes + Key Players to Watch */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">        {/* Key Players to Watch (ESPN H2H Leaders) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {/* Key Players to Watch (ESPN H2H Leaders) */}
         {(espnData?.series_leaders?.length ?? 0) > 0 && (
           <motion.div
             className={detailTileClass}
@@ -1222,7 +1223,7 @@ export function PredictDetails() {
 
         {/* Research Notes */}
         <motion.div
-          className={`${detailTileClass} transition-all ${
+          className={`${detailTileClass} transition-all ${(espnData?.series_leaders?.length ?? 0) > 0 ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-3'} ${
             enrichment ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
           }`}
           {...fadeUp}
@@ -1233,54 +1234,58 @@ export function PredictDetails() {
             Research Notes
           </h2>
           {enrichment ? (
-            <>
-              {expertPreview && (
-                <p className={`${detailTileBodyClass} mb-3`}>{visiblePreview}</p>
-              )}
+            <div className="space-y-4">
+              <div className={`grid gap-4 ${visibleUpdates.length > 0 ? 'xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.9fr)] xl:items-start' : ''}`}>
+                <div className="space-y-3">
+                  {expertPreview && (
+                    <p className={`${detailTileBodyClass} max-w-4xl`}>{visiblePreview}</p>
+                  )}
 
-              {visibleUpdates.length > 0 && (
-                <div className="space-y-1.5 mb-3">
-                  {visibleUpdates.map((update, index) => {
-                    const statusText = update.status?.toLowerCase() ?? '';
-                    const dot = statusText.match(/fit|available|ready|cleared|playing|train/)
-                      ? 'bg-emerald-400'
-                      : statusText.match(/doubt|uncertain|monitor|assess|possible/)
-                      ? 'bg-amber-400'
-                      : statusText.match(/out|ruled|miss|injur|withdraw/)
-                      ? 'bg-red-400'
-                      : 'bg-gray-500';
-                    return (
-                      <div
-                        key={`${update.player ?? 'update'}-${index}`}
-                        className="flex items-start gap-2 rounded-lg bg-gray-800/40 border border-gray-700/30 px-3 py-2"
-                      >
-                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-                        <div>
-                          <span className={`${detailTileMetaClass} font-bold text-white`}>{update.player ?? update.team ?? 'Update'}</span>
-                          <span className={`${detailTileMetaClass} text-gray-400 ml-1.5`}>{update.status}</span>
+                  {visibleSources.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {visibleSources.map((source, index) => (
+                        <a
+                          key={`${source.url ?? source.title}-${index}`}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`inline-flex items-center gap-1 ${detailTileMetaClass} font-semibold text-cricket-400 hover:text-cricket-300 bg-cricket-400/8 hover:bg-cricket-400/15 border border-cricket-400/20 px-2 py-0.5 rounded-full transition-colors`}
+                        >
+                          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 2H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V6M6 1h3v3M9 1L5 5"/></svg>
+                          {source.source || `[${index + 1}]`}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {visibleUpdates.length > 0 && (
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    {visibleUpdates.map((update, index) => {
+                      const statusText = update.status?.toLowerCase() ?? '';
+                      const dot = statusText.match(/fit|available|ready|cleared|playing|train/)
+                        ? 'bg-emerald-400'
+                        : statusText.match(/doubt|uncertain|monitor|assess|possible/)
+                        ? 'bg-amber-400'
+                        : statusText.match(/out|ruled|miss|injur|withdraw/)
+                        ? 'bg-red-400'
+                        : 'bg-gray-500';
+                      return (
+                        <div
+                          key={`${update.player ?? 'update'}-${index}`}
+                          className="flex min-w-0 items-start gap-2 rounded-lg bg-gray-800/40 border border-gray-700/30 px-3 py-2"
+                        >
+                          <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                          <div className="min-w-0">
+                            <span className={`${detailTileMetaClass} font-bold text-white`}>{update.player ?? update.team ?? 'Update'}</span>
+                            <span className={`${detailTileMetaClass} text-gray-400 ml-1.5`}>{update.status}</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {visibleSources.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {visibleSources.map((source, index) => (
-                    <a
-                      key={`${source.url ?? source.title}-${index}`}
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`inline-flex items-center gap-1 ${detailTileMetaClass} font-semibold text-cricket-400 hover:text-cricket-300 bg-cricket-400/8 hover:bg-cricket-400/15 border border-cricket-400/20 px-2 py-0.5 rounded-full transition-colors`}
-                    >
-                      <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 2H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V6M6 1h3v3M9 1L5 5"/></svg>
-                      {source.source || `[${index + 1}]`}
-                    </a>
-                  ))}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               {researchNeedsAccordion && (
                 <button
                   type="button"
@@ -1290,7 +1295,7 @@ export function PredictDetails() {
                   {expandedSections.researchNotes ? 'Show less' : 'Show more'}
                 </button>
               )}
-            </>
+            </div>
           ) : (
             <p className={`${detailTileBodyClass} text-center py-4`}>Research data not available</p>
           )}
