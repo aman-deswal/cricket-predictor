@@ -31,6 +31,7 @@ const TEAMS: Record<string, TeamMeta> = {
   'Namibia': { name: 'Namibia', shortName: 'NAM', countryCode: 'na', primaryColor: '#003580', secondaryColor: '#C8102E' },
   'USA': { name: 'USA', shortName: 'USA', countryCode: 'us', primaryColor: '#002868', secondaryColor: '#BF0A30' },
   'Canada': { name: 'Canada', shortName: 'CAN', countryCode: 'ca', primaryColor: '#FF0000', secondaryColor: '#FFFFFF' },
+  'Argentina': { name: 'Argentina', shortName: 'ARG', countryCode: 'ar', primaryColor: '#74ACDF', secondaryColor: '#FFFFFF' },
   'Oman': { name: 'Oman', shortName: 'OMA', countryCode: 'om', primaryColor: '#DB161B', secondaryColor: '#008000' },
   'UAE': { name: 'UAE', shortName: 'UAE', countryCode: 'ae', primaryColor: '#00732F', secondaryColor: '#FF0000' },
   'United Arab Emirates': { name: 'UAE', shortName: 'UAE', countryCode: 'ae', primaryColor: '#00732F', secondaryColor: '#FF0000' },
@@ -45,6 +46,7 @@ const TEAMS: Record<string, TeamMeta> = {
   'Sri Lanka Women': { name: 'Sri Lanka Women', shortName: 'SLW', countryCode: 'lk', primaryColor: '#0033A0', secondaryColor: '#FFB81C' },
   'West Indies Women': { name: 'West Indies Women', shortName: 'WIW', countryCode: 'jm', primaryColor: '#7B0041', secondaryColor: '#FFD700' },
   'Bangladesh Women': { name: 'Bangladesh Women', shortName: 'BANW', countryCode: 'bd', primaryColor: '#006A4E', secondaryColor: '#F42A41' },
+  'Argentina Women': { name: 'Argentina Women', shortName: 'ARGW', countryCode: 'ar', primaryColor: '#74ACDF', secondaryColor: '#FFFFFF' },
 
   // IPL teams
   'Mumbai Indians': { name: 'Mumbai Indians', shortName: 'MI', countryCode: 'in', primaryColor: '#004BA0', secondaryColor: '#D4A017' },
