@@ -103,7 +103,7 @@ flowchart LR
 
 | Workflow | Schedule | Purpose |
 |---|---|---|
-| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures from ESPN (free, unlimited), backup score pass |
+| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures from ESPN, use Cricbuzz JSON-LD as a fixture-horizon fallback, backup score pass |
 | `fetch-results.yml` | hourly | Score unscored predictions on completed matches (ESPN only) |
 | `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN; player stats + headshots (CricAPI optional) |
 | `fetch-headshots.yml` | monthly | Full headshot refresh pass |
@@ -156,7 +156,7 @@ python pipeline/fetch_cricsheet.py --types t20s odis
 # Stats cache build
 python pipeline/compute_stats.py --types t20s ipl
 
-# Fixtures + mappings
+# Fixtures + mappings (ESPN primary, Cricbuzz upcoming fallback)
 python pipeline/fetch_fixtures.py
 
 # Optional ESPN deep fetch for upcoming matches

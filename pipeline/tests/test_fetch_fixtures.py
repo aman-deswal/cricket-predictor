@@ -9,7 +9,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import unittest
 from unittest.mock import MagicMock, patch
 
-from fetch_fixtures import _infer_match_type, _espn_fixtures_to_matches, _score_espn_completed
+from fetch_fixtures import (
+    _espn_fixtures_to_matches,
+    _fixtures_to_matches,
+    _infer_match_type,
+    _merge_fixtures_by_identity,
+    _score_espn_completed,
+    _same_fixture_window,
+)
 
 
 class TestInferMatchType(unittest.TestCase):
@@ -117,6 +124,48 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         fixtures = [self._make_fixture(espn_id="99887766")]
         matches = _espn_fixtures_to_matches(fixtures)
         self.assertEqual(matches[0]["match_id"], "espn-99887766")
+
+    def test_non_espn_source_match_id_format(self):
+        fixture = self._make_fixture()
+        fixture.pop("espn_event_id")
+        fixture["source"] = "cricbuzz"
+        fixture["source_id"] = "abc123"
+
+        matches = _fixtures_to_matches([fixture])
+
+        self.assertEqual(matches[0]["match_id"], "cricbuzz-abc123")
+
+    def test_merge_identity_prefers_espn_for_same_match(self):
+        espn_fixture = self._make_fixture(venue="")
+        cricbuzz_fixture = self._make_fixture(venue="Sophia Gardens")
+        cricbuzz_fixture.pop("espn_event_id")
+        cricbuzz_fixture["source"] = "cricbuzz"
+        cricbuzz_fixture["source_id"] = "abc123"
+
+        merged = _merge_fixtures_by_identity([cricbuzz_fixture, espn_fixture])
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].get("source", "espn"), "espn")
+
+    def test_same_fixture_window_matches_nearby_source_times(self):
+        espn_fixture = self._make_fixture(
+            team1="Welsh Fire",
+            team2="Southern Brave",
+            date="2026-08-03T17:30:00Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Southern Brave",
+            team2="Welsh Fire",
+            date="2026-08-03T18:00:00.000Z",
+        )
+
+        self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
+    def test_same_fixture_window_rejects_different_dates(self):
+        espn_fixture = self._make_fixture(date="2026-08-03T17:30:00Z")
+        cricbuzz_fixture = self._make_fixture(date="2026-08-04T17:30:00.000Z")
+
+        self.assertFalse(_same_fixture_window(espn_fixture, cricbuzz_fixture))
 
 
 class TestScoreEspnCompleted(unittest.TestCase):
