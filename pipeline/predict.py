@@ -1,11 +1,13 @@
 """Generate deterministic match predictions with optional AI garnish downstream."""
 
 import argparse
+import json
 import logging
+import re
 import sys
 from math import exp
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
 from utils.db import (
@@ -34,6 +36,83 @@ def get_default_context_stats() -> tuple[dict, dict, dict, dict]:
     return team_form, team_form, h2h, venue
 
 
+def _normalize_team_key(name: str) -> str:
+    normalized = name.lower().replace("&", "and")
+    normalized = re.sub(r"\((men|women)\)", r" \1 ", normalized)
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _team_matches(candidate: str, expected: str) -> bool:
+    candidate_key = _normalize_team_key(candidate)
+    expected_key = _normalize_team_key(expected)
+    return bool(candidate_key and expected_key) and (
+        candidate_key == expected_key
+        or candidate_key in expected_key
+        or expected_key in candidate_key
+    )
+
+
+def _parse_json_array(value: Any) -> list[dict]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(parsed, list):
+            return [item for item in parsed if isinstance(item, dict)]
+    return []
+
+
+def _stored_h2h_to_edge_results(stored_h2h: list[dict]) -> list[dict]:
+    results = []
+    for game in stored_h2h:
+        teams = game.get("teams") or []
+        if not isinstance(teams, list) or len(teams) < 2:
+            continue
+        winner = next((team for team in teams if isinstance(team, dict) and team.get("winner")), None)
+        results.append({
+            "date": game.get("date", ""),
+            "team1": teams[0].get("name", ""),
+            "team2": teams[1].get("name", ""),
+            "score1": teams[0].get("score", ""),
+            "score2": teams[1].get("score", ""),
+            "winner": winner.get("name", "") if winner else "",
+            "status": game.get("note", ""),
+        })
+    return results
+
+
+def _h2h_counts_from_espn(results: list[dict], team1: str, team2: str) -> Optional[dict]:
+    if not results:
+        return None
+
+    team1_wins = 0
+    team2_wins = 0
+    counted = 0
+    for game in results:
+        winner = game.get("winner", "")
+        if not winner:
+            continue
+        if _team_matches(winner, team1):
+            team1_wins += 1
+            counted += 1
+        elif _team_matches(winner, team2):
+            team2_wins += 1
+            counted += 1
+
+    if counted == 0:
+        return None
+
+    return {
+        "total_matches": counted,
+        "team1_wins": team1_wins,
+        "team2_wins": team2_wins,
+    }
+
+
 def _store_edge_score(match_id: str, edge: dict) -> None:
     """Store edge score in Supabase match_edge_scores table."""
     try:
@@ -48,7 +127,10 @@ def _store_edge_score(match_id: str, edge: dict) -> None:
             "factors": edge["factors"],
         }
         client.table("match_edge_scores").upsert(row, on_conflict="match_id").execute()
-        logger.info(f"  Edge score stored: {edge['edge_team']} +{abs(edge['net_edge']):.0f}")
+        if edge["edge_team"]:
+            logger.info(f"  Edge score stored: {edge['edge_team']} +{abs(edge['net_edge']):.0f}")
+        else:
+            logger.info("  Edge score stored: no clear edge")
     except Exception as exc:
         logger.warning(f"  Failed to store edge score: {exc}")
 
@@ -107,15 +189,24 @@ def build_context(match: dict) -> dict:
     espn_h2h_results: list = []
     espn_series_scoreline = ""
     espn_event_id = match.get("espn_event_id")
-    if not espn_event_id:
-        try:
-            client = get_client()
-            r = client.table("espn_match_data").select("espn_event_id,series_scoreline").eq("match_id", match["match_id"]).execute()
-            if r.data and r.data[0].get("espn_event_id"):
-                espn_event_id = r.data[0]["espn_event_id"]
-                espn_series_scoreline = r.data[0].get("series_scoreline") or ""
-        except Exception:
-            pass
+    stored_espn_h2h: list[dict] = []
+    try:
+        client = get_client()
+        r = (
+            client.table("espn_match_data")
+            .select("espn_event_id,series_scoreline,head_to_head")
+            .eq("match_id", match["match_id"])
+            .execute()
+        )
+        if r.data:
+            row = r.data[0]
+            espn_event_id = espn_event_id or row.get("espn_event_id")
+            espn_series_scoreline = row.get("series_scoreline") or ""
+            stored_espn_h2h = _parse_json_array(row.get("head_to_head"))
+            espn_h2h_results = _stored_h2h_to_edge_results(stored_espn_h2h)
+    except Exception as exc:
+        logger.warning(f"  Failed to read stored ESPN context: {exc}")
+
     if espn_event_id:
         try:
             ctx = get_espn_enrichment_context(espn_event_id)
@@ -123,9 +214,23 @@ def build_context(match: dict) -> dict:
             if formatted.strip():
                 espn_ctx = formatted
                 logger.info(f"  ESPN context for prediction: {len(espn_ctx)} chars")
-            espn_h2h_results = ctx.get("h2h_results", [])
+            live_h2h = ctx.get("h2h_results", [])
+            if live_h2h:
+                espn_h2h_results = live_h2h
         except Exception as exc:
             logger.warning(f"  Failed to get ESPN context: {exc}")
+
+    espn_h2h = _h2h_counts_from_espn(espn_h2h_results, team1, team2)
+    if espn_h2h and espn_h2h["total_matches"] > h2h.get("total_matches", 0):
+        h2h = espn_h2h
+        logger.info(
+            "  Using ESPN H2H: %s %s-%s %s across %s matches",
+            team1,
+            h2h["team1_wins"],
+            h2h["team2_wins"],
+            team2,
+            h2h["total_matches"],
+        )
 
     # Fetch latest sportsbook odds
     odds_data = None

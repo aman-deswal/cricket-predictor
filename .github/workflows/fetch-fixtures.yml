@@ -36,20 +36,6 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python pipeline/fetch_espn.py --limit 50
 
-      - name: Generate predictions and enrichment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
-          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
-          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
-          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
-          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
-          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
-        run: python pipeline/predict.py
-
       - name: Fetch odds
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
@@ -81,6 +67,20 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python pipeline/fetch_headshots.py
+
+      - name: Generate predictions and enrichment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
+          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
+          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
+          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
+          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
+        run: python pipeline/predict.py --force
 
       - name: Backup score pending results
         if: ${{ always() }}

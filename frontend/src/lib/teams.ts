@@ -77,9 +77,17 @@ const TEAMS: Record<string, TeamMeta> = {
   'Oval Invincibles': { name: 'Oval Invincibles', shortName: 'OI', countryCode: '', primaryColor: '#F4D03F', secondaryColor: '#1A1A2E' },
   'London Spirit': { name: 'London Spirit', shortName: 'LS', countryCode: '', primaryColor: '#1565C0', secondaryColor: '#FFFFFF' },
   'Southern Brave': { name: 'Southern Brave', shortName: 'SB', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
+  'Southern Brave (Men)': { name: 'Southern Brave (Men)', shortName: 'SB-M', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
+  'Southern Brave Men': { name: 'Southern Brave Men', shortName: 'SB-M', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
+  'Southern Brave (Women)': { name: 'Southern Brave (Women)', shortName: 'SB-W', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
+  'Southern Brave Women': { name: 'Southern Brave Women', shortName: 'SB-W', countryCode: '', primaryColor: '#C62828', secondaryColor: '#FFFFFF' },
   'Northern Superchargers': { name: 'Northern Superchargers', shortName: 'NS', countryCode: '', primaryColor: '#FF8F00', secondaryColor: '#1A237E' },
   'Trent Rockets': { name: 'Trent Rockets', shortName: 'TR', countryCode: '', primaryColor: '#00838F', secondaryColor: '#FFFFFF' },
   'Welsh Fire': { name: 'Welsh Fire', shortName: 'WF', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
+  'Welsh Fire (Men)': { name: 'Welsh Fire (Men)', shortName: 'WF-M', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
+  'Welsh Fire Men': { name: 'Welsh Fire Men', shortName: 'WF-M', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
+  'Welsh Fire (Women)': { name: 'Welsh Fire (Women)', shortName: 'WF-W', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
+  'Welsh Fire Women': { name: 'Welsh Fire Women', shortName: 'WF-W', countryCode: '', primaryColor: '#FF6F00', secondaryColor: '#FFFFFF' },
   'Birmingham Phoenix': { name: 'Birmingham Phoenix', shortName: 'BP', countryCode: '', primaryColor: '#00C853', secondaryColor: '#1A1A1A' },
   'Manchester Originals': { name: 'Manchester Originals', shortName: 'MO', countryCode: '', primaryColor: '#6A1B9A', secondaryColor: '#FFEB3B' },
 
@@ -112,11 +120,32 @@ function normalizeTeamName(name: string): string {
   return name.trim();
 }
 
+function splitGenderSuffix(name: string): { baseName: string; suffix: 'M' | 'W' | null } {
+  const trimmed = name.trim();
+  const match = trimmed.match(/\s*(?:\((Men|Women)\)|(Men|Women))\s*$/i);
+  if (!match) return { baseName: trimmed, suffix: null };
+  const gender = (match[1] || match[2]).toLowerCase();
+  return {
+    baseName: trimmed.slice(0, match.index).trim(),
+    suffix: gender === 'women' ? 'W' : 'M',
+  };
+}
+
 export function getTeamMeta(teamName: string): TeamMeta {
   const normalized = normalizeTeamName(teamName);
 
   // Direct match
   if (TEAMS[normalized]) return TEAMS[normalized];
+
+  const gendered = splitGenderSuffix(normalized);
+  if (gendered.suffix && TEAMS[gendered.baseName]) {
+    const base = TEAMS[gendered.baseName];
+    return {
+      ...base,
+      name: normalized,
+      shortName: `${base.shortName}-${gendered.suffix}`,
+    };
+  }
 
   // Try partial match
   const key = Object.keys(TEAMS).find(

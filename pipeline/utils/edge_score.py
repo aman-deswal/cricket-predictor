@@ -304,7 +304,7 @@ def compute_edge_score(
     )
 
     net_edge = round(t1_total - t2_total, 1)
-    edge_team = team1 if net_edge > 0 else team2
+    edge_team = team1 if net_edge > 0 else team2 if net_edge < 0 else ""
 
     # Generate narrative
     factors = []
@@ -321,7 +321,10 @@ def compute_edge_score(
         favored = team1 if t1_market > t2_market else team2
         factors.append(f"markets favor {favored}")
 
-    narrative = f"{edge_team} holds a +{abs(net_edge):.0f} edge"
+    if net_edge == 0:
+        narrative = "No clear edge on the structured factors"
+    else:
+        narrative = f"{edge_team} holds a +{abs(net_edge):.0f} edge"
     if factors:
         narrative += f" — {', '.join(factors)}"
 
@@ -356,7 +359,11 @@ def format_edge_for_prompt(edge: Dict[str, Any], team1: str, team2: str) -> str:
     lines = [
         f"**SixSense Edge Score™ (proprietary blend):**",
         f"  {team1}: {edge['team1_score']:.0f}/100  |  {team2}: {edge['team2_score']:.0f}/100",
-        f"  Net edge: {edge['edge_team']} +{abs(edge['net_edge']):.0f}",
+        (
+            f"  Net edge: {edge['edge_team']} +{abs(edge['net_edge']):.0f}"
+            if edge["edge_team"]
+            else "  Net edge: no clear edge"
+        ),
         f"",
         f"  Factor breakdown ({team1} / {team2}):",
         f"    Form (30%):     {f1['form']:.0f} / {f2['form']:.0f}",
