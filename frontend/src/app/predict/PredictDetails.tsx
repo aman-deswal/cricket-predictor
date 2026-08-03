@@ -305,6 +305,27 @@ export function PredictDetails() {
   const researchSummary = weakResearchCopy && researchFacts.length > 0
     ? researchFacts.join(' ')
     : visiblePreview;
+  const h2hLeader = h2hTeam1Wins > h2hTeam2Wins
+    ? displayTeam1
+    : h2hTeam2Wins > h2hTeam1Wins
+    ? displayTeam2
+    : null;
+  const modelPick = prediction && hasClearPick ? prediction.predicted_winner : null;
+  const h2hContradictsPick = Boolean(
+    h2hLeader
+    && modelPick
+    && !teamIdentityMatches(h2hLeader, modelPick)
+  );
+  const h2hContextSource = expertPreview || reasoningSentences.join(' ');
+  const h2hContextSentences = h2hContextSource
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 10)
+    .slice(0, 2)
+    .join(' ');
+  const h2hReconciliationNote = h2hContradictsPick && h2hContextSentences
+    ? `Despite ${h2hLeader} leading the recent H2H, ${modelPick} is the model pick. ${h2hContextSentences}`
+    : '';
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -1619,6 +1640,14 @@ export function PredictDetails() {
                 );
               })}
             </div>
+            {h2hReconciliationNote && (
+              <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3.5 py-3 text-[clamp(0.78rem,0.95vw,0.95rem)] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-amber-300">⚡</span>
+                  <p className="leading-relaxed">{h2hReconciliationNote}</p>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       ) : (
