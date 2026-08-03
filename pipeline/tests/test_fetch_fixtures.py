@@ -254,8 +254,9 @@ class TestScoreEspnCompleted(unittest.TestCase):
         self.assertEqual(result, 0)
         mock_get_client.assert_not_called()
 
+    @patch("fetch_fixtures._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
     @patch("fetch_fixtures.get_client")
-    def test_scores_matching_prediction(self, mock_get_client):
+    def test_scores_matching_prediction(self, mock_get_client, _mock_summary):
         client = MagicMock()
         mock_get_client.return_value = client
 
@@ -308,8 +309,9 @@ class TestScoreEspnCompleted(unittest.TestCase):
         scored = _score_espn_completed([self._make_espn_fixture("42", "India")])
         self.assertEqual(scored, 1)
 
+    @patch("fetch_fixtures._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
     @patch("fetch_fixtures.get_client")
-    def test_marks_completed_without_prediction(self, mock_get_client):
+    def test_marks_completed_without_prediction(self, mock_get_client, _mock_summary):
         client = MagicMock()
         mock_get_client.return_value = client
         tables = {}
@@ -344,8 +346,9 @@ class TestScoreEspnCompleted(unittest.TestCase):
             "winner": "India",
         })
 
+    @patch("fetch_fixtures._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
     @patch("fetch_fixtures.get_client")
-    def test_skips_when_no_espn_match_data(self, mock_get_client):
+    def test_skips_when_no_espn_match_data(self, mock_get_client, _mock_summary):
         client = MagicMock()
         mock_get_client.return_value = client
 
@@ -360,6 +363,60 @@ class TestScoreEspnCompleted(unittest.TestCase):
 
         scored = _score_espn_completed([self._make_espn_fixture("999", "India")])
         self.assertEqual(scored, 0)
+
+    @patch("fetch_fixtures._espn_winner_from_summary", return_value=("Guyana Amazon Warriors", "Final"))
+    @patch("fetch_fixtures.get_client")
+    def test_uses_summary_winner_when_fixture_feed_disagrees(self, mock_get_client, _mock_summary):
+        client = MagicMock()
+        mock_get_client.return_value = client
+        tables = {}
+
+        prediction = self._make_prediction(
+            "espn-1533136",
+            "Guyana Amazon Warriors",
+            "San Francisco Unicorns",
+            "Guyana Amazon Warriors",
+            0.5,
+            0.5,
+        )
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.is_.return_value = t
+            t.update.return_value = t
+            t.upsert.return_value = t
+            if name == "espn_match_data":
+                t.execute.return_value = MagicMock(data=[{"match_id": "espn-1533136"}])
+            elif name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-1533136",
+                    "team1": "Guyana Amazon Warriors",
+                    "team2": "San Francisco Unicorns",
+                }])
+            elif name == "predictions":
+                t.execute.return_value = MagicMock(data=[prediction])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            tables[name] = t
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        scored = _score_espn_completed([
+            self._make_espn_fixture("1533136", "San Francisco Unicorns")
+        ])
+
+        self.assertEqual(scored, 1)
+        tables["matches"].update.assert_called_once_with({
+            "status": "completed",
+            "winner": "Guyana Amazon Warriors",
+        })
+        result = tables["prediction_results"].upsert.call_args.args[0]
+        self.assertEqual(result["actual_winner"], "Guyana Amazon Warriors")
+        self.assertTrue(result["correct"])
+        self.assertEqual(result["result_text"], "Final")
 
 
 if __name__ == "__main__":

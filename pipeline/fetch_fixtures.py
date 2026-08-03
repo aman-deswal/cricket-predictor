@@ -17,9 +17,9 @@ from utils.cricbuzz import get_cricbuzz_upcoming_fixtures
 from utils.espn import (
     _normalize_team,
     get_espn_fixtures,
-    get_espn_match_winner,
     get_series_fixtures,
 )
+from fetch_results import _espn_winner_from_summary
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -268,7 +268,7 @@ def _reconcile_provisional_fixtures(client, espn_fixtures: list[dict]) -> int:
     return reconciled
 
 
-def _score_prediction(prediction: dict, actual_winner: str) -> dict:
+def _score_prediction(prediction: dict, actual_winner: str, result_text: Optional[str] = None) -> dict:
     """Score a single prediction against the actual winner."""
     predicted_winner = prediction["predicted_winner"]
     correct = predicted_winner == actual_winner
@@ -291,6 +291,7 @@ def _score_prediction(prediction: dict, actual_winner: str) -> dict:
             prediction["team1_win_probability"],
             prediction["team2_win_probability"],
         ),
+        "result_text": result_text,
         "scored_at": datetime.utcnow().isoformat(),
     }
 
@@ -308,8 +309,24 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
     scored = 0
 
     for fixture in completed:
-        espn_winner = fixture["winner"]
         espn_eid = fixture["espn_event_id"]
+        fixture_winner = fixture["winner"]
+
+        summary_winner, result_text = _espn_winner_from_summary(str(espn_eid))
+        if summary_winner == "__no_result__":
+            logger.info("ESPN event %s is a no-result; skipping fixture-feed winner %s", espn_eid, fixture_winner)
+            continue
+        if not summary_winner:
+            logger.warning("ESPN event %s has fixture-feed winner %s but no summary winner; skipping scoring", espn_eid, fixture_winner)
+            continue
+        if summary_winner != fixture_winner:
+            logger.warning(
+                "ESPN event %s fixture-feed winner %s disagrees with summary winner %s; using summary",
+                espn_eid,
+                fixture_winner,
+                summary_winner,
+            )
+        espn_winner = summary_winner
 
         # Find our match by ESPN event ID
         espn_rec = (
@@ -363,7 +380,7 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
             continue
 
         prediction = pred_resp.data[0]
-        result = _score_prediction(prediction, actual)
+        result = _score_prediction(prediction, actual, result_text)
         client.table("prediction_results").upsert(result, on_conflict="prediction_id").execute()
         client.table("predictions").update({"scored_at": datetime.utcnow().isoformat()}).eq("match_id", match_id).execute()
 
