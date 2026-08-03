@@ -32,6 +32,7 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
   const c2raw = team2Meta.primaryColor;
   const c2 = colorDistance(c1, c2raw) < 80 ? team2Meta.secondaryColor : c2raw;
   const COLORS = [c1, c2];
+  const isTossUp = Math.abs(team1Prob - team2Prob) < 0.005;
   const winner = team1Prob > team2Prob ? team1 : team2;
   const winnerProb = Math.max(team1Prob, team2Prob);
 
@@ -81,7 +82,7 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
         {/* Center percentage */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-xs sm:text-sm font-black text-white drop-shadow-lg">
-            {(winnerProb * 100).toFixed(0)}%
+            {isTossUp ? '50/50' : `${(winnerProb * 100).toFixed(0)}%`}
           </span>
         </div>
       </motion.div>
@@ -140,10 +141,10 @@ export function PredictionChart({ team1, team2, team1Prob, team2Prob, compact = 
         transition={{ delay: 0.8 }}
       >
         <p className="text-3xl font-black text-white">
-          {(winnerProb * 100).toFixed(0)}%
+          {isTossUp ? '50/50' : `${(winnerProb * 100).toFixed(0)}%`}
         </p>
         <p className="text-xs text-gray-400 uppercase tracking-wider mt-1">
-          {getTeamMeta(winner).shortName} wins
+          {isTossUp ? 'Toss-up' : `${getTeamMeta(winner).shortName} wins`}
         </p>
       </motion.div>
 

@@ -41,30 +41,63 @@ function getSeriesName(match: Match): string {
   return match.name || match.venue || 'TBC';
 }
 
-function getBookmakerMarketUrl(bookmaker: string, match: Match, market: string): string {
+const TRUSTED_SPORTSBOOKS: Record<string, { url: string; priority: number }> = {
+  draftkings: { url: 'https://sportsbook.draftkings.com/leagues/cricket', priority: 1 },
+  fanduel: { url: 'https://sportsbook.fanduel.com/navigation/cricket', priority: 2 },
+  betmgm: { url: 'https://sports.betmgm.com/en/sports/cricket-29', priority: 3 },
+  caesars: { url: 'https://www.caesars.com/sportsbook-and-casino/sports', priority: 4 },
+  espnbet: { url: 'https://espnbet.com/sport/cricket', priority: 5 },
+  bet365: { url: 'https://www.bet365.com/', priority: 6 },
+  williamhill: { url: 'https://sports.williamhill.com/betting/en-gb/tags/cricket', priority: 7 },
+  paddypower: { url: 'https://www.paddypower.com/cricket', priority: 8 },
+  betfairsportsbook: { url: 'https://www.betfair.com/sport/cricket', priority: 9 },
+  betfair: { url: 'https://www.betfair.com/sport/cricket', priority: 9 },
+  skybet: { url: 'https://m.skybet.com/cricket', priority: 10 },
+  unibet: { url: 'https://www.unibet.com/betting/sports/filter/cricket', priority: 11 },
+  betway: { url: 'https://betway.com/sport/cricket', priority: 12 },
+  boylesports: { url: 'https://www.boylesports.com/sports/cricket', priority: 13 },
+  matchbook: { url: 'https://www.matchbook.com/events/cricket', priority: 14 },
+  tab: { url: 'https://www.tab.com.au/sports/betting/Cricket', priority: 15 },
+  sportsbet: { url: 'https://www.sportsbet.com.au/betting/cricket', priority: 16 },
+  ladbrokes: { url: 'https://www.ladbrokes.com.au/sports/cricket', priority: 17 },
+  neds: { url: 'https://www.neds.com.au/sports/cricket', priority: 18 },
+  pointsbetau: { url: 'https://pointsbet.com.au/sports/cricket', priority: 19 },
+  pointsbet: { url: 'https://pointsbet.com.au/sports/cricket', priority: 19 },
+};
+
+function normalizeBookmaker(bookmaker: string): string {
+  return bookmaker.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getTrustedSportsbook(bookmaker: string): { url: string; priority: number } | null {
+  return TRUSTED_SPORTSBOOKS[normalizeBookmaker(bookmaker)] ?? null;
+}
+
+function getBookmakerMarketUrl(bookmaker: string): string | null {
   const normalized = bookmaker.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const query = encodeURIComponent(`${match.team1} vs ${match.team2} cricket ${market}`);
-
-  const searchUrlByBookmaker: Record<string, string> = {
-    tab: `https://www.tab.com.au/sports/search?query=${query}`,
-    skynet: `https://www.skybet.com/search?query=${query}`,
-    skybet: `https://www.skybet.com/search?query=${query}`,
-    paddypower: `https://www.paddypower.com/search?q=${query}`,
-    boylesports: `https://www.boylesports.com/search?query=${query}`,
-    bet365: `https://www.bet365.com/`,
-    williamhill: `https://sports.williamhill.com/betting/en-gb`,
-    unibet: `https://www.unibet.com/betting/sports/filter/cricket`,
-  };
-
-  return searchUrlByBookmaker[normalized] || `https://www.google.com/search?q=${encodeURIComponent(`${bookmaker} ${match.team1} vs ${match.team2} cricket odds`)}`;
+  return TRUSTED_SPORTSBOOKS[normalized]?.url ?? null;
 }
 
 function openExternalMarket(url: string): void {
   if (typeof window === 'undefined') return;
-  const popup = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!popup) {
-    window.location.href = url;
-  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function normalizeTeamIdentity(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/\((men|women)\)/g, ' $1 ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function teamIdentityMatches(candidate: string | undefined, expected: string): boolean {
+  if (!candidate || !expected) return false;
+  const candidateKey = normalizeTeamIdentity(candidate);
+  const expectedKey = normalizeTeamIdentity(expected);
+  return candidateKey === expectedKey || candidateKey.includes(expectedKey) || expectedKey.includes(candidateKey);
 }
 
 const fadeUp = {
@@ -77,6 +110,23 @@ const detailTileStrongClass = 'bg-gradient-to-br from-gray-900/90 to-cricket-950
 const detailTileTitleClass = 'text-[clamp(0.8rem,1vw,1rem)] font-bold text-white uppercase tracking-wider flex items-center gap-1.5';
 const detailTileMetaClass = 'text-[clamp(0.65rem,0.8vw,0.8rem)]';
 const detailTileBodyClass = 'text-[clamp(0.875rem,1.05vw,1.05rem)] text-gray-300 leading-relaxed';
+
+function ComingSoonTile({ title, body, eyebrow = 'Coming soon' }: { title: string; body: string; eyebrow?: string }) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-gray-950 via-gray-900 to-cricket-950 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-cricket-400/15 blur-3xl" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cricket-300/60 to-transparent" />
+      <div className="relative mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-cricket-300/25 bg-cricket-300/10 text-cricket-200">
+        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <path d="M3 13h10M4 10l2-5 2 3 2-5 2 7" />
+        </svg>
+      </div>
+      <p className={`${detailTileMetaClass} relative mb-1 font-black uppercase tracking-[0.24em] text-cricket-300`}>{eyebrow}</p>
+      <p className="relative text-[clamp(0.95rem,1.15vw,1.15rem)] font-black text-white">{title}</p>
+      <p className={`${detailTileMetaClass} relative mx-auto mt-1 max-w-md text-gray-400`}>{body}</p>
+    </div>
+  );
+}
 
 export function PredictDetails() {
   const searchParams = useSearchParams();
@@ -184,20 +234,31 @@ export function PredictDetails() {
   const displayTeam2 = prediction?.team2 ?? match.team2;
   const team1Meta = getTeamMeta(displayTeam1);
   const team2Meta = getTeamMeta(displayTeam2);
+  const predictionMargin = prediction ? Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) : 0;
+  const hasClearPick = predictionMargin >= 0.01;
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
   const isModelEstimated = enrichment !== null && (enrichment.source_links?.length ?? 0) === 0;
   const squadLabel = isModelEstimated ? 'Recent-player candidates' : 'Source-backed squad';
   const h2hGames = (espnData?.head_to_head ?? []).filter(g => g.teams && g.teams.length > 0);
+  const isH2HTeam1 = (team: { abbreviation?: string; name?: string }) =>
+    team.abbreviation?.toUpperCase() === team1Meta.shortName.toUpperCase()
+    || teamIdentityMatches(team.name, displayTeam1);
+  const h2hLast5 = h2hGames.slice(0, 5);
+  const h2hTeam1Wins = h2hLast5.filter(g => {
+    const winner = g.teams.find(t => t.winner);
+    return winner && isH2HTeam1(winner);
+  }).length;
+  const h2hTeam2Wins = h2hLast5.length - h2hTeam1Wins;
 
   // Derive form from ESPN H2H (most recent and accurate for this matchup)
   // Falls back to Cricsheet format form if no ESPN data
-  const deriveH2HForm = (teamShortName: string): Array<'W' | 'L'> => {
+  const deriveH2HForm = (teamName: string, teamShortName: string): Array<'W' | 'L'> => {
     if (h2hGames.length === 0) return [];
     return h2hGames
       .slice(0, 5)
       .map(game => {
         const team = game.teams.find((t: { abbreviation?: string; name?: string }) =>
-          t.abbreviation?.toUpperCase() === teamShortName.toUpperCase()
+          t.abbreviation?.toUpperCase() === teamShortName.toUpperCase() || teamIdentityMatches(t.name, teamName)
         );
         if (!team) return null;
         return team.winner ? 'W' as const : 'L' as const;
@@ -205,16 +266,24 @@ export function PredictDetails() {
       .filter((r): r is 'W' | 'L' => r !== null)
       .reverse(); // oldest first → left-to-right chronological
   };
-  const team1H2H = deriveH2HForm(team1Meta.shortName);
-  const team2H2H = deriveH2HForm(team2Meta.shortName);
+  const team1H2H = deriveH2HForm(displayTeam1, team1Meta.shortName);
+  const team2H2H = deriveH2HForm(displayTeam2, team2Meta.shortName);
   const team1Form = team1H2H.length > 0 ? team1H2H : (match.team1_recent_form ?? []).slice(-5);
   const team2Form = team2H2H.length > 0 ? team2H2H : (match.team2_recent_form ?? []).slice(-5);
-  const featuredBookmakerUrl = odds.length > 0
-    ? getBookmakerMarketUrl(odds[0].bookmaker, match, odds[0].market)
+  const sportsbookOdds = odds
+    .map((odd) => ({ odd, sportsbook: getTrustedSportsbook(odd.bookmaker) }))
+    .filter((entry): entry is { odd: MatchOdds; sportsbook: { url: string; priority: number } } => entry.sportsbook !== null)
+    .sort((a, b) => a.sportsbook.priority - b.sportsbook.priority)
+    .map((entry) => entry.odd);
+  const featuredBookmakerUrl = sportsbookOdds.length > 0
+    ? getBookmakerMarketUrl(sportsbookOdds[0].bookmaker)
     : null;
-  const reasoningSentences = (prediction?.reasoning || '')
+  const rawReasoningSentences = (prediction?.reasoning || '')
     .split(/(?<=[.!?])\s+/)
     .filter((s: string) => s.trim().length > 10);
+  const reasoningSentences = odds.length > 0
+    ? rawReasoningSentences.filter((s) => !/No live sportsbook line was available/i.test(s))
+    : rawReasoningSentences;
   const visibleReasoning = expandedSections.ourTake ? reasoningSentences : reasoningSentences.slice(0, 3);
 
   const expertPreview = enrichment?.expert_preview?.trim() || '';
@@ -226,6 +295,37 @@ export function PredictDetails() {
     : `${expertPreview.slice(0, 260).trimEnd()}…`;
   const visibleUpdates = expandedSections.researchNotes ? playerUpdates.slice(0, 6) : playerUpdates.slice(0, 2);
   const visibleSources = expandedSections.researchNotes ? sourceLinks.slice(0, 6) : sourceLinks.slice(0, 2);
+  const weakResearchCopy = !expertPreview || /No recent reputable source-backed updates|unavailable until a reliable source is found/i.test(expertPreview);
+  const researchFacts = [
+    espnData?.venue_name ? `ESPN confirms ${espnData.venue_name}${espnData.venue_city ? `, ${espnData.venue_city}` : ''} as the venue.` : '',
+    h2hGames.length > 0 ? `ESPN has ${h2hGames.slice(0, 5).length} recent head-to-head results for this matchup.` : '',
+    sportsbookOdds.length > 0 ? `Live market data is available from ${sportsbookOdds.length} trusted ${sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}.` : '',
+    squads.length === 0 && !hasSquadOrXi ? 'Confirmed squads or XIs are not available yet.' : '',
+  ].filter(Boolean);
+  const researchSummary = weakResearchCopy && researchFacts.length > 0
+    ? researchFacts.join(' ')
+    : visiblePreview;
+  const h2hLeader = h2hTeam1Wins > h2hTeam2Wins
+    ? displayTeam1
+    : h2hTeam2Wins > h2hTeam1Wins
+    ? displayTeam2
+    : null;
+  const modelPick = prediction && hasClearPick ? prediction.predicted_winner : null;
+  const h2hContradictsPick = Boolean(
+    h2hLeader
+    && modelPick
+    && !teamIdentityMatches(h2hLeader, modelPick)
+  );
+  const h2hContextSource = expertPreview || reasoningSentences.join(' ');
+  const h2hContextSentences = h2hContextSource
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 10)
+    .slice(0, 2)
+    .join(' ');
+  const h2hReconciliationNote = h2hContradictsPick && h2hContextSentences
+    ? `Despite ${h2hLeader} leading the recent H2H, ${modelPick} is the model pick. ${h2hContextSentences}`
+    : '';
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -309,7 +409,7 @@ export function PredictDetails() {
             transition={{ delay: 0.2 }}
           >
             {/* Pick badge above flag */}
-            {prediction && prediction.team1_win_probability >= prediction.team2_win_probability ? (
+            {prediction && hasClearPick && prediction.team1_win_probability > prediction.team2_win_probability ? (
               <div className="mb-2 flex items-center justify-center">
                 <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
@@ -319,7 +419,7 @@ export function PredictDetails() {
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
               className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
-              style={prediction && prediction.team1_win_probability >= prediction.team2_win_probability
+              style={prediction && hasClearPick && prediction.team1_win_probability > prediction.team2_win_probability
                 ? { boxShadow: `0 0 0 3px ${teamColor1}, 0 0 0 5px ${teamColor1}44, 0 0 20px ${teamColor1}55`, outline: 'none' }
                 : { boxShadow: `0 0 0 2px ${team1Meta.primaryColor}55` }
               }
@@ -355,6 +455,9 @@ export function PredictDetails() {
                 {(prediction.team1_win_probability * 100).toFixed(0)}%
               </p>
             )}
+            {!prediction && (
+              <p className={`${detailTileMetaClass} mt-1 font-black uppercase tracking-[0.24em] text-gray-500`}>Queued</p>
+            )}
             {prediction && (
               <span
                 className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
@@ -372,8 +475,8 @@ export function PredictDetails() {
                   }
                 } : undefined}
               >
-                {odds.length > 0
-                  ? decimalToAmerican(odds[0].team1_odds)
+                {sportsbookOdds.length > 0
+                  ? decimalToAmerican(sportsbookOdds[0].team1_odds)
                   : toAmericanOdds(prediction.team1_win_probability)}
               </span>
             )}
@@ -410,8 +513,16 @@ export function PredictDetails() {
                 </div>
               </div>
             ) : (
-              <div className="w-12 h-12 rounded-full bg-cricket-900/80 border border-cricket-700/50 flex items-center justify-center">
-                <span className="text-[clamp(0.8rem,1vw,1rem)] font-black text-cricket-400 uppercase">VS</span>
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-cricket-300/20 bg-gradient-to-br from-gray-950 via-gray-900 to-cricket-950 flex items-center justify-center overflow-hidden shadow-[0_0_40px_rgba(251,146,60,0.12)]">
+                  <div className="absolute inset-5 rounded-full border border-dashed border-cricket-300/20" />
+                  <div className="absolute h-16 w-16 rounded-full bg-cricket-400/10 blur-2xl" />
+                  <div className="relative text-center">
+                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-cricket-300">Coming</p>
+                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-cricket-300">Soon</p>
+                  </div>
+                </div>
+                <p className={`${detailTileMetaClass} max-w-40 text-center text-gray-500`}>SixSense model run is warming up</p>
               </div>
             )}
 
@@ -425,7 +536,7 @@ export function PredictDetails() {
             transition={{ delay: 0.2 }}
           >
             {/* Pick badge above flag */}
-            {prediction && prediction.team2_win_probability > prediction.team1_win_probability ? (
+            {prediction && hasClearPick && prediction.team2_win_probability > prediction.team1_win_probability ? (
               <div className="mb-2 flex items-center justify-center">
                 <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
@@ -435,7 +546,7 @@ export function PredictDetails() {
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
               className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
-              style={prediction && prediction.team2_win_probability > prediction.team1_win_probability
+              style={prediction && hasClearPick && prediction.team2_win_probability > prediction.team1_win_probability
                 ? { boxShadow: `0 0 0 3px ${teamColor2}, 0 0 0 5px ${teamColor2}44, 0 0 20px ${teamColor2}55` }
                 : { boxShadow: `0 0 0 2px ${team2Meta.primaryColor}55` }
               }
@@ -471,6 +582,9 @@ export function PredictDetails() {
                 {(prediction.team2_win_probability * 100).toFixed(0)}%
               </p>
             )}
+            {!prediction && (
+              <p className={`${detailTileMetaClass} mt-1 font-black uppercase tracking-[0.24em] text-gray-500`}>Queued</p>
+            )}
             {prediction && (
               <span
                 className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
@@ -488,8 +602,8 @@ export function PredictDetails() {
                   }
                 } : undefined}
               >
-                {odds.length > 0
-                  ? decimalToAmerican(odds[0].team2_odds)
+                {sportsbookOdds.length > 0
+                  ? decimalToAmerican(sportsbookOdds[0].team2_odds)
                   : toAmericanOdds(prediction.team2_win_probability)}
               </span>
             )}
@@ -526,7 +640,7 @@ export function PredictDetails() {
         {/* Sportsbook Odds */}
         <motion.div
           className={`${detailTileClass} transition-all ${
-            odds.length > 0 ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+            sportsbookOdds.length > 0 ? 'border-cricket-800/30' : 'border-cricket-800/20'
           }`}
           {...fadeUp}
           transition={{ delay: 0.22 }}
@@ -536,11 +650,11 @@ export function PredictDetails() {
               <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
               Sportsbook Odds
             </h2>
-            {odds.length > 0 && <span className={`${detailTileMetaClass} text-gray-300`}>{odds.length} {odds.length === 1 ? 'bookmaker' : 'bookmakers'}</span>}
+            {sportsbookOdds.length > 0 && <span className={`${detailTileMetaClass} text-gray-300`}>{sportsbookOdds.length} trusted {sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}</span>}
           </div>
-          {odds.length > 0 ? (
+          {sportsbookOdds.length > 0 ? (
             <div className="space-y-2">
-              {odds.slice(0, 4).map((o) => {
+              {sportsbookOdds.slice(0, 4).map((o) => {
                 const aiProb1 = prediction?.team1_win_probability;
                 const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
                 const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
@@ -551,7 +665,10 @@ export function PredictDetails() {
                   <button
                     key={`${o.bookmaker}-${o.fetched_at}`}
                     type="button"
-                    onClick={() => openExternalMarket(getBookmakerMarketUrl(o.bookmaker, match, o.market))}
+                    onClick={() => {
+                      const url = getBookmakerMarketUrl(o.bookmaker);
+                      if (url) openExternalMarket(url);
+                    }}
                     className="w-full appearance-none flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-cricket-500/40 hover:bg-gray-800/65 transition-colors text-left"
                   >
                     <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-gray-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
@@ -572,7 +689,10 @@ export function PredictDetails() {
               })}
             </div>
           ) : (
-            <p className={`${detailTileBodyClass} text-center py-4`}>No sportsbook odds available yet</p>
+            <ComingSoonTile
+              title="Market board opening soon"
+              body="Odds will appear here as soon as the bookmaker feed prices this fixture."
+            />
           )}
         </motion.div>
 
@@ -621,17 +741,20 @@ export function PredictDetails() {
           <motion.div
             {...fadeUp}
             transition={{ delay: 0.25 }}
-            className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-gray-800/20 opacity-50 flex flex-col items-center justify-center text-center"
+            className={detailTileClass}
           >
-            <p className="text-[clamp(0.9rem,1.1vw,1.1rem)] font-semibold text-gray-300">Prediction Pending</p>
-            <p className="text-gray-400 text-[clamp(0.78rem,0.95vw,0.95rem)] mt-1">Pipeline hasn&apos;t run yet</p>
+            <ComingSoonTile
+              title="Prediction premiere queued"
+              body="The deterministic model will publish this tile after fixture context, odds, and matchup signals finish ingesting."
+              eyebrow="Analysis warming up"
+            />
           </motion.div>
         )}
       </div>
 
       {/* AI vs Market Edge — the betting value signal */}
-      {odds.length > 0 && prediction && (() => {
-        const o = odds[0];
+      {sportsbookOdds.length > 0 && prediction && (() => {
+        const o = sportsbookOdds[0];
         const ai1 = Math.round(prediction.team1_win_probability * 100);
         const ai2 = Math.round(prediction.team2_win_probability * 100);
         const implied1 = Math.round((1 / o.team1_odds) * 100);
@@ -1037,7 +1160,7 @@ export function PredictDetails() {
       ) : null}
 
       {/* SixSense Edge Score™ */}
-      {edgeScore && prediction && (() => {
+      {edgeScore && prediction ? (() => {
         const edge = edgeScore;
         const f1 = edge.factors.team1;
         const f2 = edge.factors.team2;
@@ -1176,13 +1299,33 @@ export function PredictDetails() {
 
           </motion.div>
         );
-      })()}
+      })() : (
+        <motion.div
+          className={`${detailTileStrongClass} mb-4`}
+          {...fadeUp}
+          transition={{ delay: 0.18 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className={detailTileTitleClass}>
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
+              Who has the edge?
+            </h2>
+            <span className={`${detailTileMetaClass} text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded-full`}>
+              SixSense Edge Score™
+            </span>
+          </div>
+          <ComingSoonTile
+            title="Edge score rendering soon"
+            body="Form, momentum, pressure, and market factors will light up here after the prediction pass finishes."
+          />
+        </motion.div>
+      )}
 
       {/* Research Notes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <motion.div
           className={`${detailTileClass} transition-all md:col-span-2 lg:col-span-3 ${
-            enrichment ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+            enrichment || researchFacts.length > 0 ? 'border-cricket-800/30' : 'border-cricket-800/20'
           }`}
           {...fadeUp}
           transition={{ delay: 0.3 }}
@@ -1191,12 +1334,12 @@ export function PredictDetails() {
             <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="1" width="10" height="14" rx="1" /><line x1="5" y1="5" x2="11" y2="5" /><line x1="5" y1="8" x2="11" y2="8" /><line x1="5" y1="11" x2="9" y2="11" /></svg>
             Research Notes
           </h2>
-          {enrichment ? (
+          {enrichment || researchFacts.length > 0 ? (
             <div className="space-y-4">
               <div className={`grid gap-4 ${visibleUpdates.length > 0 ? 'xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.9fr)] xl:items-start' : ''}`}>
                 <div className="space-y-3">
-                  {expertPreview && (
-                    <p className={`${detailTileBodyClass} max-w-4xl`}>{visiblePreview}</p>
+                  {researchSummary && (
+                    <p className={`${detailTileBodyClass} max-w-4xl`}>{researchSummary}</p>
                   )}
 
                   {visibleSources.length > 0 && (
@@ -1255,7 +1398,10 @@ export function PredictDetails() {
               )}
             </div>
           ) : (
-            <p className={`${detailTileBodyClass} text-center py-4`}>Research data not available</p>
+            <ComingSoonTile
+              title="Research room opening soon"
+              body="Venue, team news, squads, and matchup notes will appear here after trusted sources are ingested."
+            />
           )}
         </motion.div>
       </div>
@@ -1299,12 +1445,18 @@ export function PredictDetails() {
             </motion.div>
           ) : (
             <motion.div
-              className="bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 border border-gray-800/20 opacity-50 h-full"
+              className={`${detailTileClass} h-full`}
               {...fadeUp}
               transition={{ delay: 0.35 }}
             >
-              <h2 className={`${detailTileTitleClass} mb-3`}>Toss Factor</h2>
-              <p className={`${detailTileBodyClass} text-center py-4`}>Prediction pending</p>
+              <h2 className={`${detailTileTitleClass} mb-3`}>
+                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
+                Toss Factor
+              </h2>
+              <ComingSoonTile
+                title="Toss read coming soon"
+                body="Venue and format context will shape this once the model run completes."
+              />
             </motion.div>
           )}
         </div>
@@ -1312,7 +1464,7 @@ export function PredictDetails() {
         {/* Squad — wider (3/5), clean avatar grid */}
         <motion.div
           className={`lg:col-span-3 bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl overflow-hidden border transition-all ${
-            squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-gray-800/20 opacity-50'
+            squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-cricket-800/20'
           }`}
           {...fadeUp}
           transition={{ delay: 0.4 }}
@@ -1417,13 +1569,18 @@ export function PredictDetails() {
             ))}
           </div>
         ) : (
-          <p className={`${detailTileBodyClass} text-center py-4`}>Squad not available yet</p>
+          <div className="px-4 pb-4">
+            <ComingSoonTile
+              title="Squad reveal pending"
+              body="Confirmed XIs and player cards will unlock when squad sources publish reliable lists."
+            />
+          </div>
         )}
         </motion.div>
       </div>
 
       {/* 4. Head to Head (ESPN data) */}
-      {espnData && h2hGames.length > 0 && (
+      {espnData && h2hGames.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 mb-4">
           <motion.div
             className={detailTileClass}
@@ -1436,32 +1593,17 @@ export function PredictDetails() {
                 <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
                 Head to Head
               </h2>
-              {(() => {
-                const last5 = h2hGames.slice(0, 5);
-                const t1wins = last5.filter(g => {
-                  const w = g.teams.find(t => t.winner);
-                  return w && (w.abbreviation === team1Meta.shortName || w.abbreviation === prediction?.team1);
-                }).length;
-                const t2wins = last5.length - t1wins;
-                return (
-                  <div className={`flex items-center gap-2 ${detailTileMetaClass} font-black`}>
-                    <span style={{ color: teamColor1 }}>{team1Meta.shortName} {t1wins}</span>
-                    <span className="text-gray-600">—</span>
-                    <span style={{ color: teamColor2 }}>{t2wins} {team2Meta.shortName}</span>
-                    <span className="text-gray-500 font-normal ml-1">last {last5.length}</span>
-                  </div>
-                );
-              })()}
+              <div className={`flex items-center gap-2 ${detailTileMetaClass} font-black`}>
+                <span style={{ color: teamColor1 }}>{team1Meta.shortName} {h2hTeam1Wins}</span>
+                <span className="text-gray-600">—</span>
+                <span style={{ color: teamColor2 }}>{h2hTeam2Wins} {team2Meta.shortName}</span>
+                <span className="text-gray-500 font-normal ml-1">last {h2hLast5.length}</span>
+              </div>
             </div>
 
             {/* Win proportion bar */}
             {(() => {
-              const last5 = h2hGames.slice(0, 5);
-              const t1wins = last5.filter(g => {
-                const w = g.teams.find(t => t.winner);
-                return w && (w.abbreviation === team1Meta.shortName || w.abbreviation === prediction?.team1);
-              }).length;
-              const t1Pct = Math.round((t1wins / last5.length) * 100);
+              const t1Pct = Math.round((h2hTeam1Wins / h2hLast5.length) * 100);
               return (
                 <div className="flex h-1.5 rounded-full overflow-hidden mb-4 gap-0.5">
                   <div className="rounded-full transition-all" style={{ width: `${t1Pct}%`, backgroundColor: teamColor1 }} />
@@ -1473,14 +1615,14 @@ export function PredictDetails() {
             <div className="space-y-1.5">
               {h2hGames.slice(0, 5).map((game, i) => {
                 const winner = game.teams.find(t => t.winner);
-                const isTeam1Win = winner && (winner.abbreviation === team1Meta.shortName || winner.abbreviation === prediction?.team1);
+                const isTeam1Win = winner && isH2HTeam1(winner);
                 const winColor = isTeam1Win ? teamColor1 : teamColor2;
                 return (
                   <div key={i} className={`flex items-center gap-3 ${detailTileMetaClass} px-2.5 py-2 rounded-lg`} style={{ background: winner ? `${winColor}10` : 'rgba(255,255,255,0.03)', borderLeft: winner ? `2px solid ${winColor}` : '2px solid transparent' }}>
                     <span className="text-gray-500 w-14 shrink-0 tabular-nums">{game.date ? new Date(game.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' }) : '?'}</span>
                     <div className="flex-1 flex items-center gap-1 min-w-0">
                       {game.teams.map((t, j) => {
-                        const isT1 = t.abbreviation === team1Meta.shortName || t.abbreviation === prediction?.team1;
+                        const isT1 = isH2HTeam1(t);
                         const tColor = isT1 ? teamColor1 : teamColor2;
                         return (
                           <span key={j} className="truncate" style={{ color: t.winner ? tColor : '#6b7280', fontWeight: t.winner ? 700 : 400 }}>
@@ -1498,6 +1640,31 @@ export function PredictDetails() {
                 );
               })}
             </div>
+            {h2hReconciliationNote && (
+              <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3.5 py-3 text-[clamp(0.78rem,0.95vw,0.95rem)] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-amber-300">⚡</span>
+                  <p className="leading-relaxed">{h2hReconciliationNote}</p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <motion.div
+            className={detailTileClass}
+            {...fadeUp}
+            transition={{ delay: 0.55 }}
+          >
+            <h2 className={`${detailTileTitleClass} mb-3`}>
+              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
+              Head to Head
+            </h2>
+            <ComingSoonTile
+              title="Rivalry reel coming soon"
+              body="Recent matchup history will appear once ESPN or scorecard history is available for this fixture."
+            />
           </motion.div>
         </div>
       )}
