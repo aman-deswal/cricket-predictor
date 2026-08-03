@@ -14,6 +14,7 @@ from fetch_fixtures import (
     _fixtures_to_matches,
     _infer_match_type,
     _merge_fixtures_by_identity,
+    _normalize_fixture_team,
     _score_espn_completed,
     _same_fixture_window,
 )
@@ -160,6 +161,60 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         )
 
         self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
+    def test_same_fixture_window_matches_espn_parenthetical_men(self):
+        espn_fixture = self._make_fixture(
+            team1="Welsh Fire (Men)",
+            team2="Southern Brave (Men)",
+            date="2026-08-03T17:30Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Welsh Fire",
+            team2="Southern Brave",
+            date="2026-08-03T17:30:00.000Z",
+        )
+
+        self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
+    def test_same_fixture_window_matches_espn_parenthetical_women(self):
+        espn_fixture = self._make_fixture(
+            team1="Welsh Fire (Women)",
+            team2="Southern Brave (Women)",
+            date="2026-08-03T14:00:00Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Welsh Fire Women",
+            team2="Southern Brave Women",
+            date="2026-08-03T14:00:00.000Z",
+        )
+
+        self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
+    def test_merge_identity_deduplicates_parenthetical_source_names(self):
+        espn_fixture = self._make_fixture(
+            espn_id="1521249",
+            team1="Welsh Fire (Men)",
+            team2="Southern Brave (Men)",
+            date="2026-08-03T17:30Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Welsh Fire",
+            team2="Southern Brave",
+            date="2026-08-03T17:30:00.000Z",
+        )
+        cricbuzz_fixture.pop("espn_event_id")
+        cricbuzz_fixture["source"] = "cricbuzz"
+        cricbuzz_fixture["source_id"] = "b2fc3039466a2083"
+
+        merged = _merge_fixtures_by_identity([cricbuzz_fixture, espn_fixture])
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["espn_event_id"], "1521249")
+
+    def test_fixture_team_normalizer_preserves_women(self):
+        self.assertEqual(_normalize_fixture_team("Welsh Fire (Women)"), "welsh fire women")
+        self.assertEqual(_normalize_fixture_team("Welsh Fire Women"), "welsh fire women")
+        self.assertEqual(_normalize_fixture_team("Welsh Fire (Men)"), "welsh fire")
 
     def test_same_fixture_window_rejects_different_dates(self):
         espn_fixture = self._make_fixture(date="2026-08-03T17:30:00Z")

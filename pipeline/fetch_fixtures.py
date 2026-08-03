@@ -8,6 +8,7 @@ Also detects completed matches and scores any pending predictions.
 
 import argparse
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -61,13 +62,16 @@ def _merge_fixtures_by_event(fixtures: list[dict]) -> list[dict]:
     return list(merged.values())
 
 
-def _fixture_identity(fixture: dict) -> tuple[str, str, str]:
-    """Return a cross-source fixture identity for exact same-match de-duping."""
-    teams = sorted([
-        _normalize_team(fixture.get("team1", "")),
-        _normalize_team(fixture.get("team2", "")),
-    ])
-    return (teams[0], teams[1], fixture.get("date", ""))
+def _normalize_fixture_team(name: str) -> str:
+    """Normalize source-specific gender labels without erasing women's teams."""
+    normalized = name.strip().lower()
+    normalized = re.sub(r"\s*\((men|women)\)\s*", r" \1", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if normalized.endswith(" men"):
+        normalized = normalized[:-4].strip()
+    elif not normalized.endswith(" women"):
+        normalized = _normalize_team(normalized)
+    return normalized
 
 
 def _parse_fixture_date(value: str) -> Optional[datetime]:
@@ -82,12 +86,12 @@ def _parse_fixture_date(value: str) -> Optional[datetime]:
 
 def _same_fixture_window(left: dict, right: dict, tolerance: timedelta = timedelta(hours=2)) -> bool:
     left_teams = sorted([
-        _normalize_team(left.get("team1", "")),
-        _normalize_team(left.get("team2", "")),
+        _normalize_fixture_team(left.get("team1", "")),
+        _normalize_fixture_team(left.get("team2", "")),
     ])
     right_teams = sorted([
-        _normalize_team(right.get("team1", "")),
-        _normalize_team(right.get("team2", "")),
+        _normalize_fixture_team(right.get("team1", "")),
+        _normalize_fixture_team(right.get("team2", "")),
     ])
     if left_teams != right_teams:
         return False
@@ -102,24 +106,27 @@ def _same_fixture_window(left: dict, right: dict, tolerance: timedelta = timedel
 
 def _merge_fixtures_by_identity(fixtures: list[dict]) -> list[dict]:
     """Deduplicate same match from multiple sources, preferring ESPN rows."""
-    merged: dict[tuple[str, str, str], dict] = {}
+    merged: list[dict] = []
     for fixture in fixtures:
-        key = _fixture_identity(fixture)
-        current = merged.get(key)
-        if current is None:
-            merged[key] = fixture
+        match_index = next(
+            (idx for idx, current in enumerate(merged) if _same_fixture_window(fixture, current)),
+            None,
+        )
+        if match_index is None:
+            merged.append(fixture)
             continue
 
+        current = merged[match_index]
         current_source = current.get("source", "espn")
         incoming_source = fixture.get("source", "espn")
         if current_source != "espn" and incoming_source == "espn":
-            merged[key] = fixture
+            merged[match_index] = fixture
             continue
 
         if fixture.get("venue") and not current.get("venue"):
-            merged[key] = fixture
+            merged[match_index] = fixture
 
-    return list(merged.values())
+    return merged
 
 
 def _target_exists(client, table: str, match_id: str, select_field: str = "match_id") -> bool:
@@ -142,6 +149,7 @@ def _migrate_single_match_id_table(
 ) -> None:
     if _target_exists(client, table, new_match_id, select_field=target_field):
         logger.info("Skipping %s migration for %s; target %s already exists", table, old_match_id, new_match_id)
+        client.table(table).delete().eq(target_field, old_match_id).execute()
         return
 
     payload = update_payload or {"match_id": new_match_id}
@@ -214,17 +222,37 @@ def _reconcile_provisional_fixtures(client, espn_fixtures: list[dict]) -> int:
     if not cricbuzz_matches:
         return 0
 
+    existing_espn_matches = (
+        client.table("matches")
+        .select("match_id, team1, team2, date")
+        .like("match_id", "espn-%")
+        .eq("status", "upcoming")
+        .execute()
+        .data
+        or []
+    )
+    canonical_fixtures = [
+        f for f in espn_fixtures
+        if f.get("status") == "pre" and f.get("espn_event_id")
+    ]
+    canonical_fixtures.extend(existing_espn_matches)
+
     reconciled = 0
-    for espn_fixture in espn_fixtures:
-        if espn_fixture.get("status") != "pre":
+    reconciled_ids: set[str] = set()
+    for espn_fixture in canonical_fixtures:
+        new_match_id = espn_fixture.get("match_id")
+        if not new_match_id:
+            espn_id = espn_fixture.get("espn_event_id")
+            if not espn_id:
+                continue
+            new_match_id = f"espn-{espn_id}"
+        if not str(new_match_id).startswith("espn-"):
             continue
-        espn_id = espn_fixture.get("espn_event_id")
-        if not espn_id:
-            continue
-        new_match_id = f"espn-{espn_id}"
 
         for provisional in cricbuzz_matches:
             old_match_id = provisional["match_id"]
+            if old_match_id in reconciled_ids:
+                continue
             if not _same_fixture_window(espn_fixture, provisional):
                 continue
 
@@ -233,6 +261,7 @@ def _reconcile_provisional_fixtures(client, espn_fixtures: list[dict]) -> int:
                 client.table("matches").delete().eq("match_id", old_match_id).execute()
                 logger.info("Reconciled provisional fixture %s -> %s", old_match_id, new_match_id)
                 reconciled += 1
+                reconciled_ids.add(old_match_id)
             except Exception as exc:
                 logger.warning("Failed to reconcile provisional fixture %s -> %s: %s", old_match_id, new_match_id, exc)
 
