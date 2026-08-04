@@ -10,9 +10,39 @@ import Link from 'next/link';
 
 const SECTIONS: MatchSection[] = ['International', 'League', 'Other'];
 
-/** Featured hero for the highest-confidence, highest-EV match */
+function getPrimaryPrediction(match: MatchWithPredictions) {
+  return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
+}
+
+function getMatchTimestamp(match: MatchWithPredictions): number {
+  const raw = match.date.endsWith('Z') || match.date.includes('+') ? match.date : `${match.date}Z`;
+  const timestamp = new Date(raw).getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+}
+
+function getSpotlightScore(match: MatchWithPredictions): number {
+  const prediction = getPrimaryPrediction(match);
+  const kickoff = getMatchTimestamp(match);
+  const hoursAway = Math.max(0, (kickoff - Date.now()) / (1000 * 60 * 60));
+  const soonScore = Math.max(0, 48 - Math.min(hoursAway, 48));
+  const section = getMatchSection(match);
+  const sectionScore = section === 'International' ? 24 : section === 'League' ? 14 : 4;
+  const confidenceScore = prediction?.confidence === 'high' ? 30 : prediction?.confidence === 'medium' ? 18 : prediction ? 8 : 0;
+  const oddsScore = match.bookmaker_odds ? 18 : 0;
+  const edgeScore = prediction && match.bookmaker_odds
+    ? Math.max(
+        0,
+        Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100),
+        Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
+      )
+    : 0;
+
+  return sectionScore + confidenceScore + oddsScore + soonScore + Math.min(edgeScore, 20);
+}
+
+/** Spotlight hero for the highest-ranked upcoming match */
 function FeaturedHero({ match }: { match: MatchWithPredictions }) {
-  const prediction = Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
+  const prediction = getPrimaryPrediction(match);
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
@@ -62,15 +92,20 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
-          {/* Row 1: unified Best Bet label + match context */}
+          {/* Row 1: unified spotlight label + match context */}
           <div className="flex items-center gap-2 mb-4">
             <motion.span
-              className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2.5 py-1 rounded-full"
+              className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-amber-200 bg-amber-500/10 border border-amber-400/30 px-2.5 py-1 rounded-full shadow-[0_0_18px_rgba(251,191,36,0.12)]"
               animate={{ opacity: [1, 0.75, 1] }}
               transition={{ duration: 1.8, repeat: Infinity }}
             >
-              🔥 Best Bet
+              ✦ Spotlight Game
             </motion.span>
+            {match.bookmaker_odds && (
+              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2.5 py-1 rounded-full">
+                🔥 Best Bet
+              </span>
+            )}
             <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">
               {match.match_type} · {match.venue?.split(',')[0]}
             </span>
@@ -180,9 +215,19 @@ export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const featuredMatch = [...matches].sort((a, b) => {
+    const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return getMatchTimestamp(a) - getMatchTimestamp(b);
+  })[0] ?? null;
+
+  const sectionPool = featuredMatch
+    ? matches.filter((match) => match.match_id !== featuredMatch.match_id)
+    : matches;
+
   const matchesBySection = SECTIONS.map((section) => ({
     section,
-    matches: matches
+    matches: sectionPool
       .filter((match) => getMatchSection(match) === section)
       .sort((a, b) => {
         const aScore = a.predictions?.length ? 1 : 0;
@@ -190,15 +235,6 @@ export default function HomePage() {
         return bScore - aScore;
       }),
   })).filter(({ matches }) => matches.length > 0);
-
-  // Pick featured match: highest confidence with bookmaker odds (most gamble-worthy)
-  const featuredMatch = matches.find(m => {
-    const pred = Array.isArray(m.predictions) ? m.predictions[0] : m.predictions;
-    return pred?.confidence === 'high' && m.bookmaker_odds;
-  }) ?? matches.find(m => {
-    const pred = Array.isArray(m.predictions) ? m.predictions[0] : m.predictions;
-    return pred != null && m.bookmaker_odds;
-  }) ?? matches[0] ?? null;
 
   useEffect(() => {
     async function load() {
@@ -225,8 +261,11 @@ export default function HomePage() {
         className="mb-6"
       >
         <h1 className="text-2xl font-black text-white tracking-tight">
-          Up <span className="text-cricket-400">Next</span>
+          Spotlight <span className="text-cricket-400">Game</span>
         </h1>
+        <p className="mt-1 text-xs text-gray-600">
+          Featured by kickoff timing, match tier, model confidence, odds coverage, and AI-vs-market edge.
+        </p>
       </motion.div>
 
       {matches.length === 0 ? (
@@ -241,7 +280,7 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div>
-          {/* Featured hero pick — the best bet at a glance */}
+          {/* Spotlight game — the featured match at a glance */}
           {featuredMatch && <FeaturedHero match={featuredMatch} />}
 
           {/* Section grids */}
