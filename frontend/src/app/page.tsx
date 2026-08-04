@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getMatchSection, getUpcomingMatches, MatchSection, MatchWithPredictions } from '@/lib/supabase';
+import { getMatchSection, getUpcomingMatches, MATCH_SECTIONS, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import Link from 'next/link';
-
-const SECTIONS: MatchSection[] = ['International', 'League', 'Other'];
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
   return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
@@ -44,7 +42,7 @@ function getSpotlightScore(match: MatchWithPredictions): number {
   const hoursAway = Math.max(0, (kickoff - Date.now()) / (1000 * 60 * 60));
   const soonScore = Math.max(0, 12 - Math.min(hoursAway, 12));
   const section = getMatchSection(match);
-  const popularityScore = section === 'International' ? 240 : section === 'League' ? 170 : 0;
+  const popularityScore = section === 'International' ? 240 : section !== 'Other' ? 170 : 0;
   const dataRichnessScore = getDataRichnessScore(match);
   const confidenceScore = prediction?.confidence === 'high' ? 45 : prediction?.confidence === 'medium' ? 25 : prediction ? 8 : 0;
   const edgeScore = prediction && match.bookmaker_odds
@@ -243,7 +241,7 @@ export default function HomePage() {
     ? matches.filter((match) => match.match_id !== featuredMatch.match_id)
     : matches;
 
-  const matchesBySection = SECTIONS.map((section) => ({
+  const matchesBySection = MATCH_SECTIONS.map((section) => ({
     section,
     matches: sectionPool
       .filter((match) => getMatchSection(match) === section)

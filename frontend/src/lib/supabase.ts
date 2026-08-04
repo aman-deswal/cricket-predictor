@@ -228,7 +228,34 @@ interface TeamStatsCacheRow {
   }>;
 }
 
-export type MatchSection = 'International' | 'League' | 'Other';
+export type MatchSection =
+  | 'International'
+  | 'Indian Premier League'
+  | "Women's Premier League"
+  | 'Big Bash League'
+  | 'The Hundred'
+  | 'Caribbean Premier League'
+  | 'Pakistan Super League'
+  | 'SA20'
+  | 'Major League Cricket'
+  | 'Lanka Premier League'
+  | 'Bangladesh Premier League'
+  | 'Other';
+
+export const MATCH_SECTIONS: MatchSection[] = [
+  'International',
+  "Women's Premier League",
+  'Indian Premier League',
+  'Big Bash League',
+  'The Hundred',
+  'Caribbean Premier League',
+  'Pakistan Super League',
+  'SA20',
+  'Major League Cricket',
+  'Lanka Premier League',
+  'Bangladesh Premier League',
+  'Other',
+];
 
 const TOP_INTERNATIONAL_TEAMS = new Set([
   'India',
@@ -245,63 +272,118 @@ const TOP_INTERNATIONAL_TEAMS = new Set([
   'Ireland',
 ]);
 
-const POPULAR_LEAGUES = [
-  'indian premier league',
-  'ipl',
-  'womens premier league',
-  'women premier league',
-  'wpl',
-  'big bash league',
-  'bbl',
-  'the hundred',
-  'caribbean premier league',
-  'cpl',
-  'pakistan super league',
-  'psl',
-  'sa20',
-  'major league cricket',
-  'mlc',
-  'lanka premier league',
-  'lpl',
-  'bangladesh premier league',
-  'bpl',
+const TOP_LEAGUE_SECTIONS: Array<{
+  section: Exclude<MatchSection, 'International' | 'Other'>;
+  aliases: string[];
+  teams: string[];
+}> = [
+  {
+    section: "Women's Premier League",
+    aliases: ['womens premier league', "women's premier league", 'women premier league', 'wpl'],
+    teams: [
+      'Mumbai Indians Women',
+      'Delhi Capitals Women',
+      'Royal Challengers Bengaluru Women',
+      'Royal Challengers Bangalore Women',
+      'UP Warriorz',
+      'Gujarat Giants Women',
+    ],
+  },
+  {
+    section: 'Indian Premier League',
+    aliases: ['indian premier league', 'ipl'],
+    teams: [
+      'Chennai Super Kings',
+      'Mumbai Indians',
+      'Royal Challengers Bengaluru',
+      'Royal Challengers Bangalore',
+      'Kolkata Knight Riders',
+      'Rajasthan Royals',
+      'Delhi Capitals',
+      'Punjab Kings',
+      'Sunrisers Hyderabad',
+      'Gujarat Titans',
+      'Lucknow Super Giants',
+    ],
+  },
+  {
+    section: 'Big Bash League',
+    aliases: ['big bash league', 'bbl'],
+    teams: [
+      'Sydney Sixers',
+      'Sydney Thunder',
+      'Melbourne Stars',
+      'Melbourne Renegades',
+      'Brisbane Heat',
+      'Perth Scorchers',
+      'Hobart Hurricanes',
+      'Adelaide Strikers',
+    ],
+  },
+  {
+    section: 'The Hundred',
+    aliases: ['the hundred'],
+    teams: [
+      'Sunrisers Leeds',
+      'Manchester Super Giants',
+      'Oval Invincibles',
+      'London Spirit',
+      'Southern Brave',
+      'Northern Superchargers',
+      'Trent Rockets',
+      'Welsh Fire',
+      'Birmingham Phoenix',
+      'Manchester Originals',
+    ],
+  },
+  {
+    section: 'Caribbean Premier League',
+    aliases: ['caribbean premier league', 'cpl'],
+    teams: [
+      'Trinbago Knight Riders',
+      'Barbados Royals',
+      'Guyana Amazon Warriors',
+      'Jamaica Tallawahs',
+      'Saint Lucia Kings',
+      'St Kitts and Nevis Patriots',
+      'Antigua and Barbuda Falcons',
+    ],
+  },
+  {
+    section: 'Pakistan Super League',
+    aliases: ['pakistan super league', 'psl'],
+    teams: ['Islamabad United', 'Karachi Kings', 'Lahore Qalandars', 'Multan Sultans', 'Peshawar Zalmi', 'Quetta Gladiators'],
+  },
+  {
+    section: 'SA20',
+    aliases: ['sa20'],
+    teams: ['MI Cape Town', 'Durban Super Giants', 'Joburg Super Kings', 'Paarl Royals', 'Pretoria Capitals', 'Sunrisers Eastern Cape'],
+  },
+  {
+    section: 'Major League Cricket',
+    aliases: ['major league cricket', 'mlc'],
+    teams: ['San Francisco Unicorns', 'MI New York', 'Los Angeles Knight Riders', 'Seattle Orcas', 'Texas Super Kings', 'Washington Freedom'],
+  },
+  {
+    section: 'Lanka Premier League',
+    aliases: ['lanka premier league', 'lpl'],
+    teams: [
+      'Dambulla Sixers',
+      'Kandy Royals',
+      'Kandy Falcons',
+      'B-Love Kandy',
+      'Galle Gallants',
+      'Galle Titans',
+      'Colombo Kaps',
+      'Colombo Strikers',
+    ],
+  },
+  {
+    section: 'Bangladesh Premier League',
+    aliases: ['bangladesh premier league', 'bpl'],
+    teams: ['Comilla Victorians', 'Dhaka Dominators', 'Fortune Barishal', 'Khulna Tigers', 'Rangpur Riders', 'Sylhet Strikers'],
+  },
 ];
-
-const POPULAR_LEAGUE_TEAMS = new Set([
-  'Sunrisers Leeds',
-  'Manchester Super Giants',
-  'Oval Invincibles',
-  'London Spirit',
-  'Southern Brave',
-  'Northern Superchargers',
-  'Trent Rockets',
-  'Welsh Fire',
-  'Birmingham Phoenix',
-  'Manchester Originals',
-  'Trinbago Knight Riders',
-  'Barbados Royals',
-  'Guyana Amazon Warriors',
-  'Jamaica Tallawahs',
-  'Saint Lucia Kings',
-  'St Kitts and Nevis Patriots',
-  'Antigua and Barbuda Falcons',
-  'Sydney Sixers',
-  'Sydney Thunder',
-  'Melbourne Stars',
-  'Melbourne Renegades',
-  'Brisbane Heat',
-  'Perth Scorchers',
-  'Hobart Hurricanes',
-  'Adelaide Strikers',
-  'Dambulla Sixers',
-  'Kandy Royals',
-  'Kandy Falcons',
-  'B-Love Kandy',
-  'Galle Gallants',
-  'Galle Titans',
-  'Colombo Kaps',
-  'Colombo Strikers',
-]);
 
 function normalizeTeam(team: string): string {
   return team.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
@@ -322,9 +404,13 @@ function getTeamStatsKey(team: string, gender: string, matchType: string): strin
   return `${normalizeTeam(team)}::${gender}::${matchType}`;
 }
 
-function includesPopularLeague(match: Match): boolean {
+function getLeagueSection(match: Match): MatchSection | null {
+  const matchTeams = new Set([match.team1.trim(), match.team2.trim(), normalizeTeam(match.team1), normalizeTeam(match.team2)]);
   const haystack = `${match.name} ${match.venue}`.toLowerCase();
-  return POPULAR_LEAGUES.some((league) => haystack.includes(league));
+  const league = TOP_LEAGUE_SECTIONS.find(({ aliases, teams: leagueTeams }) => (
+    aliases.some((alias) => haystack.includes(alias)) || leagueTeams.some((team) => matchTeams.has(team))
+  ));
+  return league?.section ?? null;
 }
 
 export function getMatchSection(match: Match): MatchSection {
@@ -335,18 +421,16 @@ export function getMatchSection(match: Match): MatchSection {
     return 'International';
   }
 
-  if (includesPopularLeague(match) || POPULAR_LEAGUE_TEAMS.has(team1) || POPULAR_LEAGUE_TEAMS.has(team2)) {
-    return 'League';
+  const leagueSection = getLeagueSection(match);
+  if (leagueSection) {
+    return leagueSection;
   }
 
   return 'Other';
 }
 
 function getMatchPriority(match: Match): number {
-  const section = getMatchSection(match);
-  if (section === 'International') return 0;
-  if (section === 'League') return 1;
-  return 2;
+  return MATCH_SECTIONS.indexOf(getMatchSection(match));
 }
 
 function getMatchTimestamp(match: Match): number {
