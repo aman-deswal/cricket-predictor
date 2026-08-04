@@ -20,15 +20,33 @@ function getMatchTimestamp(match: MatchWithPredictions): number {
   return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
 }
 
+function getDataRichnessScore(match: MatchWithPredictions): number {
+  const prediction = getPrimaryPrediction(match);
+  const signals = match.spotlight_signals;
+  return [
+    prediction ? 35 : 0,
+    match.bookmaker_odds ? 30 : 0,
+    signals?.has_expert_preview ? 25 : 0,
+    signals?.has_espn_context ? 20 : 0,
+    signals?.enrichment_confidence === 'high' ? 18 : signals?.enrichment_confidence === 'medium' ? 10 : 0,
+    Math.min((signals?.h2h_match_count ?? 0) * 4, 20),
+    Math.min((signals?.source_link_count ?? 0) * 5, 20),
+    Math.min((signals?.key_player_count ?? 0) * 4, 20),
+    Math.min((signals?.possible_xi_player_count ?? 0) * 2, 20),
+    Math.min((signals?.player_update_count ?? 0) * 3, 12),
+    Math.min(((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0)) * 2, 20),
+  ].reduce((sum, score) => sum + score, 0);
+}
+
 function getSpotlightScore(match: MatchWithPredictions): number {
   const prediction = getPrimaryPrediction(match);
   const kickoff = getMatchTimestamp(match);
   const hoursAway = Math.max(0, (kickoff - Date.now()) / (1000 * 60 * 60));
-  const soonScore = Math.max(0, 48 - Math.min(hoursAway, 48));
+  const soonScore = Math.max(0, 12 - Math.min(hoursAway, 12));
   const section = getMatchSection(match);
-  const sectionScore = section === 'International' ? 24 : section === 'League' ? 14 : 4;
-  const confidenceScore = prediction?.confidence === 'high' ? 30 : prediction?.confidence === 'medium' ? 18 : prediction ? 8 : 0;
-  const oddsScore = match.bookmaker_odds ? 18 : 0;
+  const popularityScore = section === 'International' ? 240 : section === 'League' ? 170 : 0;
+  const dataRichnessScore = getDataRichnessScore(match);
+  const confidenceScore = prediction?.confidence === 'high' ? 45 : prediction?.confidence === 'medium' ? 25 : prediction ? 8 : 0;
   const edgeScore = prediction && match.bookmaker_odds
     ? Math.max(
         0,
@@ -37,7 +55,7 @@ function getSpotlightScore(match: MatchWithPredictions): number {
       )
     : 0;
 
-  return sectionScore + confidenceScore + oddsScore + soonScore + Math.min(edgeScore, 20);
+  return popularityScore + dataRichnessScore + confidenceScore + Math.min(edgeScore, 30) + soonScore;
 }
 
 /** Spotlight hero for the highest-ranked upcoming match */
@@ -264,7 +282,7 @@ export default function HomePage() {
           Spotlight <span className="text-cricket-400">Game</span>
         </h1>
         <p className="mt-1 text-xs text-gray-600">
-          Featured by kickoff timing, match tier, model confidence, odds coverage, and AI-vs-market edge.
+          Featured by popularity, enrichment depth, prediction quality, market coverage, and relevance.
         </p>
       </motion.div>
 

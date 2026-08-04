@@ -152,7 +152,21 @@ export interface MatchEnrichment {
   generated_at: string;
 }
 
-export type MatchWithPredictions = Match & { predictions: Prediction[] };
+export interface MatchSpotlightSignals {
+  enrichment_confidence?: 'high' | 'medium' | 'low';
+  has_expert_preview?: boolean;
+  has_espn_context?: boolean;
+  h2h_match_count?: number;
+  key_player_count?: number;
+  player_update_count?: number;
+  possible_xi_player_count?: number;
+  source_link_count?: number;
+}
+
+export type MatchWithPredictions = Match & {
+  predictions: Prediction[];
+  spotlight_signals?: MatchSpotlightSignals;
+};
 
 export interface MatchOdds {
   match_id: string;
@@ -253,6 +267,42 @@ const POPULAR_LEAGUES = [
   'bpl',
 ];
 
+const POPULAR_LEAGUE_TEAMS = new Set([
+  'Sunrisers Leeds',
+  'Manchester Super Giants',
+  'Oval Invincibles',
+  'London Spirit',
+  'Southern Brave',
+  'Northern Superchargers',
+  'Trent Rockets',
+  'Welsh Fire',
+  'Birmingham Phoenix',
+  'Manchester Originals',
+  'Trinbago Knight Riders',
+  'Barbados Royals',
+  'Guyana Amazon Warriors',
+  'Jamaica Tallawahs',
+  'Saint Lucia Kings',
+  'St Kitts and Nevis Patriots',
+  'Antigua and Barbuda Falcons',
+  'Sydney Sixers',
+  'Sydney Thunder',
+  'Melbourne Stars',
+  'Melbourne Renegades',
+  'Brisbane Heat',
+  'Perth Scorchers',
+  'Hobart Hurricanes',
+  'Adelaide Strikers',
+  'Dambulla Sixers',
+  'Kandy Royals',
+  'Kandy Falcons',
+  'B-Love Kandy',
+  'Galle Gallants',
+  'Galle Titans',
+  'Colombo Kaps',
+  'Colombo Strikers',
+]);
+
 function normalizeTeam(team: string): string {
   return team.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
 }
@@ -285,7 +335,7 @@ export function getMatchSection(match: Match): MatchSection {
     return 'International';
   }
 
-  if (includesPopularLeague(match)) {
+  if (includesPopularLeague(match) || POPULAR_LEAGUE_TEAMS.has(team1) || POPULAR_LEAGUE_TEAMS.has(team2)) {
     return 'League';
   }
 
@@ -337,7 +387,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .eq('stat_type', 'team_stats'),
     supabase
       .from('match_enrichment')
-      .select('match_id, venue_name'),
+      .select('match_id, venue_name, confidence, expert_preview, player_updates, key_players, possible_xi, source_links'),
     supabase
       .from('espn_match_data')
       .select('match_id, venue_name, head_to_head'),
@@ -357,8 +407,27 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
   });
   const enrichmentVenue = new Map<string, string>();
-  (enrichmentData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
+  const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
+  (enrichmentData ?? []).forEach((e: {
+    match_id: string;
+    venue_name: string | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+    expert_preview: string | null;
+    player_updates: unknown[] | null;
+    key_players: unknown[] | null;
+    possible_xi: { team1?: unknown[]; team2?: unknown[] } | null;
+    source_links: unknown[] | null;
+  }) => {
     if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
+    enrichmentSignals.set(e.match_id, {
+      enrichment_confidence: e.confidence ?? undefined,
+      has_expert_preview: Boolean(e.expert_preview?.trim()),
+      key_player_count: Array.isArray(e.key_players) ? e.key_players.length : 0,
+      player_update_count: Array.isArray(e.player_updates) ? e.player_updates.length : 0,
+      possible_xi_player_count: (Array.isArray(e.possible_xi?.team1) ? e.possible_xi.team1.length : 0)
+        + (Array.isArray(e.possible_xi?.team2) ? e.possible_xi.team2.length : 0),
+      source_link_count: Array.isArray(e.source_links) ? e.source_links.length : 0,
+    });
   });
 
   // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
@@ -386,10 +455,12 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 
     // Override with ESPN H2H form if available (more accurate/recent)
     const h2hRaw = espnH2H.get(match.match_id);
+    let h2hMatchCount = 0;
     if (h2hRaw) {
       try {
         const h2hGames = typeof h2hRaw === 'string' ? JSON.parse(h2hRaw) : h2hRaw;
         if (Array.isArray(h2hGames) && h2hGames.length > 0) {
+          h2hMatchCount = h2hGames.length;
           const team1Meta = getTeamMeta(match.team1);
           const team2Meta = getTeamMeta(match.team2);
           const deriveForm = (shortName: string): Array<'W' | 'L'> => {
@@ -415,6 +486,11 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       team1_recent_form: team1Form,
       team2_recent_form: team2Form,
       bookmaker_odds: oddsMap.get(match.match_id),
+      spotlight_signals: {
+        ...enrichmentSignals.get(match.match_id),
+        has_espn_context: espnVenue.has(match.match_id) || espnH2H.has(match.match_id),
+        h2h_match_count: h2hMatchCount,
+      },
     };
   });
 
