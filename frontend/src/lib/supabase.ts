@@ -152,7 +152,21 @@ export interface MatchEnrichment {
   generated_at: string;
 }
 
-export type MatchWithPredictions = Match & { predictions: Prediction[] };
+export interface MatchSpotlightSignals {
+  enrichment_confidence?: 'high' | 'medium' | 'low';
+  has_expert_preview?: boolean;
+  has_espn_context?: boolean;
+  h2h_match_count?: number;
+  key_player_count?: number;
+  player_update_count?: number;
+  possible_xi_player_count?: number;
+  source_link_count?: number;
+}
+
+export type MatchWithPredictions = Match & {
+  predictions: Prediction[];
+  spotlight_signals?: MatchSpotlightSignals;
+};
 
 export interface MatchOdds {
   match_id: string;
@@ -214,7 +228,34 @@ interface TeamStatsCacheRow {
   }>;
 }
 
-export type MatchSection = 'International' | 'League' | 'Other';
+export type MatchSection =
+  | 'International'
+  | 'Indian Premier League'
+  | "Women's Premier League"
+  | 'Big Bash League'
+  | 'The Hundred'
+  | 'Caribbean Premier League'
+  | 'Pakistan Super League'
+  | 'SA20'
+  | 'Major League Cricket'
+  | 'Lanka Premier League'
+  | 'Bangladesh Premier League'
+  | 'Other';
+
+export const MATCH_SECTIONS: MatchSection[] = [
+  'International',
+  "Women's Premier League",
+  'Indian Premier League',
+  'Big Bash League',
+  'The Hundred',
+  'Caribbean Premier League',
+  'Pakistan Super League',
+  'SA20',
+  'Major League Cricket',
+  'Lanka Premier League',
+  'Bangladesh Premier League',
+  'Other',
+];
 
 const TOP_INTERNATIONAL_TEAMS = new Set([
   'India',
@@ -231,26 +272,117 @@ const TOP_INTERNATIONAL_TEAMS = new Set([
   'Ireland',
 ]);
 
-const POPULAR_LEAGUES = [
-  'indian premier league',
-  'ipl',
-  'womens premier league',
-  'women premier league',
-  'wpl',
-  'big bash league',
-  'bbl',
-  'the hundred',
-  'caribbean premier league',
-  'cpl',
-  'pakistan super league',
-  'psl',
-  'sa20',
-  'major league cricket',
-  'mlc',
-  'lanka premier league',
-  'lpl',
-  'bangladesh premier league',
-  'bpl',
+const TOP_LEAGUE_SECTIONS: Array<{
+  section: Exclude<MatchSection, 'International' | 'Other'>;
+  aliases: string[];
+  teams: string[];
+}> = [
+  {
+    section: "Women's Premier League",
+    aliases: ['womens premier league', "women's premier league", 'women premier league', 'wpl'],
+    teams: [
+      'Mumbai Indians Women',
+      'Delhi Capitals Women',
+      'Royal Challengers Bengaluru Women',
+      'Royal Challengers Bangalore Women',
+      'UP Warriorz',
+      'Gujarat Giants Women',
+    ],
+  },
+  {
+    section: 'Indian Premier League',
+    aliases: ['indian premier league', 'ipl'],
+    teams: [
+      'Chennai Super Kings',
+      'Mumbai Indians',
+      'Royal Challengers Bengaluru',
+      'Royal Challengers Bangalore',
+      'Kolkata Knight Riders',
+      'Rajasthan Royals',
+      'Delhi Capitals',
+      'Punjab Kings',
+      'Sunrisers Hyderabad',
+      'Gujarat Titans',
+      'Lucknow Super Giants',
+    ],
+  },
+  {
+    section: 'Big Bash League',
+    aliases: ['big bash league', 'bbl'],
+    teams: [
+      'Sydney Sixers',
+      'Sydney Thunder',
+      'Melbourne Stars',
+      'Melbourne Renegades',
+      'Brisbane Heat',
+      'Perth Scorchers',
+      'Hobart Hurricanes',
+      'Adelaide Strikers',
+    ],
+  },
+  {
+    section: 'The Hundred',
+    aliases: ['the hundred'],
+    teams: [
+      'Sunrisers Leeds',
+      'Manchester Super Giants',
+      'Oval Invincibles',
+      'London Spirit',
+      'Southern Brave',
+      'Northern Superchargers',
+      'Trent Rockets',
+      'Welsh Fire',
+      'Birmingham Phoenix',
+      'Manchester Originals',
+    ],
+  },
+  {
+    section: 'Caribbean Premier League',
+    aliases: ['caribbean premier league', 'cpl'],
+    teams: [
+      'Trinbago Knight Riders',
+      'Barbados Royals',
+      'Guyana Amazon Warriors',
+      'Jamaica Tallawahs',
+      'Saint Lucia Kings',
+      'St Kitts and Nevis Patriots',
+      'Antigua and Barbuda Falcons',
+    ],
+  },
+  {
+    section: 'Pakistan Super League',
+    aliases: ['pakistan super league', 'psl'],
+    teams: ['Islamabad United', 'Karachi Kings', 'Lahore Qalandars', 'Multan Sultans', 'Peshawar Zalmi', 'Quetta Gladiators'],
+  },
+  {
+    section: 'SA20',
+    aliases: ['sa20'],
+    teams: ['MI Cape Town', 'Durban Super Giants', 'Joburg Super Kings', 'Paarl Royals', 'Pretoria Capitals', 'Sunrisers Eastern Cape'],
+  },
+  {
+    section: 'Major League Cricket',
+    aliases: ['major league cricket', 'mlc'],
+    teams: ['San Francisco Unicorns', 'MI New York', 'Los Angeles Knight Riders', 'Seattle Orcas', 'Texas Super Kings', 'Washington Freedom'],
+  },
+  {
+    section: 'Lanka Premier League',
+    aliases: ['lanka premier league', 'lpl'],
+    teams: [
+      'Dambulla Sixers',
+      'Kandy Royals',
+      'Kandy Falcons',
+      'B-Love Kandy',
+      'Galle Gallants',
+      'Galle Titans',
+      'Colombo Kaps',
+      'Colombo Strikers',
+    ],
+  },
+  {
+    section: 'Bangladesh Premier League',
+    aliases: ['bangladesh premier league', 'bpl'],
+    teams: ['Comilla Victorians', 'Dhaka Dominators', 'Fortune Barishal', 'Khulna Tigers', 'Rangpur Riders', 'Sylhet Strikers'],
+  },
 ];
 
 function normalizeTeam(team: string): string {
@@ -272,9 +404,13 @@ function getTeamStatsKey(team: string, gender: string, matchType: string): strin
   return `${normalizeTeam(team)}::${gender}::${matchType}`;
 }
 
-function includesPopularLeague(match: Match): boolean {
+function getLeagueSection(match: Match): MatchSection | null {
+  const matchTeams = new Set([match.team1.trim(), match.team2.trim(), normalizeTeam(match.team1), normalizeTeam(match.team2)]);
   const haystack = `${match.name} ${match.venue}`.toLowerCase();
-  return POPULAR_LEAGUES.some((league) => haystack.includes(league));
+  const league = TOP_LEAGUE_SECTIONS.find(({ aliases, teams: leagueTeams }) => (
+    aliases.some((alias) => haystack.includes(alias)) || leagueTeams.some((team) => matchTeams.has(team))
+  ));
+  return league?.section ?? null;
 }
 
 export function getMatchSection(match: Match): MatchSection {
@@ -285,18 +421,16 @@ export function getMatchSection(match: Match): MatchSection {
     return 'International';
   }
 
-  if (includesPopularLeague(match)) {
-    return 'League';
+  const leagueSection = getLeagueSection(match);
+  if (leagueSection) {
+    return leagueSection;
   }
 
   return 'Other';
 }
 
 function getMatchPriority(match: Match): number {
-  const section = getMatchSection(match);
-  if (section === 'International') return 0;
-  if (section === 'League') return 1;
-  return 2;
+  return MATCH_SECTIONS.indexOf(getMatchSection(match));
 }
 
 function getMatchTimestamp(match: Match): number {
@@ -337,7 +471,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .eq('stat_type', 'team_stats'),
     supabase
       .from('match_enrichment')
-      .select('match_id, venue_name'),
+      .select('match_id, venue_name, confidence, expert_preview, player_updates, key_players, possible_xi, source_links'),
     supabase
       .from('espn_match_data')
       .select('match_id, venue_name, head_to_head'),
@@ -357,8 +491,27 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
   });
   const enrichmentVenue = new Map<string, string>();
-  (enrichmentData ?? []).forEach((e: { match_id: string; venue_name: string | null }) => {
+  const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
+  (enrichmentData ?? []).forEach((e: {
+    match_id: string;
+    venue_name: string | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+    expert_preview: string | null;
+    player_updates: unknown[] | null;
+    key_players: unknown[] | null;
+    possible_xi: { team1?: unknown[]; team2?: unknown[] } | null;
+    source_links: unknown[] | null;
+  }) => {
     if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
+    enrichmentSignals.set(e.match_id, {
+      enrichment_confidence: e.confidence ?? undefined,
+      has_expert_preview: Boolean(e.expert_preview?.trim()),
+      key_player_count: Array.isArray(e.key_players) ? e.key_players.length : 0,
+      player_update_count: Array.isArray(e.player_updates) ? e.player_updates.length : 0,
+      possible_xi_player_count: (Array.isArray(e.possible_xi?.team1) ? e.possible_xi.team1.length : 0)
+        + (Array.isArray(e.possible_xi?.team2) ? e.possible_xi.team2.length : 0),
+      source_link_count: Array.isArray(e.source_links) ? e.source_links.length : 0,
+    });
   });
 
   // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
@@ -386,10 +539,12 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 
     // Override with ESPN H2H form if available (more accurate/recent)
     const h2hRaw = espnH2H.get(match.match_id);
+    let h2hMatchCount = 0;
     if (h2hRaw) {
       try {
         const h2hGames = typeof h2hRaw === 'string' ? JSON.parse(h2hRaw) : h2hRaw;
         if (Array.isArray(h2hGames) && h2hGames.length > 0) {
+          h2hMatchCount = h2hGames.length;
           const team1Meta = getTeamMeta(match.team1);
           const team2Meta = getTeamMeta(match.team2);
           const deriveForm = (shortName: string): Array<'W' | 'L'> => {
@@ -415,6 +570,11 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       team1_recent_form: team1Form,
       team2_recent_form: team2Form,
       bookmaker_odds: oddsMap.get(match.match_id),
+      spotlight_signals: {
+        ...enrichmentSignals.get(match.match_id),
+        has_espn_context: espnVenue.has(match.match_id) || espnH2H.has(match.match_id),
+        h2h_match_count: h2hMatchCount,
+      },
     };
   });
 
