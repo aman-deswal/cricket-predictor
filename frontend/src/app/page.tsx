@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MATCH_SECTIONS, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
+import { BarChartIcon, BowlIcon } from '@/components/CricketIcons';
+import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
@@ -56,6 +59,322 @@ function getSpotlightScore(match: MatchWithPredictions): number {
   return popularityScore + dataRichnessScore + confidenceScore + Math.min(edgeScore, 30) + soonScore;
 }
 
+function getMatchDayLabel(date: string): string {
+  const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
+  const kickoff = new Date(raw);
+  if (Number.isNaN(kickoff.getTime())) return 'Upcoming';
+
+  const now = new Date();
+  const kickoffDay = new Date(kickoff.getFullYear(), kickoff.getMonth(), kickoff.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((kickoffDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  return kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function isMatchToday(match: MatchWithPredictions): boolean {
+  return getMatchDayLabel(match.date) === 'Today';
+}
+
+function decimalToAmerican(d: number): string {
+  if (d <= 1) return '-';
+  if (d >= 2) return '+' + Math.round((d - 1) * 100);
+  return Math.round(-100 / (d - 1)).toString();
+}
+
+function SectionHeading({
+  icon,
+  children,
+  className = '',
+  bareIcon = false,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bareIcon?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className={bareIcon
+        ? 'inline-flex h-8 w-8 items-center justify-center'
+        : 'inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
+      }>
+        {icon}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function SixSensePickHeading() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="shrink-0">
+        <Logo size={32} />
+      </div>
+      <div className="leading-none">
+        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">SixSense</p>
+        <h1 className="mt-1 text-3xl font-black uppercase tracking-[0.18em] text-white sm:text-4xl">
+          Pick
+        </h1>
+      </div>
+    </div>
+  );
+}
+
+function MatchDiscoveryPanel({
+  section,
+  sectionMatches,
+  sectionIdx,
+}: {
+  section: string;
+  sectionMatches: MatchWithPredictions[];
+  sectionIdx: number;
+}) {
+  return (
+    <motion.section
+      key={section}
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: sectionIdx * 0.1 }}
+      className="rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-black text-white uppercase tracking-[0.16em]">{section}</h2>
+        <span className="shrink-0 rounded-full border border-cricket-400/30 bg-cricket-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cricket-200">
+          {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
+        </span>
+      </div>
+
+      <div className="grid gap-4">
+        {sectionMatches.map((match, idx) => (
+          <MatchCard
+            key={match.match_id}
+            match={match}
+            prediction={getPrimaryPrediction(match)}
+            index={idx}
+            hot={sectionIdx === 0 && idx === 0}
+          />
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function MatchBoardStrip({
+  matches,
+}: {
+  matches: MatchWithPredictions[];
+}) {
+  const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'today' | 'upcoming'>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const tickerRef = useRef<HTMLDivElement>(null);
+  const sortedMatches = [...matches].sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
+  const filteredMatches = sortedMatches.filter((match) => {
+    if (activeFilter === 'live') return (match.status as string) === 'live';
+    if (activeFilter === 'today') return isMatchToday(match);
+    if (activeFilter === 'upcoming') return !isMatchToday(match) && (match.status as string) !== 'live';
+    return true;
+  });
+  const predictedCount = matches.filter((match) => Boolean(getPrimaryPrediction(match))).length;
+  const oddsCount = matches.filter((match) => Boolean(match.bookmaker_odds)).length;
+  const filterOptions: Array<{ key: 'all' | 'live' | 'today' | 'upcoming'; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'live', label: 'Live' },
+    { key: 'today', label: 'Today' },
+    { key: 'upcoming', label: 'Upcoming' },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/35 bg-gradient-to-br from-amber-400/20 to-amber-900/10 text-cricket-200 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+              <BowlIcon className="h-5 w-5" />
+            </span>
+            <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
+          </div>
+          <div className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 sm:flex">
+            <span><span className="text-white">{matches.length}</span> upcoming</span>
+            <span className="text-gray-700">/</span>
+            <span><span className="text-cricket-300">{predictedCount}</span> predicted</span>
+            <span className="text-gray-700">/</span>
+            <span><span className="text-emerald-300">{oddsCount}</span> odds</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden items-center gap-1 rounded-full border border-white/[0.08] bg-black/20 p-1 sm:flex">
+            {filterOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => {
+                  setActiveFilter(option.key);
+                  setFiltersOpen(false);
+                }}
+                className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                  activeFilter === option.key
+                    ? 'bg-cricket-400/15 text-cricket-200'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+              filtersOpen
+                ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                : 'border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/50 hover:text-amber-100'
+            }`}
+            aria-label="Filter matches by status"
+            aria-expanded={filtersOpen}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 6h16M7 12h10M10 18h4" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {filtersOpen && (
+        <div className="flex flex-wrap gap-2 border-b border-white/[0.07] px-4 py-3">
+          {filterOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => {
+                setActiveFilter(option.key);
+                setFiltersOpen(false);
+              }}
+              className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                activeFilter === option.key
+                  ? 'border-cricket-400/30 bg-cricket-400/15 text-cricket-200'
+                  : 'border-white/[0.1] bg-black/20 text-gray-400'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="relative">
+        <div
+          ref={tickerRef}
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
+          aria-label="Swipe horizontally through upcoming matches"
+        >
+          {filteredMatches.map((match, index) => {
+          const prediction = getPrimaryPrediction(match);
+          const team1Meta = getTeamMeta(match.team1);
+          const team2Meta = getTeamMeta(match.team2);
+          const team1Leads = prediction
+            ? prediction.team1_win_probability >= prediction.team2_win_probability
+            : false;
+          const team2Leads = prediction
+            ? prediction.team2_win_probability > prediction.team1_win_probability
+            : false;
+          const ev1 = prediction && match.bookmaker_odds
+            ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
+            : 0;
+          const ev2 = prediction && match.bookmaker_odds
+            ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
+            : 0;
+          const edgePct = Math.max(ev1, ev2);
+          const hasEdge = edgePct >= 7;
+
+          return (
+            <Link
+              key={match.match_id}
+              href={`/predict?id=${encodeURIComponent(match.match_id)}`}
+              className={`group min-w-[17rem] snap-start rounded-xl border px-3 py-3 transition-colors hover:border-amber-400/50 hover:bg-amber-400/[0.07] sm:min-w-[18.5rem] ${
+                index === 0
+                  ? 'border-amber-400/45 bg-amber-400/[0.08]'
+                  : 'border-white/[0.08] bg-black/20'
+              }`}
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+                    {match.match_type}
+                  </span>
+                  {hasEdge && (
+                    <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                      +{edgePct} edge
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 text-right text-[10px] font-bold text-gray-300">{getMatchDayLabel(match.date)}</span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className={`truncate text-sm font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
+                      {team1Meta.shortName}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] font-bold tabular-nums text-gray-400">
+                      {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '-'}
+                    </span>
+                  </span>
+                  <span className={`w-12 shrink-0 text-right font-mono text-sm font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}>
+                    {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className={`truncate text-sm font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
+                      {team2Meta.shortName}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] font-bold tabular-nums text-gray-400">
+                      {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '-'}
+                    </span>
+                  </span>
+                  <span className={`w-12 shrink-0 text-right font-mono text-sm font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}>
+                    {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '-'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2">
+                <span className="truncate text-[10px] font-semibold text-gray-400">
+                  {getMatchSection(match)}
+                </span>
+                <span className="text-[10px] font-bold text-gray-300 group-hover:text-amber-200">Open →</span>
+              </div>
+            </Link>
+          );
+          })}
+          {filteredMatches.length === 0 && (
+            <div className="min-w-[17rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[18.5rem]">
+              No {activeFilter} matches
+            </div>
+          )}
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center bg-gradient-to-l from-[#171308] via-[#171308]/90 to-transparent pl-10 pr-3">
+          <button
+            type="button"
+            onClick={() => tickerRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
+            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100"
+            aria-label="Scroll match center"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Spotlight hero for the highest-ranked upcoming match */
 function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const prediction = getPrimaryPrediction(match);
@@ -80,16 +399,10 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
     ? Math.round((1 / (match.bookmaker_odds?.team1_odds ?? 1)) * 100)
     : Math.round((1 / (match.bookmaker_odds?.team2_odds ?? 1)) * 100);
 
-  function decimalToAmerican(d: number): string {
-    if (d <= 1) return '-';
-    if (d >= 2) return '+' + Math.round((d - 1) * 100);
-    return Math.round(-100 / (d - 1)).toString();
-  }
-
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
       <motion.div
-        className="relative rounded-2xl overflow-hidden border border-white/[0.08] mb-10"
+        className="relative rounded-2xl overflow-hidden border border-white/[0.08]"
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -108,22 +421,13 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
-          {/* Row 1: unified spotlight label + match context */}
-          <div className="flex items-center gap-2 mb-4">
-            <motion.span
-              className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-amber-200 bg-amber-500/10 border border-amber-400/30 px-2.5 py-1 rounded-full shadow-[0_0_18px_rgba(251,191,36,0.12)]"
-              animate={{ opacity: [1, 0.75, 1] }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-            >
-              ✦ Spotlight Game
-            </motion.span>
-            {match.bookmaker_odds && (
-              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2.5 py-1 rounded-full">
-                🔥 Best Bet
-              </span>
-            )}
-            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">
-              {match.match_type} · {match.venue?.split(',')[0]}
+          {/* Row 1: match context */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <span className="rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+              {match.match_type}
+            </span>
+            <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">
+              {match.venue?.split(',')[0]}
             </span>
             {hasEdge && (
               <span
@@ -161,7 +465,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   </p>
                 )}
                 {match.bookmaker_odds && (
-                  <p className="text-[10px] font-mono text-gray-500 mt-1">
+                  <p className="text-[10px] font-mono text-gray-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team1_odds)}
                   </p>
                 )}
@@ -170,7 +474,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
             {/* Center VS */}
             <div className="flex flex-col items-center flex-shrink-0 px-2">
-              <span className="text-xs font-black text-gray-700 uppercase tracking-widest">vs</span>
+              <span className="text-xs font-black text-gray-500 uppercase tracking-widest">vs</span>
             </div>
 
             {/* Team 2 */}
@@ -184,7 +488,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   </p>
                 )}
                 {match.bookmaker_odds && (
-                  <p className="text-[10px] font-mono text-gray-500 mt-1">
+                  <p className="text-[10px] font-mono text-gray-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team2_odds)}
                   </p>
                 )}
@@ -218,7 +522,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
           )}
 
           {/* CTA hint */}
-          <p className="mt-3 text-[9px] text-gray-600 text-right group-hover:text-gray-500 transition-colors">
+          <p className="mt-3 text-[9px] font-semibold text-gray-400 text-right group-hover:text-amber-200 transition-colors">
             Full breakdown →
           </p>
         </div>
@@ -252,6 +556,8 @@ export default function HomePage() {
       }),
   })).filter(({ matches }) => matches.length > 0);
 
+  const boardMatchCount = matchesBySection.reduce((count, section) => count + section.matches.length, 0);
+
   useEffect(() => {
     async function load() {
       try {
@@ -270,20 +576,6 @@ export default function HomePage() {
 
   return (
     <div>
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-6"
-      >
-        <h1 className="text-2xl font-black text-white tracking-tight">
-          Spotlight <span className="text-cricket-400">Game</span>
-        </h1>
-        <p className="mt-1 text-xs text-gray-600">
-          Featured by popularity, enrichment depth, prediction quality, market coverage, and relevance.
-        </p>
-      </motion.div>
-
       {matches.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -292,42 +584,53 @@ export default function HomePage() {
         >
           <p className="text-lg font-medium text-gray-400">No upcoming matches</p>
           <p className="mt-1 text-sm">Check back later for new fixtures</p>
-          <p className="mt-2 text-xs text-gray-600">Use the Demo toggle in the nav to load mock fixtures.</p>
+          <p className="mt-2 text-xs text-gray-400">Use the Demo toggle in the nav to load mock fixtures.</p>
         </motion.div>
       ) : (
-        <div>
-          {/* Spotlight game — the featured match at a glance */}
-          {featuredMatch && <FeaturedHero match={featuredMatch} />}
+        <div className="space-y-6">
+          <MatchBoardStrip matches={matches} />
 
-          {/* Section grids */}
-          <div className="space-y-12">
-            {matchesBySection.map(({ section, matches: sectionMatches }, sectionIdx) => (
-              <motion.section
-                key={section}
-                initial={{ opacity: 0, y: 20 }}
+          {featuredMatch && (
+            <section>
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: sectionIdx * 0.12 }}
+                transition={{ duration: 0.4 }}
+                className="mb-4"
               >
-                <div className="flex items-center gap-3 mb-5">
-                  <h2 className="text-sm font-bold text-white uppercase tracking-widest">{section}</h2>
-                  <div className="flex-1 h-px bg-gradient-to-r from-cricket-800/40 to-transparent" />
-                  <span className="text-[9px] text-gray-700 font-semibold tracking-widest uppercase">
-                    {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {sectionMatches.map((match, idx) => (
-                    <MatchCard
-                      key={match.match_id}
-                      match={match}
-                      prediction={Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null}
-                      index={idx}
-                      hot={sectionIdx === 0 && idx === 0}
-                    />
-                  ))}
-                </div>
-              </motion.section>
-            ))}
+                <SixSensePickHeading />
+              </motion.div>
+              <FeaturedHero match={featuredMatch} />
+            </section>
+          )}
+
+          {/* Match discovery board */}
+          <div className="min-w-0">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <SectionHeading icon={<BarChartIcon className="h-4 w-4" />}>
+                <h2 className="text-lg font-black text-white tracking-tight">Match discovery</h2>
+              </SectionHeading>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
+                {boardMatchCount} match{boardMatchCount === 1 ? '' : 'es'}
+              </span>
+            </div>
+
+            {matchesBySection.length > 0 ? (
+              <div className="grid gap-5 lg:grid-cols-2">
+                {matchesBySection.map(({ section, matches: sectionMatches }, sectionIdx) => (
+                  <MatchDiscoveryPanel
+                    key={section}
+                    section={section}
+                    sectionMatches={sectionMatches}
+                    sectionIdx={sectionIdx}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-6 text-center">
+                <p className="text-sm font-bold text-gray-200">Only the spotlight match is available right now.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

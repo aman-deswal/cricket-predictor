@@ -188,7 +188,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
               </div>
 
               {/* Time */}
-              <span className="text-[10px] text-gray-500 font-medium tabular-nums">
+              <span className="text-[10px] text-gray-300 font-semibold tabular-nums">
                 {getMatchTime(match.date)}
               </span>
             </div>
@@ -218,7 +218,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                 <FormDots form={match.team1_recent_form} />
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-600'}`}
+                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -230,7 +230,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
 
               {/* VS + AI Edge signal — always shows the value (positive) side */}
               <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[9px] font-black text-gray-700 uppercase tracking-widest">vs</span>
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">vs</span>
                 {prediction && odds1 && odds2 && (() => {
                   // Always pick whichever team has POSITIVE edge (AI > market)
                   // If ev1 > 0 → Team 1 is underpriced; if ev2 > 0 → Team 2 is underpriced
@@ -275,7 +275,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                 <FormDots form={match.team2_recent_form} />
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-600'}`}
+                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -293,25 +293,25 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
 
             {/* ── Footer: series name + odds ── */}
             <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
-              <p className="text-[9px] text-gray-600 truncate mb-2">{getMatchDescriptor(match)}</p>
+              <p className="text-[10px] text-gray-400 truncate mb-2">{getMatchDescriptor(match)}</p>
 
               {(match.bookmaker_odds || prediction) && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] text-gray-700 uppercase tracking-widest font-semibold">Odds</span>
+                  <span className="text-[8px] text-gray-400 uppercase tracking-widest font-bold">Odds</span>
                   <div className="flex items-center gap-2">
                     {/* Team 1 odds */}
                     <div className="flex flex-col items-center">
-                      <span className="text-[8px] text-gray-600 mb-0.5">{team1Meta.shortName}</span>
+                      <span className="text-[8px] text-gray-400 mb-0.5">{team1Meta.shortName}</span>
                       <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
                         ev1Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev1Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
                       }`}>
                         {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : prediction ? toAmericanOdds(prediction.team1_win_probability) : '-'}
                       </span>
                     </div>
-                    <span className="text-gray-800 text-[10px]">·</span>
+                    <span className="text-gray-600 text-[10px]">·</span>
                     {/* Team 2 odds */}
                     <div className="flex flex-col items-center">
-                      <span className="text-[8px] text-gray-600 mb-0.5">{team2Meta.shortName}</span>
+                      <span className="text-[8px] text-gray-400 mb-0.5">{team2Meta.shortName}</span>
                       <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
                         ev2Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev2Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
                       }`}>
