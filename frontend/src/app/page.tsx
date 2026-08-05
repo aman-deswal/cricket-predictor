@@ -268,37 +268,33 @@ function MatchBoardStrip({
       <div className="relative">
         <div
           ref={tickerRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 pl-6 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
           aria-label="Swipe horizontally through upcoming matches"
         >
-          {filteredMatches.map((match, index) => {
-          const prediction = getPrimaryPrediction(match);
-          const team1Meta = getTeamMeta(match.team1);
-          const team2Meta = getTeamMeta(match.team2);
-          const team1Leads = prediction
-            ? prediction.team1_win_probability >= prediction.team2_win_probability
-            : false;
-          const team2Leads = prediction
-            ? prediction.team2_win_probability > prediction.team1_win_probability
-            : false;
-          const ev1 = prediction && match.bookmaker_odds
-            ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
-            : 0;
-          const ev2 = prediction && match.bookmaker_odds
-            ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
-            : 0;
-          const edgePct = Math.max(ev1, ev2);
-          const hasEdge = edgePct >= 7;
+          {filteredMatches.map((match) => {
+            const prediction = getPrimaryPrediction(match);
+            const team1Meta = getTeamMeta(match.team1);
+            const team2Meta = getTeamMeta(match.team2);
+            const team1Leads = prediction
+              ? prediction.team1_win_probability >= prediction.team2_win_probability
+              : false;
+            const team2Leads = prediction
+              ? prediction.team2_win_probability > prediction.team1_win_probability
+              : false;
+            const ev1 = prediction && match.bookmaker_odds
+              ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
+              : 0;
+            const ev2 = prediction && match.bookmaker_odds
+              ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
+              : 0;
+            const edgePct = Math.max(ev1, ev2);
+            const hasEdge = edgePct >= 7;
 
-          return (
+            return (
             <Link
               key={match.match_id}
               href={`/predict?id=${encodeURIComponent(match.match_id)}`}
-              className={`group min-w-[17rem] snap-start rounded-xl border px-3 py-3 transition-colors hover:border-amber-400/50 hover:bg-amber-400/[0.07] sm:min-w-[18.5rem] ${
-                index === 0
-                  ? 'border-amber-400/45 bg-amber-400/[0.08]'
-                  : 'border-white/[0.08] bg-black/20'
-              }`}
+              className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 hover:bg-amber-400/[0.07] sm:min-w-[18.5rem]"
             >
               <div className="mb-3 flex items-center gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
