@@ -630,7 +630,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shareFeedback, setShareFeedback] = useState<'idle' | 'shared' | 'error'>('idle');
 
   const featuredMatch = [...matches].sort((a, b) => {
     const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
@@ -653,28 +652,6 @@ export default function HomePage() {
   })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
-  const shareFeaturedMatch = async () => {
-    if (!featuredMatch || typeof window === 'undefined') return;
-
-    const shareUrl = `${window.location.origin}/predict?id=${encodeURIComponent(featuredMatch.match_id)}`;
-    const shareText = `SixSense™ Pick: ${featuredMatch.team1} vs ${featuredMatch.team2} — ${getCompetitionLabel(featuredMatch)}.`;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'SixSense™ Pick', text: shareText, url: shareUrl });
-      } else {
-        await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-      }
-      setShareFeedback('shared');
-      window.setTimeout(() => setShareFeedback('idle'), 1800);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      console.error('Failed to share SixSense Pick:', error);
-      setShareFeedback('error');
-      window.setTimeout(() => setShareFeedback('idle'), 1800);
-    }
-  };
-
   useEffect(() => {
     async function load() {
       try {
@@ -725,25 +702,9 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="mb-4 flex items-end justify-between gap-4"
+                className="mb-4"
               >
                 <SixSensePickHeading />
-                <div className="flex min-w-0 flex-1 items-end justify-end pb-0.5">
-                  <button
-                    type="button"
-                    onClick={shareFeaturedMatch}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-300/[0.06] text-amber-200 transition-colors hover:bg-amber-300/[0.12]"
-                    aria-label="Share SixSense Pick"
-                    title={shareFeedback === 'shared' ? 'Copied' : shareFeedback === 'error' ? 'Try sharing again' : 'Share SixSense Pick'}
-                  >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <circle cx="4" cy="8" r="2" />
-                      <circle cx="12" cy="4" r="2" />
-                      <circle cx="12" cy="12" r="2" />
-                      <path d="M5.8 7.1l4.4-2.2M5.8 8.9l4.4 2.2" />
-                    </svg>
-                  </button>
-                </div>
               </motion.div>
               <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
             </section>
