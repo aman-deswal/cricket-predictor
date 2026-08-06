@@ -683,6 +683,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeCompetition, setActiveCompetition] = useState('all');
 
   const featuredMatch = [...matches].sort((a, b) => {
     const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
@@ -705,6 +706,10 @@ export default function HomePage() {
   })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
+  const visibleCompetitionGroups = activeCompetition === 'all'
+    ? matchesByCompetition
+    : matchesByCompetition.filter((group) => group.competition === activeCompetition);
+  const visibleDiscoveryMatchCount = visibleCompetitionGroups.reduce((count, group) => count + group.matches.length, 0);
   useEffect(() => {
     async function load() {
       try {
@@ -767,18 +772,53 @@ export default function HomePage() {
 
           {/* Match discovery board */}
           <div className="min-w-0">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
-                <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
-              </SectionHeading>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
-                {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
-              </span>
+            <div className="mb-5">
+              <div className="flex items-center justify-between gap-3">
+                <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
+                  <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
+                </SectionHeading>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
+                  {visibleDiscoveryMatchCount} match{visibleDiscoveryMatchCount === 1 ? '' : 'es'}
+                </span>
+              </div>
+
+              {matchesByCompetition.length > 0 && (
+                <div
+                  className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  aria-label="Filter matches by competition"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveCompetition('all')}
+                    className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                      activeCompetition === 'all'
+                        ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
+                        : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    All <span className="ml-1 font-mono opacity-70">{discoveryMatchCount}</span>
+                  </button>
+                  {matchesByCompetition.map(({ competition, matches: competitionMatches }) => (
+                    <button
+                      key={competition}
+                      type="button"
+                      onClick={() => setActiveCompetition(competition)}
+                      className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                        activeCompetition === competition
+                          ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
+                          : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {competition} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {matchesByCompetition.length > 0 ? (
+            {visibleCompetitionGroups.length > 0 ? (
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
-                {matchesByCompetition.map(({ competition, matches: sectionMatches }, sectionIdx) => (
+                {visibleCompetitionGroups.map(({ competition, matches: sectionMatches }, sectionIdx) => (
                   <MatchDiscoveryPanel
                     key={competition}
                     competition={competition}
