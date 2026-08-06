@@ -347,7 +347,7 @@ function MatchBoardStrip({
             </span>
           )}
           {hasOverflow && (
-            <div className="hidden items-center gap-1 lg:flex">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => scrollTicker(-1)}
