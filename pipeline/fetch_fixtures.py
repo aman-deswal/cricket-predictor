@@ -133,11 +133,16 @@ def _merge_fixtures_by_identity(fixtures: list[dict]) -> list[dict]:
         current_source = current.get("source", "espn")
         incoming_source = fixture.get("source", "espn")
         if current_source != "espn" and incoming_source == "espn":
-            merged[match_index] = fixture
+            canonical = dict(fixture)
+            if current.get("venue") and not canonical.get("venue"):
+                canonical["venue"] = current["venue"]
+            merged[match_index] = canonical
             continue
 
         if fixture.get("venue") and not current.get("venue"):
-            merged[match_index] = fixture
+            enriched = dict(current)
+            enriched["venue"] = fixture["venue"]
+            merged[match_index] = enriched
 
     return merged
 
@@ -499,6 +504,7 @@ def _persist_fixture_matches(client, matches: list[dict]) -> int:
                 client.table("matches").insert(match).execute()
                 existing_statuses[match_id] = incoming_status
                 persisted += 1
+                logger.info("Persisted fixture state: %s -> %s", match_id, incoming_status)
                 continue
             except Exception:
                 # Another writer may have inserted the canonical row after our read.
@@ -524,15 +530,42 @@ def _persist_fixture_matches(client, matches: list[dict]) -> int:
 
         # The status predicate protects against another workflow completing the
         # match between our initial read and this update.
-        (
+        update_response = (
             client.table("matches")
             .update(match)
             .eq("match_id", match_id)
             .in_("status", _allowed_current_statuses(incoming_status))
             .execute()
         )
+        updated_rows = update_response.data or []
+        if not any(
+            row.get("match_id") == match_id and row.get("status") == incoming_status
+            for row in updated_rows
+        ):
+            current_response = (
+                client.table("matches")
+                .select("match_id,status")
+                .eq("match_id", match_id)
+                .execute()
+            )
+            final_status = (
+                current_response.data[0].get("status", "")
+                if current_response.data
+                else ""
+            )
+            if final_status != incoming_status:
+                logger.info(
+                    "Fixture state advanced concurrently: %s current=%s incoming=%s",
+                    match_id,
+                    final_status or "missing",
+                    incoming_status,
+                )
+                existing_statuses[match_id] = final_status
+                continue
+
         existing_statuses[match_id] = incoming_status
         persisted += 1
+        logger.info("Persisted fixture state: %s -> %s", match_id, incoming_status)
 
     return persisted
 
