@@ -105,6 +105,63 @@ function getCompetitionLabel(match: MatchWithPredictions): string {
   return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
+function MatchCoverageStrip({ matches }: { matches: MatchWithPredictions[] }) {
+  const modelledCount = matches.filter((match) => getPrimaryPrediction(match)).length;
+  const marketCount = matches.filter((match) => match.bookmaker_odds).length;
+  const competitionCount = new Set(matches.map(getCompetitionLabel)).size;
+  const liveCount = matches.filter(isMatchLive).length;
+  const metrics = [
+    { value: liveCount > 0 ? liveCount : matches.length, label: liveCount > 0 ? 'Live now' : 'On the board' },
+    { value: `${modelledCount}/${matches.length}`, label: 'Modelled' },
+    { value: marketCount, label: 'With markets' },
+    { value: competitionCount, label: competitionCount === 1 ? 'Competition' : 'Competitions' },
+  ];
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="grid grid-cols-2 overflow-hidden rounded-xl border border-white/[0.08] bg-[#171308]/75 sm:grid-cols-4"
+      aria-label="Current match coverage"
+    >
+      {metrics.map((metric, index) => (
+        <div
+          key={metric.label}
+          className={`px-4 py-3 ${index % 2 === 1 ? 'border-l border-white/[0.06]' : ''} ${
+            index >= 2 ? 'border-t border-white/[0.06] sm:border-t-0' : ''
+          } ${index === 2 ? 'sm:border-l' : ''}`}
+        >
+          <p className="font-mono text-lg font-black tabular-nums text-white">{metric.value}</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">{metric.label}</p>
+        </div>
+      ))}
+    </motion.section>
+  );
+}
+
+function SparseSlateNotice({ matchCount }: { matchCount: number }) {
+  if (matchCount > 2) return null;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Verified slate</p>
+        <p className="mt-1 text-sm text-gray-300">
+          {matchCount === 1
+            ? 'One scheduled match is available right now. SixSense only displays fixtures received from the live schedule feed.'
+            : 'Two scheduled matches are available right now. More appear automatically as official fixture feeds publish them.'}
+        </p>
+      </div>
+      <Link
+        href="/history"
+        className="shrink-0 text-xs font-black uppercase tracking-widest text-cricket-300 transition-colors hover:text-amber-200"
+      >
+        Recent results →
+      </Link>
+    </div>
+  );
+}
+
 function SectionHeading({
   icon,
   children,
@@ -503,6 +560,17 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const edgeImpliedPct = valueIsT1
     ? Math.round((1 / (match.bookmaker_odds?.team1_odds ?? 1)) * 100)
     : Math.round((1 / (match.bookmaker_odds?.team2_odds ?? 1)) * 100);
+  const featuredSignals = [
+    hasEdge ? `${edgeTeam} +${edgePct}% market edge` : '',
+    match.spotlight_signals?.has_expert_preview ? 'Expert preview ready' : '',
+    (match.spotlight_signals?.source_link_count ?? 0) > 0
+      ? `${match.spotlight_signals?.source_link_count} trusted source${match.spotlight_signals?.source_link_count === 1 ? '' : 's'}`
+      : '',
+    (match.spotlight_signals?.h2h_match_count ?? 0) > 0
+      ? `${match.spotlight_signals?.h2h_match_count} H2H results`
+      : '',
+    match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} market` : '',
+  ].filter(Boolean).slice(0, 3);
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
@@ -531,8 +599,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
               {match.match_type}
             </span>
-            <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">
-              {match.venue?.split(',')[0]}
+            <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-gray-200">
+              {getCompetitionLabel(match)}
             </span>
             {hasEdge && (
               <span
@@ -626,10 +694,24 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             </div>
           )}
 
-          {/* CTA hint */}
-          <p className="mt-3 text-[9px] font-semibold text-gray-400 text-right group-hover:text-amber-200 transition-colors">
-            Full breakdown →
-          </p>
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-200">Why this pick</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {featuredSignals.length > 0 ? featuredSignals.map((signal) => (
+                  <span key={signal} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[9px] font-bold text-gray-300">
+                    {signal}
+                  </span>
+                )) : (
+                  <span className="text-[10px] font-semibold text-gray-400">Highest-ranked matchup by available data and schedule context.</span>
+                )}
+              </div>
+              {match.venue && <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{match.venue}</p>}
+            </div>
+            <span className="shrink-0 rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[9px] font-black uppercase tracking-widest text-amber-200 transition-colors group-hover:bg-amber-300/[0.12]">
+              View full breakdown →
+            </span>
+          </div>
         </div>
       </motion.div>
     </Link>
@@ -684,14 +766,27 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center text-gray-500 py-20 bg-gradient-to-br from-gray-900/50 to-cricket-950/50 rounded-2xl border border-gray-800/30"
+          className="overflow-hidden rounded-2xl border border-amber-300/15 bg-gradient-to-br from-[#171308] to-cricket-950/50 px-6 py-14 text-center"
         >
-          <p className="text-lg font-medium text-gray-400">No upcoming matches</p>
-          <p className="mt-1 text-sm">Check back later for new fixtures</p>
-          <p className="mt-2 text-xs text-gray-400">Use the Demo toggle in the nav to load mock fixtures.</p>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] text-cricket-300">
+            <BowlIcon className="h-6 w-6" />
+          </div>
+          <p className="text-lg font-black text-white">The next slate has not landed yet</p>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-gray-400">
+            SixSense only publishes scheduled fixtures received from its cricket feeds. New matches will appear here automatically when they are available.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/history" className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-4 py-2 text-xs font-black uppercase tracking-widest text-amber-200">
+              Review recent picks
+            </Link>
+            <Link href="/dashboard" className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 transition-colors hover:text-white">
+              Model dashboard →
+            </Link>
+          </div>
         </motion.div>
       ) : (
         <div className="space-y-6">
+          <MatchCoverageStrip matches={matches} />
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
@@ -707,6 +802,8 @@ export default function HomePage() {
               <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
             </section>
           )}
+
+          <SparseSlateNotice matchCount={matches.length} />
 
           {/* Match discovery board */}
           <div className="min-w-0">
