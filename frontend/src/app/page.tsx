@@ -111,6 +111,21 @@ function getCompetitionKind(competition: string, match: MatchWithPredictions): s
   return 'League';
 }
 
+function getCompetitionFilterLabel(competition: string): string {
+  const knownLabels: Array<[RegExp, string]> = [
+    [/Indian Premier League/i, 'IPL'],
+    [/Women'?s Premier League/i, 'WPL'],
+    [/Women'?s Big Bash/i, 'WBBL'],
+    [/Big Bash/i, 'BBL'],
+    [/Major League Cricket/i, 'MLC'],
+    [/Caribbean Premier League/i, 'CPL'],
+    [/Pakistan Super League/i, 'PSL'],
+    [/Lanka Premier League/i, 'LPL'],
+    [/(Men'?s |Women'?s )?Hundred/i, 'The Hundred'],
+  ];
+  return knownLabels.find(([pattern]) => pattern.test(competition))?.[1] ?? competition;
+}
+
 function SparseSlateNotice({ matchCount }: { matchCount: number }) {
   if (matchCount > 2) return null;
 
@@ -684,6 +699,7 @@ export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCompetition, setActiveCompetition] = useState('all');
+  const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
 
   const featuredMatch = [...matches].sort((a, b) => {
     const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
@@ -777,20 +793,37 @@ export default function HomePage() {
                 <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
                   <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
                 </SectionHeading>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
-                  {visibleDiscoveryMatchCount} match{visibleDiscoveryMatchCount === 1 ? '' : 'es'}
-                </span>
-              </div>
-
-              {matchesByCompetition.length > 0 && (
-                <div
-                  className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  aria-label="Filter matches by competition"
-                >
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
+                    {visibleDiscoveryMatchCount} match{visibleDiscoveryMatchCount === 1 ? '' : 'es'}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setActiveCompetition('all')}
-                    className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                    onClick={() => setCompetitionFiltersOpen((open) => !open)}
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      competitionFiltersOpen
+                        ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                        : 'border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/50 hover:text-amber-100'
+                    }`}
+                    aria-label="Filter matches by competition"
+                    aria-expanded={competitionFiltersOpen}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 6h16M7 12h10M10 18h4" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {competitionFiltersOpen && matchesByCompetition.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-white/[0.07] bg-black/15 p-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCompetition('all');
+                      setCompetitionFiltersOpen(false);
+                    }}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
                       activeCompetition === 'all'
                         ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
                         : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
@@ -802,14 +835,17 @@ export default function HomePage() {
                     <button
                       key={competition}
                       type="button"
-                      onClick={() => setActiveCompetition(competition)}
-                      className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                      onClick={() => {
+                        setActiveCompetition(competition);
+                        setCompetitionFiltersOpen(false);
+                      }}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
                         activeCompetition === competition
                           ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
                           : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
                       }`}
                     >
-                      {competition} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
+                      {getCompetitionFilterLabel(competition)} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
                     </button>
                   ))}
                 </div>
