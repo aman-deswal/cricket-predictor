@@ -105,35 +105,6 @@ function getCompetitionLabel(match: MatchWithPredictions): string {
   return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
-function getFeaturedStory(match: MatchWithPredictions): string {
-  const prediction = getPrimaryPrediction(match);
-
-  if (prediction && match.bookmaker_odds) {
-    const team1Edge = Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100);
-    const team2Edge = Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100);
-    const bestEdge = Math.max(team1Edge, team2Edge);
-    if (bestEdge >= 7) {
-      const team1HasEdge = team1Edge >= team2Edge;
-      const edgeTeam = getTeamMeta(team1HasEdge ? match.team1 : match.team2);
-      const winProbability = team1HasEdge
-        ? prediction.team1_win_probability
-        : prediction.team2_win_probability;
-      return `${edgeTeam.shortName} is the read: ${Math.round(winProbability * 100)}% to win, ${bestEdge} points clear of the market.`;
-    }
-  }
-
-  if (prediction) {
-    const team1Leads = prediction.team1_win_probability >= prediction.team2_win_probability;
-    const pick = getTeamMeta(team1Leads ? match.team1 : match.team2);
-    const probability = team1Leads
-      ? prediction.team1_win_probability
-      : prediction.team2_win_probability;
-    return `${pick.shortName} carries the ${Math.round(probability * 100)}% model lean in the matchup we are watching.`;
-  }
-
-  return 'The headline matchup with the strongest available cricket context.';
-}
-
 function SparseSlateNotice({ matchCount }: { matchCount: number }) {
   if (matchCount > 2) return null;
 
@@ -682,16 +653,11 @@ export default function HomePage() {
   })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
-  const featuredStory = featuredMatch ? getFeaturedStory(featuredMatch) : '';
-
   const shareFeaturedMatch = async () => {
     if (!featuredMatch || typeof window === 'undefined') return;
 
-    const prediction = getPrimaryPrediction(featuredMatch);
     const shareUrl = `${window.location.origin}/predict?id=${encodeURIComponent(featuredMatch.match_id)}`;
-    const shareText = prediction
-      ? `SixSense™ Pick: ${featuredMatch.team1} vs ${featuredMatch.team2}. ${prediction.predicted_winner} is the ${Math.round(Math.max(prediction.team1_win_probability, prediction.team2_win_probability) * 100)}% model lean.`
-      : `SixSense™ Pick: ${featuredMatch.team1} vs ${featuredMatch.team2}.`;
+    const shareText = `SixSense™ Pick: ${featuredMatch.team1} vs ${featuredMatch.team2} — ${getCompetitionLabel(featuredMatch)}.`;
 
     try {
       if (navigator.share) {
@@ -762,18 +728,13 @@ export default function HomePage() {
                 className="mb-4 flex items-end justify-between gap-4"
               >
                 <SixSensePickHeading />
-                <div className="flex min-w-0 flex-1 items-end justify-end gap-3 pb-0.5 text-right">
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-amber-200">The headliner</p>
-                    <p className="mt-1 text-[9px] font-bold leading-relaxed text-gray-400 sm:text-[10px]">
-                      {featuredStory}
-                    </p>
-                  </div>
+                <div className="flex min-w-0 flex-1 items-end justify-end pb-0.5">
                   <button
                     type="button"
                     onClick={shareFeaturedMatch}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[0.06] px-2.5 text-[8px] font-black uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-300/[0.12]"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-300/[0.06] text-amber-200 transition-colors hover:bg-amber-300/[0.12]"
                     aria-label="Share SixSense Pick"
+                    title={shareFeedback === 'shared' ? 'Copied' : shareFeedback === 'error' ? 'Try sharing again' : 'Share SixSense Pick'}
                   >
                     <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <circle cx="4" cy="8" r="2" />
@@ -781,9 +742,6 @@ export default function HomePage() {
                       <circle cx="12" cy="12" r="2" />
                       <path d="M5.8 7.1l4.4-2.2M5.8 8.9l4.4 2.2" />
                     </svg>
-                    <span className="hidden sm:inline">
-                      {shareFeedback === 'shared' ? 'Shared' : shareFeedback === 'error' ? 'Retry' : 'Share'}
-                    </span>
                   </button>
                 </div>
               </motion.div>
