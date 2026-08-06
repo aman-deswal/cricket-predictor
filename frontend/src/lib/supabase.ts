@@ -166,6 +166,7 @@ export interface MatchSpotlightSignals {
 export type MatchWithPredictions = Match & {
   predictions: Prediction[];
   spotlight_signals?: MatchSpotlightSignals;
+  competition_name?: string;
 };
 
 export interface MatchOdds {
@@ -476,7 +477,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .select('match_id, venue_name, confidence, expert_preview, player_updates, key_players, possible_xi, source_links'),
     supabase
       .from('espn_match_data')
-      .select('match_id, venue_name, head_to_head'),
+      .select('match_id, venue_name, head_to_head, series_note'),
     supabase
       .from('match_odds')
       .select('match_id, bookmaker, team1_odds, team2_odds')
@@ -488,9 +489,11 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   // Build venue + H2H lookups (ESPN takes priority)
   const espnVenue = new Map<string, string>();
   const espnH2H = new Map<string, string>();
-  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null; head_to_head: string | null }) => {
+  const espnCompetition = new Map<string, string>();
+  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null; head_to_head: string | null; series_note: string | null }) => {
     if (e.venue_name) espnVenue.set(e.match_id, e.venue_name);
     if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
+    if (e.series_note) espnCompetition.set(e.match_id, e.series_note);
   });
   const enrichmentVenue = new Map<string, string>();
   const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
@@ -569,6 +572,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     return {
       ...match,
       venue: match.venue || espnVenue.get(match.match_id) || enrichmentVenue.get(match.match_id) || '',
+      competition_name: espnCompetition.get(match.match_id),
       team1_recent_form: team1Form,
       team2_recent_form: team2Form,
       bookmaker_odds: oddsMap.get(match.match_id),
