@@ -13,8 +13,10 @@ from fetch_fixtures import (
     _espn_fixtures_to_matches,
     _fixtures_to_matches,
     _infer_match_type,
+    _allowed_current_statuses,
     _merge_fixtures_by_identity,
     _normalize_fixture_team,
+    _persist_fixture_matches,
     _score_espn_completed,
     _same_fixture_window,
 )
@@ -73,15 +75,16 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(m["match_type"], "T20")
         self.assertEqual(m["name"], "India vs Australia")
 
-    def test_completed_fixture_excluded(self):
+    def test_completed_fixture_converted(self):
         fixtures = [self._make_fixture(status="post")]
         matches = _espn_fixtures_to_matches(fixtures)
-        self.assertEqual(matches, [])
+        self.assertEqual(matches[0]["status"], "completed")
 
-    def test_in_progress_fixture_excluded(self):
+    def test_in_progress_fixture_converted(self):
         fixtures = [self._make_fixture(status="in")]
         matches = _espn_fixtures_to_matches(fixtures)
-        self.assertEqual(matches, [])
+        self.assertEqual(matches[0]["match_id"], "espn-12345")
+        self.assertEqual(matches[0]["status"], "live")
 
     def test_missing_espn_id_excluded(self):
         f = self._make_fixture()
@@ -117,9 +120,9 @@ class TestEspnFixturesToMatches(unittest.TestCase):
             self._make_fixture(espn_id="4", status="in"),
         ]
         matches = _espn_fixtures_to_matches(fixtures)
-        self.assertEqual(len(matches), 2)
+        self.assertEqual(len(matches), 4)
         ids = {m["match_id"] for m in matches}
-        self.assertEqual(ids, {"espn-1", "espn-3"})
+        self.assertEqual(ids, {"espn-1", "espn-2", "espn-3", "espn-4"})
 
     def test_stable_match_id_format(self):
         fixtures = [self._make_fixture(espn_id="99887766")]
@@ -221,6 +224,95 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         cricbuzz_fixture = self._make_fixture(date="2026-08-04T17:30:00.000Z")
 
         self.assertFalse(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
+
+class TestPersistFixtureMatches(unittest.TestCase):
+    def _client_with_status(self, status):
+        client = MagicMock()
+        table = MagicMock()
+        client.table.return_value = table
+        table.select.return_value = table
+        table.in_.return_value = table
+        table.eq.return_value = table
+        table.update.return_value = table
+        table.insert.return_value = table
+        table.execute.return_value = MagicMock(
+            data=[] if status is None else [{"match_id": "espn-1521219", "status": status}]
+        )
+        return client, table
+
+    def _match(self, status):
+        return {
+            "match_id": "espn-1521219",
+            "name": "London Spirit (Women) vs MI London (Women)",
+            "team1": "London Spirit (Women)",
+            "team2": "MI London (Women)",
+            "date": "2026-08-06T14:00:00Z",
+            "venue": "Lord's",
+            "match_type": "T20",
+            "status": status,
+            "espn_event_id": "1521219",
+        }
+
+    def test_pre_to_live_to_completed_progression(self):
+        self.assertEqual(_allowed_current_statuses("upcoming"), ["upcoming"])
+        self.assertEqual(_allowed_current_statuses("live"), ["upcoming", "live"])
+        self.assertEqual(
+            _allowed_current_statuses("completed"),
+            ["upcoming", "live", "completed"],
+        )
+
+        for current, incoming in [
+            ("upcoming", "live"),
+            ("live", "completed"),
+        ]:
+            client, table = self._client_with_status(current)
+            self.assertEqual(_persist_fixture_matches(client, [self._match(incoming)]), 1)
+            table.update.assert_called_once_with(self._match(incoming))
+            self.assertIn(
+                unittest.mock.call("status", _allowed_current_statuses(incoming)),
+                table.in_.call_args_list,
+            )
+
+    def test_initial_upcoming_ingestion_inserts_canonical_row(self):
+        client, table = self._client_with_status(None)
+
+        self.assertEqual(_persist_fixture_matches(client, [self._match("upcoming")]), 1)
+
+        table.insert.assert_called_once_with(self._match("upcoming"))
+        table.update.assert_not_called()
+
+    def test_repeated_live_ingestion_is_idempotent(self):
+        client, table = self._client_with_status("live")
+
+        self.assertEqual(_persist_fixture_matches(client, [self._match("live")]), 1)
+
+        table.update.assert_called_once_with(self._match("live"))
+        table.insert.assert_not_called()
+
+    def test_stale_upcoming_cannot_replace_live(self):
+        client, table = self._client_with_status("live")
+
+        self.assertEqual(_persist_fixture_matches(client, [self._match("upcoming")]), 0)
+
+        table.update.assert_not_called()
+        table.insert.assert_not_called()
+
+    def test_stale_upcoming_cannot_replace_completed(self):
+        client, table = self._client_with_status("completed")
+
+        self.assertEqual(_persist_fixture_matches(client, [self._match("upcoming")]), 0)
+
+        table.update.assert_not_called()
+        table.insert.assert_not_called()
+
+    def test_live_cannot_replace_completed(self):
+        client, table = self._client_with_status("completed")
+
+        self.assertEqual(_persist_fixture_matches(client, [self._match("live")]), 0)
+
+        table.update.assert_not_called()
+        table.insert.assert_not_called()
 
 
 class TestScoreEspnCompleted(unittest.TestCase):
@@ -345,6 +437,7 @@ class TestScoreEspnCompleted(unittest.TestCase):
             "status": "completed",
             "winner": "India",
         })
+        self.assertNotIn("prediction_results", tables)
 
     @patch("fetch_fixtures._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
     @patch("fetch_fixtures.get_client")
