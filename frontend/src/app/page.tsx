@@ -381,7 +381,7 @@ function MatchBoardStrip({
                 className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
               >
                 <div>
-                  <div className="mb-3 flex items-center gap-2">
+                  <div className="mb-3 flex h-7 items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
                         {match.match_type}
