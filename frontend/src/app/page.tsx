@@ -780,7 +780,7 @@ export default function HomePage() {
           <section className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
             <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
                 <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
-                  <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Browse competitions</h2>
+                  <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Around the grounds</h2>
                 </SectionHeading>
                 <div className="flex shrink-0 items-center">
                   <button
