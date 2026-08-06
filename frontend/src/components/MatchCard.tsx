@@ -30,12 +30,12 @@ function TeamCrest({
 
   return (
     <motion.div
-      className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-black/20 p-1.5 shadow-lg"
+      className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-black/20 p-1 shadow-md"
       style={{
         borderColor: selected ? `${meta.primaryColor}aa` : 'rgba(255,255,255,0.09)',
-        boxShadow: selected ? `0 0 18px ${meta.primaryColor}30` : undefined,
+        boxShadow: selected ? `0 0 14px ${meta.primaryColor}28` : undefined,
       }}
-      whileHover={{ scale: 1.08 }}
+      whileHover={{ scale: 1.06 }}
     >
       {imageUrl ? (
         <img
@@ -47,7 +47,7 @@ function TeamCrest({
         />
       ) : (
         <span
-          className="flex h-full w-full items-center justify-center rounded-xl text-[10px] font-black text-white"
+          className="flex h-full w-full items-center justify-center rounded-lg text-[8px] font-black text-white"
           style={{ background: `linear-gradient(145deg, ${meta.primaryColor}, ${meta.secondaryColor})` }}
         >
           {meta.shortName.slice(0, 3)}
@@ -63,7 +63,7 @@ function FormDots({ form, align = 'center' }: { form?: Array<'W' | 'L'>; align?:
   const recent = form.slice(-5);
   const alignClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
   return (
-    <div className={`flex ${alignClass} gap-[3px] mb-2`}>
+    <div className={`flex ${alignClass} gap-[3px]`}>
       {recent.map((r, i) => (
         <motion.span
           key={i}
@@ -125,7 +125,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: index * 0.08 }}
-        whileHover={{ y: -5, scale: 1.015 }}
+        whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
       >
         <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
@@ -143,9 +143,9 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
             style={{ background: `radial-gradient(circle at 80% 45%, ${team2Meta.primaryColor}, transparent 65%)` }}
           />
 
-          <div className="relative p-4">
+          <div className="relative p-3">
             {/* ── Header row ── */}
-            <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+            <div className="mb-2.5 flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
                 {/* Match type pill */}
                 <span className="text-[9px] font-bold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 border border-cricket-400/15">
@@ -160,18 +160,22 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
               </span>
             </div>
 
-            {/* ── Teams ── */}
-            <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
-
-              {/* Team 1 */}
-              <div className="min-w-0 flex-1 text-center">
+            {/* ── Compact team rows ── */}
+            <div className="mb-2.5 space-y-2">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <TeamCrest team={match.team1} logoUrl={match.team1_logo_url} selected={winner === match.team1} />
-                <p className="truncate text-base font-black leading-tight text-white">{team1Meta.shortName}</p>
-                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team1Meta.name}</p>
-                <FormDots form={match.team1_recent_form} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <p className="shrink-0 text-sm font-black leading-tight text-white">{team1Meta.shortName}</p>
+                    <p className="truncate text-[9px] font-semibold text-gray-500">{team1Meta.name}</p>
+                  </div>
+                  <div className="mt-1">
+                    <FormDots form={match.team1_recent_form} align="left" />
+                  </div>
+                </div>
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-400'}`}
+                    className={`shrink-0 text-base font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -181,19 +185,20 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
                 )}
               </div>
 
-              <div className="flex shrink-0 flex-col items-center gap-1.5">
-                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">vs</span>
-              </div>
-
-              {/* Team 2 */}
-              <div className="min-w-0 flex-1 text-center">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <TeamCrest team={match.team2} logoUrl={match.team2_logo_url} selected={winner === match.team2} />
-                <p className="truncate text-base font-black leading-tight text-white">{team2Meta.shortName}</p>
-                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team2Meta.name}</p>
-                <FormDots form={match.team2_recent_form} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <p className="shrink-0 text-sm font-black leading-tight text-white">{team2Meta.shortName}</p>
+                    <p className="truncate text-[9px] font-semibold text-gray-500">{team2Meta.name}</p>
+                  </div>
+                  <div className="mt-1">
+                    <FormDots form={match.team2_recent_form} align="left" />
+                  </div>
+                </div>
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-400'}`}
+                    className={`shrink-0 text-base font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -209,7 +214,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
               <ProbBar team1Prob={prediction.team1_win_probability} c1={team1Meta.primaryColor} c2={team2Meta.primaryColor} />
             )}
 
-            <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">
+            <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">
               <p className="min-w-0 truncate text-[10px] text-gray-400">{match.venue || 'Venue TBD'}</p>
               <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-200 transition-colors group-hover:text-amber-100">
                 Match preview →
