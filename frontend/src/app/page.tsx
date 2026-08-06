@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
-import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
+import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
 import { BarChartIcon, BowlIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
@@ -167,6 +167,39 @@ function SixSensePickHeading() {
         </h1>
       </div>
     </div>
+  );
+}
+
+function MatchCenterTeamMark({
+  team,
+  logoUrl,
+}: {
+  team: string;
+  logoUrl?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const meta = getTeamMeta(team);
+  const imageUrl = !imageFailed
+    ? logoUrl || (isInternationalTeam(team) && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
+    : '';
+
+  return (
+    <span
+      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm text-[6px] font-black text-white"
+      style={{ backgroundColor: imageUrl ? 'transparent' : meta.primaryColor }}
+      aria-hidden="true"
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="h-full w-full object-contain"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        meta.shortName.slice(0, 2)
+      )}
+    </span>
   );
 }
 
@@ -433,6 +466,7 @@ function MatchBoardStrip({
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
+                        <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
                         <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
                           {team1Meta.shortName}
                         </span>
@@ -452,6 +486,7 @@ function MatchBoardStrip({
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
+                        <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
                         <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
                           {team2Meta.shortName}
                         </span>
