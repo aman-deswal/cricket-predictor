@@ -65,6 +65,23 @@ export function GlobeIcon({ className = 'w-4 h-4' }: IconProps) {
   );
 }
 
+/** Globe and batter — matches from around the cricket world */
+export function GroundsIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <g opacity="0.55" strokeWidth="1.35">
+        <circle cx="10.5" cy="12" r="8.5" />
+        <path d="M10.5 3.5c-2.4 3.8-2.4 13.2 0 17M3 9h12.2M2.4 14.8h9.2" />
+      </g>
+      <g strokeWidth="1.75">
+        <circle cx="15.4" cy="7.2" r="1.45" fill="currentColor" stroke="none" />
+        <path d="M14.7 9.3l-2 3.1 2.7 2.2-1.1 4.2M13.8 10.6l3.1 2 2-3.2M15.4 14.6l2.8 3.8" />
+        <path d="M19 9.6l2.4-5.8" strokeWidth="2.3" />
+      </g>
+    </svg>
+  );
+}
+
 /** Shield — league / domestic cricket */
 export function ShieldIcon({ className = 'w-4 h-4' }: IconProps) {
   return (

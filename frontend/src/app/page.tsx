@@ -7,7 +7,7 @@ import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
-import { BowlIcon, TrophyIcon } from '@/components/CricketIcons';
+import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
@@ -779,7 +779,7 @@ export default function HomePage() {
           {/* Match discovery board */}
           <section className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
             <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
-                <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
+                <SectionHeading icon={<GroundsIcon className="h-6 w-6" />}>
                   <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Around the grounds</h2>
                 </SectionHeading>
                 <div className="flex shrink-0 items-center">
