@@ -30,7 +30,9 @@ function TeamCrest({
 
   return (
     <motion.div
-      className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-black/20 p-1.5 shadow-lg"
+      className={`mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden border bg-black/20 p-1.5 shadow-lg ${
+        isInternational ? 'rounded-full' : 'rounded-2xl'
+      }`}
       style={{
         borderColor: selected ? `${meta.primaryColor}aa` : 'rgba(255,255,255,0.09)',
         boxShadow: selected ? `0 0 18px ${meta.primaryColor}30` : undefined,
@@ -41,7 +43,9 @@ function TeamCrest({
         <img
           src={imageUrl}
           alt={team}
-          className={`h-full w-full ${logoUrl ? 'object-contain' : 'rounded-lg object-cover'}`}
+          className={`h-full w-full ${
+            isInternational ? 'rounded-full object-cover' : 'object-contain'
+          }`}
           loading="lazy"
           onError={() => setImageFailed(true)}
         />

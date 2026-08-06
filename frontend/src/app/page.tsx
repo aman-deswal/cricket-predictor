@@ -193,13 +193,16 @@ function MatchCenterTeamMark({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const meta = getTeamMeta(team);
+  const isInternational = isInternationalTeam(team);
   const imageUrl = !imageFailed
-    ? logoUrl || (isInternationalTeam(team) && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
+    ? logoUrl || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
     : '';
 
   return (
     <span
-      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm text-[6px] font-black text-white"
+      className={`flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[6px] font-black text-white ${
+        isInternational ? 'rounded-full' : 'rounded-sm'
+      }`}
       style={{ backgroundColor: imageUrl ? 'transparent' : meta.primaryColor }}
       aria-hidden="true"
     >
@@ -207,7 +210,7 @@ function MatchCenterTeamMark({
         <img
           src={imageUrl}
           alt=""
-          className="h-full w-full object-contain"
+          className={`h-full w-full ${isInternational ? 'rounded-full object-cover' : 'object-contain'}`}
           onError={() => setImageFailed(true)}
         />
       ) : (
