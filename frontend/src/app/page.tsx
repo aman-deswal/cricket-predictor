@@ -586,7 +586,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         whileTap={{ scale: 0.98 }}
       >
         <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
-        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] transition-all duration-300 group-hover:border-white/[0.13]">
+        <div className="featured-cricket-border relative overflow-hidden rounded-[18px] p-px">
+        <div className="relative overflow-hidden rounded-[17px] bg-[#111008]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
@@ -703,6 +704,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
               Full breakdown →
             </span>
           </div>
+        </div>
         </div>
         </div>
       </motion.div>
