@@ -7,7 +7,7 @@ import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
-import { BarChartIcon, BowlIcon } from '@/components/CricketIcons';
+import { BowlIcon, TrophyIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
@@ -768,7 +768,7 @@ export default function HomePage() {
           {/* Match discovery board */}
           <div className="min-w-0">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <SectionHeading icon={<BarChartIcon className="h-4 w-4" />}>
+              <SectionHeading icon={<TrophyIcon className="h-4 w-4" />}>
                 <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
               </SectionHeading>
               <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
