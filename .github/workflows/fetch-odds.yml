@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deterministic-data-writes
+  group: odds-writes
   cancel-in-progress: false
 
 jobs:

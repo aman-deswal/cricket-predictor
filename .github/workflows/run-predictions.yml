@@ -1,9 +1,8 @@
 name: Run Predictions
 
 on:
-  workflow_run:
-    workflows: ["Fetch Sportsbook Odds"]
-    types: [completed]
+  schedule:
+    - cron: '32 */2 * * *'  # Every 2 hours, after the scheduled odds refresh
   workflow_dispatch:
 
 permissions:
@@ -11,13 +10,11 @@ permissions:
   models: read
 
 concurrency:
-  group: deterministic-data-writes
+  group: prediction-writes
   cancel-in-progress: false
 
 jobs:
   predict:
-    # Manual recovery is always allowed; automatic runs require fresh successful odds.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
