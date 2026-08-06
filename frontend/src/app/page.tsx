@@ -578,11 +578,11 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
       <motion.div
-        className="relative rounded-2xl overflow-hidden border border-white/[0.08]"
+        className="relative overflow-hidden rounded-2xl border border-white/[0.08] transition-[border-color,box-shadow] duration-500 group-hover:border-amber-300/45 group-hover:shadow-[0_18px_48px_rgba(0,0,0,0.38),0_0_32px_rgba(251,191,36,0.12)]"
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        whileHover={{ scale: 1.008 }}
+        whileHover={{ y: -4, scale: 1.012 }}
       >
         {/* Dual-team color wash — left and right bleeds */}
         <div
@@ -595,6 +595,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         <div className="absolute top-0 left-0 right-0 h-[2px]"
           style={{ background: `linear-gradient(90deg, ${team1Meta.primaryColor}, ${team2Meta.primaryColor})` }}
         />
+        <div className="pointer-events-none absolute inset-y-[-20%] left-[-45%] w-[32%] -skew-x-12 bg-gradient-to-r from-transparent via-amber-100/15 to-transparent opacity-0 blur-sm transition-[left,opacity] duration-1000 ease-out group-hover:left-[115%] group-hover:opacity-100" />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
