@@ -386,6 +386,11 @@ function MatchBoardStrip({
                       <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
                         {match.match_type}
                       </span>
+                      {isFeatured && (
+                        <span className="inline-flex shrink-0" title="SixSense Pick" aria-label="SixSense Pick">
+                          <Logo size={22} />
+                        </span>
+                      )}
                       {hasEdge && (
                         <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
                           +{edgePct} edge
@@ -446,15 +451,8 @@ function MatchBoardStrip({
                     <span className="truncate text-[10px] font-semibold text-gray-400">
                       {getCompetitionLabel(match)}
                     </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      {isFeatured && (
-                        <span className="rounded-full border border-amber-300/30 bg-[#fff2c2]/[0.08] px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-[#f7dfa0]">
-                          SixSense™ Pick
-                        </span>
-                      )}
-                      <span className="text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
-                        Open →
-                      </span>
+                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
+                      Open →
                     </span>
                   </div>
                 </div>
