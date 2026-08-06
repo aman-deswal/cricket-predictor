@@ -175,19 +175,12 @@ function SectionHeading({
 
 function SixSensePickHeading() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="shrink-0">
-        <Logo size={32} />
-      </div>
-      <div className="leading-none">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">
-          SixSense<sup className="ml-0.5 text-[0.55em] tracking-normal">™</sup>
-        </p>
-        <h1 className="mt-1 text-3xl font-black uppercase tracking-[0.18em] text-white sm:text-4xl">
-          Pick
-        </h1>
-      </div>
-    </div>
+    <SectionHeading icon={<Logo size={28} />}>
+      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+        <span className="text-cricket-300">SixSense</span>
+        <sup className="ml-0.5 text-[0.55em] tracking-normal text-cricket-300">™</sup> Pick
+      </h2>
+    </SectionHeading>
   );
 }
 
@@ -761,17 +754,19 @@ export default function HomePage() {
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
-            <section>
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="mb-4"
-              >
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10"
+            >
+              <div className="border-b border-white/[0.07] px-4 py-3">
                 <SixSensePickHeading />
-              </motion.div>
-              <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
-            </section>
+              </div>
+              <div className="p-3">
+                <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
+              </div>
+            </motion.section>
           )}
 
           <SparseSlateNotice matchCount={matches.length} />
