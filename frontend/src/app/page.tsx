@@ -200,9 +200,7 @@ function MatchCenterTeamMark({
 
   return (
     <span
-      className={`flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[6px] font-black text-white ${
-        isInternational ? 'rounded-full' : 'rounded-sm'
-      }`}
+      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm text-[6px] font-black text-white"
       style={{ backgroundColor: imageUrl ? 'transparent' : meta.primaryColor }}
       aria-hidden="true"
     >
@@ -210,7 +208,7 @@ function MatchCenterTeamMark({
         <img
           src={imageUrl}
           alt=""
-          className={`h-full w-full ${isInternational ? 'rounded-full object-cover' : 'object-contain'}`}
+          className={`h-full w-full ${isInternational ? 'rounded-sm object-cover' : 'object-contain'}`}
           onError={() => setImageFailed(true)}
         />
       ) : (
@@ -593,12 +591,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             {/* Team 1 */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <motion.div
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 ring-2 shadow-xl"
+                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
+                  team1Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+                }`}
                 style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
                 whileHover={{ scale: 1.1 }}
               >
                 {team1Meta.countryCode ? (
-                  <img src={getFlagUrl(team1Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 64)} 2x`} alt={match.team1} className="w-full h-full object-cover" />
+                  <img src={getFlagUrl(team1Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 64)} 2x`} alt={match.team1} className="w-full h-full rounded-xl object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team1Meta.primaryColor }}>
                     {team1Meta.shortName.slice(0, 3)}
@@ -643,12 +643,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                 )}
               </div>
               <motion.div
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 ring-2 shadow-xl"
+                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
+                  team2Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+                }`}
                 style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
                 whileHover={{ scale: 1.1 }}
               >
                 {team2Meta.countryCode ? (
-                  <img src={getFlagUrl(team2Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 64)} 2x`} alt={match.team2} className="w-full h-full object-cover" />
+                  <img src={getFlagUrl(team2Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 64)} 2x`} alt={match.team2} className="w-full h-full rounded-xl object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team2Meta.primaryColor }}>
                     {team2Meta.shortName.slice(0, 3)}
