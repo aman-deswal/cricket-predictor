@@ -387,8 +387,18 @@ function MatchBoardStrip({
                         {match.match_type}
                       </span>
                       {isFeatured && (
-                        <span className="inline-flex shrink-0" title="SixSense Pick" aria-label="SixSense Pick">
-                          <Logo size={22} />
+                        <span
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-amber-300/20 bg-black/25 px-1.5"
+                          title="SixSense Pick"
+                          aria-label="SixSense Pick"
+                        >
+                          <Logo size={18} />
+                          <span className="leading-none">
+                            <span className="block text-[6px] font-black uppercase tracking-[0.2em] text-amber-300">
+                              SixSense<sup className="ml-px text-[0.55em] tracking-normal">™</sup>
+                            </span>
+                            <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.2em] text-white">Pick</span>
+                          </span>
                         </span>
                       )}
                       {hasEdge && (
