@@ -37,7 +37,7 @@ export interface Match {
   date: string;
   venue: string;
   match_type: string;
-  status: 'upcoming' | 'completed';
+  status: 'upcoming' | 'live' | 'completed';
   winner?: string;
   team1_recent_form?: Array<'W' | 'L'>;
   team2_recent_form?: Array<'W' | 'L'>;
@@ -451,19 +451,21 @@ function isFutureMatch(match: Match, now = Date.now()): boolean {
   return getMatchTimestamp(match) > now;
 }
 
+function isLiveMatch(match: Match): boolean {
+  return match.status === 'live';
+}
+
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   if (isMockDataEnabled()) {
     return getMockUpcomingMatches();
   }
 
   const now = Date.now();
-  const nowIso = new Date(now).toISOString();
   const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
-      .eq('status', 'upcoming')
-      .gte('date', nowIso)
+      .in('status', ['upcoming', 'live'])
       .order('date', { ascending: true }),
     supabase
       .from('stats_cache')
@@ -578,7 +580,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     };
   });
 
-  return sortMatchesByPriority(matchesWithForm.filter((match) => isFutureMatch(match, now)));
+  return sortMatchesByPriority(matchesWithForm.filter((match) => isLiveMatch(match) || isFutureMatch(match, now)));
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
