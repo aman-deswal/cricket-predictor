@@ -786,11 +786,10 @@ export default function HomePage() {
           <SparseSlateNotice matchCount={matches.length} />
 
           {/* Match discovery board */}
-          <div className="min-w-0">
-            <div className="mb-5">
-              <div className="flex items-center justify-between gap-3">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
                 <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
-                  <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
+                  <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Browse competitions</h2>
                 </SectionHeading>
                 <div className="flex shrink-0 items-center">
                   <button
@@ -809,10 +808,10 @@ export default function HomePage() {
                     </svg>
                   </button>
                 </div>
-              </div>
+            </div>
 
-              {competitionFiltersOpen && matchesByCompetition.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-white/[0.07] bg-black/15 p-3">
+            {competitionFiltersOpen && matchesByCompetition.length > 0 && (
+                <div className="flex flex-wrap gap-2 border-b border-white/[0.07] px-4 py-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -845,9 +844,9 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
+            )}
 
+            <div className="p-3">
             {visibleCompetitionGroups.length > 0 ? (
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
                 {visibleCompetitionGroups.map(({ competition, matches: sectionMatches }, sectionIdx) => (
@@ -864,7 +863,8 @@ export default function HomePage() {
                 <p className="text-sm font-bold text-gray-200">Only the spotlight match is available right now.</p>
               </div>
             )}
-          </div>
+            </div>
+          </section>
         </div>
       )}
     </div>
