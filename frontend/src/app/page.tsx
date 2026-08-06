@@ -576,14 +576,17 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const winner = prediction?.predicted_winner;
 
   return (
-    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
+    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
       <motion.div
-        className="relative overflow-hidden rounded-2xl border border-white/[0.08] transition-[border-color,box-shadow] duration-500 group-hover:border-amber-300/45 group-hover:shadow-[0_18px_48px_rgba(0,0,0,0.38),0_0_32px_rgba(251,191,36,0.12)]"
+        className="relative min-w-0 w-full max-w-full"
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        whileHover={{ y: -4, scale: 1.012 }}
+        whileHover={{ y: -5, scale: 1.015 }}
+        whileTap={{ scale: 0.98 }}
       >
+        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
+        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] transition-all duration-300 group-hover:border-white/[0.13]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
@@ -595,7 +598,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         <div className="absolute top-0 left-0 right-0 h-[2px]"
           style={{ background: `linear-gradient(90deg, ${team1Meta.primaryColor}, ${team2Meta.primaryColor})` }}
         />
-        <div className="pointer-events-none absolute inset-y-[-20%] left-[-45%] w-[32%] -skew-x-12 bg-gradient-to-r from-transparent via-amber-100/15 to-transparent opacity-0 blur-sm transition-[left,opacity] duration-1000 ease-out group-hover:left-[115%] group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.025] to-transparent transition-transform duration-[1200ms] group-hover:translate-x-full" />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
@@ -700,6 +703,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
               Full breakdown →
             </span>
           </div>
+        </div>
         </div>
       </motion.div>
     </Link>
