@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MATCH_SECTIONS, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
@@ -78,10 +78,29 @@ function isMatchToday(match: MatchWithPredictions): boolean {
   return getMatchDayLabel(match.date) === 'Today';
 }
 
+function getMatchDateLabel(date: string): string {
+  const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
+  const kickoff = new Date(raw);
+  if (Number.isNaN(kickoff.getTime())) return 'Date TBD';
+  return kickoff.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function isMatchLive(match: MatchWithPredictions): boolean {
+  return String(match.status).toLowerCase() === 'live';
+}
+
 function decimalToAmerican(d: number): string {
   if (d <= 1) return '-';
   if (d >= 2) return '+' + Math.round((d - 1) * 100);
   return Math.round(-100 / (d - 1)).toString();
+}
+
+function getCompetitionLabel(match: MatchWithPredictions): string {
+  const namedCompetition = match.name.split(',').slice(1).join(',').trim();
+  if (namedCompetition) return namedCompetition;
+
+  const section = getMatchSection(match);
+  return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
 function SectionHeading({
@@ -168,24 +187,70 @@ function MatchBoardStrip({
 }: {
   matches: MatchWithPredictions[];
 }) {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'today' | 'upcoming'>('all');
+  type MatchCenterFilter = 'all' | 'live' | 'today' | 'upcoming';
+
+  const [activeFilter, setActiveFilter] = useState<MatchCenterFilter>('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
   const tickerRef = useRef<HTMLDivElement>(null);
   const sortedMatches = [...matches].sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
   const filteredMatches = sortedMatches.filter((match) => {
-    if (activeFilter === 'live') return (match.status as string) === 'live';
+    if (activeFilter === 'live') return isMatchLive(match);
     if (activeFilter === 'today') return isMatchToday(match);
-    if (activeFilter === 'upcoming') return !isMatchToday(match) && (match.status as string) !== 'live';
+    if (activeFilter === 'upcoming') return !isMatchToday(match) && !isMatchLive(match);
     return true;
   });
   const predictedCount = matches.filter((match) => Boolean(getPrimaryPrediction(match))).length;
   const oddsCount = matches.filter((match) => Boolean(match.bookmaker_odds)).length;
-  const filterOptions: Array<{ key: 'all' | 'live' | 'today' | 'upcoming'; label: string }> = [
+  const filterOptions: Array<{ key: MatchCenterFilter; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'live', label: 'Live' },
     { key: 'today', label: 'Today' },
     { key: 'upcoming', label: 'Upcoming' },
   ];
+  const selectedFilterLabel = filterOptions.find((option) => option.key === activeFilter)?.label ?? 'All';
+  const filteredMatchKey = filteredMatches.map((match) => match.match_id).join('|');
+
+  const updateScrollState = useCallback(() => {
+    const ticker = tickerRef.current;
+    if (!ticker) return;
+
+    const maxScrollLeft = Math.max(0, ticker.scrollWidth - ticker.clientWidth);
+    setHasOverflow(maxScrollLeft > 4);
+    setCanScrollLeft(ticker.scrollLeft > 4);
+    setCanScrollRight(ticker.scrollLeft < maxScrollLeft - 4);
+  }, []);
+
+  const scrollTicker = (direction: -1 | 1) => {
+    const ticker = tickerRef.current;
+    if (!ticker) return;
+
+    const tile = ticker.querySelector<HTMLElement>('[data-match-center-tile]');
+    const gap = Number.parseFloat(window.getComputedStyle(ticker).columnGap) || 12;
+    ticker.scrollBy({
+      left: direction * ((tile?.offsetWidth ?? 288) + gap),
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    const ticker = tickerRef.current;
+    if (!ticker) return;
+
+    ticker.scrollTo({ left: 0 });
+    const frame = window.requestAnimationFrame(updateScrollState);
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(ticker);
+    ticker.addEventListener('scroll', updateScrollState, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      ticker.removeEventListener('scroll', updateScrollState);
+    };
+  }, [activeFilter, filteredMatchKey, updateScrollState]);
 
   return (
     <section className="rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
@@ -198,7 +263,7 @@ function MatchBoardStrip({
             <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
           </div>
           <div className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 sm:flex">
-            <span><span className="text-white">{matches.length}</span> upcoming</span>
+            <span><span className="text-white">{matches.length}</span> matches</span>
             <span className="text-gray-700">/</span>
             <span><span className="text-cricket-300">{predictedCount}</span> predicted</span>
             <span className="text-gray-700">/</span>
@@ -206,25 +271,11 @@ function MatchBoardStrip({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden items-center gap-1 rounded-full border border-white/[0.08] bg-black/20 p-1 sm:flex">
-            {filterOptions.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => {
-                  setActiveFilter(option.key);
-                  setFiltersOpen(false);
-                }}
-                className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest transition-colors ${
-                  activeFilter === option.key
-                    ? 'bg-cricket-400/15 text-cricket-200'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {activeFilter !== 'all' && (
+            <span className="text-[9px] font-black uppercase tracking-widest text-amber-300">
+              {selectedFilterLabel}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
@@ -255,8 +306,8 @@ function MatchBoardStrip({
               }}
               className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
                 activeFilter === option.key
-                  ? 'border-cricket-400/30 bg-cricket-400/15 text-cricket-200'
-                  : 'border-white/[0.1] bg-black/20 text-gray-400'
+                  ? 'border-amber-400/40 bg-amber-400/15 text-amber-200'
+                  : 'border-white/[0.1] bg-black/20 text-gray-400 hover:border-white/[0.18] hover:text-gray-200'
               }`}
             >
               {option.label}
@@ -268,8 +319,8 @@ function MatchBoardStrip({
       <div className="relative">
         <div
           ref={tickerRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 pl-6 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
-          aria-label="Swipe horizontally through upcoming matches"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 pl-6 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] sm:px-16 [&::-webkit-scrollbar]:hidden"
+          aria-label="Swipe horizontally through Match Center"
         >
           {filteredMatches.map((match) => {
             const prediction = getPrimaryPrediction(match);
@@ -291,62 +342,81 @@ function MatchBoardStrip({
             const hasEdge = edgePct >= 7;
 
             return (
-            <Link
-              key={match.match_id}
-              href={`/predict?id=${encodeURIComponent(match.match_id)}`}
-              className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 hover:bg-amber-400/[0.07] sm:min-w-[18.5rem]"
-            >
-              <div className="mb-3 flex items-center gap-2">
-                <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
-                    {match.match_type}
-                  </span>
-                  {hasEdge && (
-                    <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
-                      +{edgePct} edge
+              <Link
+                key={match.match_id}
+                href={`/predict?id=${encodeURIComponent(match.match_id)}`}
+                data-match-center-tile
+                className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
+              >
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+                      {match.match_type}
                     </span>
+                    {hasEdge && (
+                      <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                        +{edgePct} edge
+                      </span>
+                    )}
+                  </div>
+                  {isMatchLive(match) ? (
+                    <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-300">
+                      Live
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
                   )}
                 </div>
-                <span className="shrink-0 text-right text-[10px] font-bold text-gray-300">{getMatchDayLabel(match.date)}</span>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className={`truncate text-sm font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
-                      {team1Meta.shortName}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
+                        {team1Meta.shortName}
+                      </span>
+                      <span
+                        className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
+                        title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                      >
+                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
+                      </span>
                     </span>
-                    <span className="shrink-0 font-mono text-[10px] font-bold tabular-nums text-gray-400">
-                      {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '-'}
+                    <span
+                      className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                      title={team1Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
+                    >
+                      {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}
                     </span>
-                  </span>
-                  <span className={`w-12 shrink-0 text-right font-mono text-sm font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}>
-                    {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '-'}
-                  </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
+                        {team2Meta.shortName}
+                      </span>
+                      <span
+                        className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
+                        title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                      >
+                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
+                      </span>
+                    </span>
+                    <span
+                      className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                      title={team2Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
+                    >
+                      {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className={`truncate text-sm font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
-                      {team2Meta.shortName}
-                    </span>
-                    <span className="shrink-0 font-mono text-[10px] font-bold tabular-nums text-gray-400">
-                      {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '-'}
-                    </span>
-                  </span>
-                  <span className={`w-12 shrink-0 text-right font-mono text-sm font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}>
-                    {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '-'}
-                  </span>
-                </div>
-              </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2">
-                <span className="truncate text-[10px] font-semibold text-gray-400">
-                  {getMatchSection(match)}
-                </span>
-                <span className="text-[10px] font-bold text-gray-300 group-hover:text-amber-200">Open →</span>
-              </div>
-            </Link>
-          );
+                <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2">
+                  <span className="truncate text-[10px] font-semibold text-gray-400">
+                    {getCompetitionLabel(match)}
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">Open →</span>
+                </div>
+              </Link>
+            );
           })}
           {filteredMatches.length === 0 && (
             <div className="min-w-[17rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[18.5rem]">
@@ -354,18 +424,36 @@ function MatchBoardStrip({
             </div>
           )}
         </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center bg-gradient-to-l from-[#171308] via-[#171308]/90 to-transparent pl-10 pr-3">
-          <button
-            type="button"
-            onClick={() => tickerRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
-            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100"
-            aria-label="Scroll match center"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+        {hasOverflow && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 hidden items-center bg-gradient-to-r from-[#171308] via-[#171308]/90 to-transparent pl-3 pr-10 sm:flex">
+            <button
+              type="button"
+              onClick={() => scrollTicker(-1)}
+              disabled={!canScrollLeft}
+              className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100 disabled:cursor-default disabled:border-white/[0.08] disabled:bg-black/20 disabled:text-gray-700 disabled:shadow-none"
+              aria-label="Scroll Match Center left"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {hasOverflow && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center bg-gradient-to-l from-[#171308] via-[#171308]/90 to-transparent pl-10 pr-3 sm:flex">
+            <button
+              type="button"
+              onClick={() => scrollTicker(1)}
+              disabled={!canScrollRight}
+              className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100 disabled:cursor-default disabled:border-white/[0.08] disabled:bg-black/20 disabled:text-gray-700 disabled:shadow-none"
+              aria-label="Scroll Match Center right"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
