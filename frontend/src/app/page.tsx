@@ -212,17 +212,28 @@ function MatchDiscoveryPanel({
   sectionMatches: MatchWithPredictions[];
   sectionIdx: number;
 }) {
+  const leadMatch = sectionMatches[0];
+  const leadTeam1 = getTeamMeta(leadMatch.team1);
+  const leadTeam2 = getTeamMeta(leadMatch.team2);
+
   return (
     <motion.section
       key={competition}
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: sectionIdx * 0.1 }}
-      className="min-w-0 max-w-full rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
+      className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
     >
+      <div
+        className="absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, ${leadTeam1.primaryColor}, ${leadTeam2.primaryColor})` }}
+      />
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
-        <span className="shrink-0 rounded-full border border-cricket-400/30 bg-cricket-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cricket-200">
+        <div className="min-w-0">
+          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Competition</p>
+          <h2 className="mt-1 min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
+        </div>
+        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-400">
           {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
         </span>
       </div>

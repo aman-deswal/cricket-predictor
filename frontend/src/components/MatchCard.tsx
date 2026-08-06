@@ -1,14 +1,60 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Match, Prediction } from '@/lib/supabase';
-import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
+import { MatchWithPredictions, Prediction } from '@/lib/supabase';
+import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 
 interface MatchCardProps {
-  match: Match;
+  match: MatchWithPredictions;
   prediction: Prediction | null;
   index?: number;
+}
+
+function TeamCrest({
+  team,
+  logoUrl,
+  selected,
+}: {
+  team: string;
+  logoUrl?: string;
+  selected: boolean;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const meta = getTeamMeta(team);
+  const isInternational = isInternationalTeam(team);
+  const imageUrl = imageFailed
+    ? ''
+    : logoUrl || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 64) : '');
+
+  return (
+    <motion.div
+      className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-black/20 p-1.5 shadow-lg"
+      style={{
+        borderColor: selected ? `${meta.primaryColor}aa` : 'rgba(255,255,255,0.09)',
+        boxShadow: selected ? `0 0 18px ${meta.primaryColor}30` : undefined,
+      }}
+      whileHover={{ scale: 1.08 }}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={team}
+          className={`h-full w-full ${logoUrl ? 'object-contain' : 'rounded-lg object-cover'}`}
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span
+          className="flex h-full w-full items-center justify-center rounded-xl text-[10px] font-black text-white"
+          style={{ background: `linear-gradient(145deg, ${meta.primaryColor}, ${meta.secondaryColor})` }}
+        >
+          {meta.shortName.slice(0, 3)}
+        </span>
+      )}
+    </motion.div>
+  );
 }
 
 /** Win/Loss dots — tight, readable, right-aligned */
@@ -84,12 +130,20 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
       >
         <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
 
-        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#18130a]/95 backdrop-blur-xl transition-all duration-300 group-hover:border-white/[0.13]">
+        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#15120b]/95 backdrop-blur-xl transition-all duration-300 group-hover:border-white/[0.13]">
 
           {/* Shimmer sweep on hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.025] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] pointer-events-none" />
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 opacity-[0.08]"
+            style={{ background: `radial-gradient(circle at 20% 45%, ${team1Meta.primaryColor}, transparent 65%)` }}
+          />
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-[0.08]"
+            style={{ background: `radial-gradient(circle at 80% 45%, ${team2Meta.primaryColor}, transparent 65%)` }}
+          />
 
-          <div className="p-4">
+          <div className="relative p-4">
             {/* ── Header row ── */}
             <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -111,23 +165,9 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
 
               {/* Team 1 */}
               <div className="min-w-0 flex-1 text-center">
-                <motion.div
-                  className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
-                  style={{
-                    ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(75,85,99,0.3)',
-                    ['--tw-ring-offset-color' as string]: '#18130a',
-                  }}
-                  whileHover={{ scale: 1.12 }}
-                >
-                  {team1Meta.countryCode ? (
-                    <img src={getFlagUrl(team1Meta.countryCode, 48)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 48)} 2x`} alt={match.team1} className="w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center font-black text-white text-[11px]" style={{ backgroundColor: team1Meta.primaryColor }}>
-                      {team1Meta.shortName.slice(0, 3)}
-                    </div>
-                  )}
-                </motion.div>
-                <p className="truncate text-sm font-bold leading-tight text-white">{team1Meta.shortName}</p>
+                <TeamCrest team={match.team1} logoUrl={match.team1_logo_url} selected={winner === match.team1} />
+                <p className="truncate text-base font-black leading-tight text-white">{team1Meta.shortName}</p>
+                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team1Meta.name}</p>
                 <FormDots form={match.team1_recent_form} />
                 {prediction && (
                   <motion.p
@@ -147,23 +187,9 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
 
               {/* Team 2 */}
               <div className="min-w-0 flex-1 text-center">
-                <motion.div
-                  className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
-                  style={{
-                    ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(75,85,99,0.3)',
-                    ['--tw-ring-offset-color' as string]: '#18130a',
-                  }}
-                  whileHover={{ scale: 1.12 }}
-                >
-                  {team2Meta.countryCode ? (
-                    <img src={getFlagUrl(team2Meta.countryCode, 48)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 48)} 2x`} alt={match.team2} className="w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center font-black text-white text-[11px]" style={{ backgroundColor: team2Meta.primaryColor }}>
-                      {team2Meta.shortName.slice(0, 3)}
-                    </div>
-                  )}
-                </motion.div>
-                <p className="truncate text-sm font-bold leading-tight text-white">{team2Meta.shortName}</p>
+                <TeamCrest team={match.team2} logoUrl={match.team2_logo_url} selected={winner === match.team2} />
+                <p className="truncate text-base font-black leading-tight text-white">{team2Meta.shortName}</p>
+                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team2Meta.name}</p>
                 <FormDots form={match.team2_recent_form} />
                 {prediction && (
                   <motion.p
@@ -185,8 +211,8 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
 
             <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">
               <p className="min-w-0 truncate text-[10px] text-gray-400">{match.venue || 'Venue TBD'}</p>
-              <span className="shrink-0 text-[9px] font-semibold text-gray-300 transition-colors group-hover:text-amber-200">
-                View match →
+              <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-200 transition-colors group-hover:text-amber-100">
+                Match preview →
               </span>
             </div>
           </div>
