@@ -2,11 +2,15 @@ name: Fetch Squads & Player Stats
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours (ESPN rosters are free)
+    - cron: '37 */6 * * *'  # Every 6 hours; owns squads, player stats, and new-squad headshots
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: squad-player-writes
+  cancel-in-progress: false
 
 jobs:
   fetch-squads:

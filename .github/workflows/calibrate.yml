@@ -2,11 +2,15 @@ name: Calibrate Predictions
 
 on:
   schedule:
-    - cron: '0 3 * * 1'  # Weekly on Mondays at 3 AM UTC
+    - cron: '53 3 * * 1'  # Weekly on Mondays, staggered from frequent data refreshes
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: calibration-writes
+  cancel-in-progress: false
 
 jobs:
   calibrate:

@@ -2,12 +2,16 @@ name: Run Predictions
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+    - cron: '32 */2 * * *'  # Every 2 hours, after the scheduled odds refresh
   workflow_dispatch:
 
 permissions:
   contents: read
   models: read
+
+concurrency:
+  group: prediction-writes
+  cancel-in-progress: false
 
 jobs:
   predict:
@@ -23,24 +27,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Fetch match context
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_espn.py --limit 50
-
-      - name: Fetch odds
-        env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: |
-          if [ -n "$ODDS_API_KEY" ]; then
-            python pipeline/fetch_odds.py
-          else
-            echo "ODDS_API_KEY not set — skipping odds fetch."
-          fi
 
       - name: Generate predictions
         env:
