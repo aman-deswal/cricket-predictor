@@ -725,7 +725,6 @@ export default function HomePage() {
   const visibleCompetitionGroups = activeCompetition === 'all'
     ? matchesByCompetition
     : matchesByCompetition.filter((group) => group.competition === activeCompetition);
-  const visibleDiscoveryMatchCount = visibleCompetitionGroups.reduce((count, group) => count + group.matches.length, 0);
   useEffect(() => {
     async function load() {
       try {
@@ -793,10 +792,7 @@ export default function HomePage() {
                 <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
                   <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
                 </SectionHeading>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
-                    {visibleDiscoveryMatchCount} match{visibleDiscoveryMatchCount === 1 ? '' : 'es'}
-                  </span>
+                <div className="flex shrink-0 items-center">
                   <button
                     type="button"
                     onClick={() => setCompetitionFiltersOpen((open) => !open)}
