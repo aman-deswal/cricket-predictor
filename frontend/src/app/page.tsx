@@ -148,8 +148,8 @@ function SectionHeading({
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <span className={bareIcon
-        ? 'inline-flex h-8 w-8 items-center justify-center'
-        : 'inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
+        ? 'inline-flex h-10 w-10 items-center justify-center'
+        : 'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
       }>
         {icon}
       </span>
@@ -768,7 +768,7 @@ export default function HomePage() {
           {/* Match discovery board */}
           <div className="min-w-0">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <SectionHeading icon={<TrophyIcon className="h-4 w-4" />}>
+              <SectionHeading icon={<TrophyIcon className="h-5 w-5" />}>
                 <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
               </SectionHeading>
               <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
