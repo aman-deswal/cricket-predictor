@@ -105,38 +105,31 @@ function getCompetitionLabel(match: MatchWithPredictions): string {
   return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
-function MatchCoverageStrip({ matches }: { matches: MatchWithPredictions[] }) {
-  const modelledCount = matches.filter((match) => getPrimaryPrediction(match)).length;
-  const marketCount = matches.filter((match) => match.bookmaker_odds).length;
-  const competitionCount = new Set(matches.map(getCompetitionLabel)).size;
-  const liveCount = matches.filter(isMatchLive).length;
-  const metrics = [
-    { value: liveCount > 0 ? liveCount : matches.length, label: liveCount > 0 ? 'Live now' : 'On the board' },
-    { value: `${modelledCount}/${matches.length}`, label: 'Modelled' },
-    { value: marketCount, label: 'With markets' },
-    { value: competitionCount, label: competitionCount === 1 ? 'Competition' : 'Competitions' },
-  ];
+function getFeaturedSignals(match: MatchWithPredictions): string[] {
+  const prediction = getPrimaryPrediction(match);
+  let edgeSignal = '';
 
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="grid grid-cols-2 overflow-hidden rounded-xl border border-white/[0.08] bg-[#171308]/75 sm:grid-cols-4"
-      aria-label="Current match coverage"
-    >
-      {metrics.map((metric, index) => (
-        <div
-          key={metric.label}
-          className={`px-4 py-3 ${index % 2 === 1 ? 'border-l border-white/[0.06]' : ''} ${
-            index >= 2 ? 'border-t border-white/[0.06] sm:border-t-0' : ''
-          } ${index === 2 ? 'sm:border-l' : ''}`}
-        >
-          <p className="font-mono text-lg font-black tabular-nums text-white">{metric.value}</p>
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">{metric.label}</p>
-        </div>
-      ))}
-    </motion.section>
-  );
+  if (prediction && match.bookmaker_odds) {
+    const team1Edge = Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100);
+    const team2Edge = Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100);
+    const bestEdge = Math.max(team1Edge, team2Edge);
+    if (bestEdge >= 7) {
+      const edgeTeam = team1Edge >= team2Edge ? getTeamMeta(match.team1) : getTeamMeta(match.team2);
+      edgeSignal = `${edgeTeam.shortName} +${bestEdge}% market edge`;
+    }
+  }
+
+  return [
+    edgeSignal,
+    match.spotlight_signals?.has_expert_preview ? 'Expert preview ready' : '',
+    (match.spotlight_signals?.source_link_count ?? 0) > 0
+      ? `${match.spotlight_signals?.source_link_count} trusted source${match.spotlight_signals?.source_link_count === 1 ? '' : 's'}`
+      : '',
+    (match.spotlight_signals?.h2h_match_count ?? 0) > 0
+      ? `${match.spotlight_signals?.h2h_match_count} H2H results`
+      : '',
+    match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} market` : '',
+  ].filter(Boolean).slice(0, 3);
 }
 
 function SparseSlateNotice({ matchCount }: { matchCount: number }) {
@@ -264,8 +257,6 @@ function MatchBoardStrip({
     if (activeFilter === 'upcoming') return !isMatchToday(match) && !isMatchLive(match);
     return true;
   });
-  const predictedCount = matches.filter((match) => Boolean(getPrimaryPrediction(match))).length;
-  const oddsCount = matches.filter((match) => Boolean(match.bookmaker_odds)).length;
   const filterOptions: Array<{ key: MatchCenterFilter; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'live', label: 'Live' },
@@ -323,13 +314,6 @@ function MatchBoardStrip({
               <BowlIcon className="h-5 w-5" />
             </span>
             <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
-          </div>
-          <div className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 sm:flex">
-            <span><span className="text-white">{matches.length}</span> matches</span>
-            <span className="text-gray-700">/</span>
-            <span><span className="text-cricket-300">{predictedCount}</span> predicted</span>
-            <span className="text-gray-700">/</span>
-            <span><span className="text-emerald-300">{oddsCount}</span> odds</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -544,34 +528,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
 
-  const ev1 = prediction && match.bookmaker_odds
-    ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
-    : 0;
-  const ev2 = prediction && match.bookmaker_odds
-    ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
-    : 0;
-  // Always pick the team with POSITIVE edge (AI thinks they're underpriced by market)
-  const valueIsT1 = ev1 >= ev2 && ev1 >= 7;
-  const valueIsT2 = !valueIsT1 && ev2 >= 7;
-  const hasEdge = valueIsT1 || valueIsT2;
-  const edgePct  = valueIsT1 ? ev1 : ev2;
-  const edgeTeam = valueIsT1 ? team1Meta.shortName : team2Meta.shortName;
-  const edgeAiPct      = valueIsT1 ? Math.round((prediction?.team1_win_probability ?? 0) * 100) : Math.round((prediction?.team2_win_probability ?? 0) * 100);
-  const edgeImpliedPct = valueIsT1
-    ? Math.round((1 / (match.bookmaker_odds?.team1_odds ?? 1)) * 100)
-    : Math.round((1 / (match.bookmaker_odds?.team2_odds ?? 1)) * 100);
-  const featuredSignals = [
-    hasEdge ? `${edgeTeam} +${edgePct}% market edge` : '',
-    match.spotlight_signals?.has_expert_preview ? 'Expert preview ready' : '',
-    (match.spotlight_signals?.source_link_count ?? 0) > 0
-      ? `${match.spotlight_signals?.source_link_count} trusted source${match.spotlight_signals?.source_link_count === 1 ? '' : 's'}`
-      : '',
-    (match.spotlight_signals?.h2h_match_count ?? 0) > 0
-      ? `${match.spotlight_signals?.h2h_match_count} H2H results`
-      : '',
-    match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} market` : '',
-  ].filter(Boolean).slice(0, 3);
-
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
       <motion.div
@@ -602,14 +558,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-gray-200">
               {getCompetitionLabel(match)}
             </span>
-            {hasEdge && (
-              <span
-                className="ml-auto text-[9px] font-bold tabular-nums text-emerald-400 cursor-help"
-                title={`${edgeTeam}: AI says ${edgeAiPct}% win chance, bookmaker implies ${edgeImpliedPct}%. Our model sees +${edgePct}% extra value here.`}
-              >
-                ↑ AI Edge +{edgePct}%
-              </span>
-            )}
           </div>
 
           {/* Row 2: Teams + chart */}
@@ -694,22 +642,10 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             </div>
           )}
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-200">Why this pick</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {featuredSignals.length > 0 ? featuredSignals.map((signal) => (
-                  <span key={signal} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[9px] font-bold text-gray-300">
-                    {signal}
-                  </span>
-                )) : (
-                  <span className="text-[10px] font-semibold text-gray-400">Highest-ranked matchup by available data and schedule context.</span>
-                )}
-              </div>
-              {match.venue && <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{match.venue}</p>}
-            </div>
-            <span className="shrink-0 rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[9px] font-black uppercase tracking-widest text-amber-200 transition-colors group-hover:bg-amber-300/[0.12]">
-              View full breakdown →
+          <div className="mt-3 flex items-center justify-between gap-3 text-[9px] font-semibold">
+            <span className="min-w-0 truncate text-gray-500">{match.venue || 'Venue TBC'}</span>
+            <span className="shrink-0 text-gray-400 transition-colors group-hover:text-amber-200">
+              Full breakdown →
             </span>
           </div>
         </div>
@@ -743,6 +679,7 @@ export default function HomePage() {
   })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
+  const featuredSignals = featuredMatch ? getFeaturedSignals(featuredMatch) : [];
 
   useEffect(() => {
     async function load() {
@@ -786,7 +723,6 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          <MatchCoverageStrip matches={matches} />
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
@@ -795,9 +731,17 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="mb-4"
+                className="mb-4 flex items-end justify-between gap-4"
               >
                 <SixSensePickHeading />
+                <div className="min-w-0 flex-1 pb-0.5 text-right">
+                  <p className="text-[8px] font-black uppercase tracking-[0.2em] text-amber-200">Why it&apos;s featured</p>
+                  <p className="mt-1 text-[9px] font-bold leading-relaxed text-gray-400 sm:text-[10px]">
+                    {featuredSignals.length > 0
+                      ? featuredSignals.join(' · ')
+                      : 'Highest-ranked matchup by available data and schedule context'}
+                  </p>
+                </div>
               </motion.div>
               <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
             </section>
