@@ -176,14 +176,16 @@ export function isInternationalTeam(teamName: string): boolean {
   return INTERNATIONAL_TEAMS.has(normalizeTeamName(teamName));
 }
 
+const FLAG_IMAGE_WIDTHS = [20, 40, 80, 160, 320, 640, 1280, 2560];
+
+function getFlagImageWidth(size: number): number {
+  return FLAG_IMAGE_WIDTHS.find((width) => width >= size) ?? FLAG_IMAGE_WIDTHS[FLAG_IMAGE_WIDTHS.length - 1];
+}
+
 export function getFlagUrl(countryCode: string, size: number = 64): string {
-  // flagcdn.com uses {width}x{height} format for PNG flags
-  const height = Math.round(size * 0.75);
-  return `https://flagcdn.com/${size}x${height}/${countryCode}.png`;
+  return `https://flagcdn.com/w${getFlagImageWidth(size)}/${countryCode}.png`;
 }
 
 export function getFlag2xUrl(countryCode: string, size: number = 64): string {
-  const s = size * 2;
-  const height = Math.round(s * 0.75);
-  return `https://flagcdn.com/${s}x${height}/${countryCode}.png`;
+  return `https://flagcdn.com/w${getFlagImageWidth(size * 2)}/${countryCode}.png`;
 }

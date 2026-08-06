@@ -68,4 +68,54 @@
   .animate-ev-ping {
     animation: ev-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
+
+  @keyframes cricket-seam-orbit {
+    to { transform: rotate(1turn); }
+  }
+
+  .featured-cricket-border {
+    background: rgba(255, 255, 255, 0.07);
+    isolation: isolate;
+  }
+
+  .featured-cricket-border::before {
+    content: '';
+    position: absolute;
+    inset: -75%;
+    background: conic-gradient(
+      transparent 0deg 28deg,
+      rgba(251, 191, 36, 0.75) 36deg,
+      rgba(255, 251, 235, 0.95) 41deg,
+      rgba(251, 191, 36, 0.75) 46deg,
+      transparent 54deg 208deg,
+      rgba(251, 191, 36, 0.75) 216deg,
+      rgba(255, 251, 235, 0.95) 221deg,
+      rgba(251, 191, 36, 0.75) 226deg,
+      transparent 234deg 360deg
+    );
+    opacity: 0;
+    transform: rotate(0);
+    transition: opacity 300ms ease;
+    animation: cricket-seam-orbit 2.8s linear infinite paused;
+  }
+
+  .group:hover .featured-cricket-border::before {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .featured-cricket-border::before {
+      opacity: 0.55;
+      animation-duration: 6s;
+      animation-play-state: running;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .featured-cricket-border::before,
+    .group:hover .featured-cricket-border::before {
+      animation-play-state: paused;
+    }
+  }
 }

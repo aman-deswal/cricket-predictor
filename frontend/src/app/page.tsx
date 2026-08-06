@@ -193,8 +193,9 @@ function MatchCenterTeamMark({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const meta = getTeamMeta(team);
+  const isInternational = isInternationalTeam(team);
   const imageUrl = !imageFailed
-    ? logoUrl || (isInternationalTeam(team) && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
+    ? logoUrl || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
     : '';
 
   return (
@@ -207,7 +208,7 @@ function MatchCenterTeamMark({
         <img
           src={imageUrl}
           alt=""
-          className="h-full w-full object-contain"
+          className={`h-full w-full ${isInternational ? 'rounded-sm object-cover' : 'object-contain'}`}
           onError={() => setImageFailed(true)}
         />
       ) : (
@@ -294,9 +295,10 @@ function MatchBoardStrip({
     if (!ticker) return;
 
     const maxScrollLeft = Math.max(0, ticker.scrollWidth - ticker.clientWidth);
-    setHasOverflow(maxScrollLeft > 4);
-    setCanScrollLeft(ticker.scrollLeft > 4);
-    setCanScrollRight(ticker.scrollLeft < maxScrollLeft - 4);
+    const edgeTolerance = 8;
+    setHasOverflow(maxScrollLeft > edgeTolerance);
+    setCanScrollLeft(ticker.scrollLeft > edgeTolerance);
+    setCanScrollRight(ticker.scrollLeft < maxScrollLeft - edgeTolerance);
   }, []);
 
   const scrollTicker = (direction: -1 | 1) => {
@@ -315,6 +317,7 @@ function MatchBoardStrip({
     const ticker = tickerRef.current;
     if (!ticker) return;
 
+    setCanScrollLeft(false);
     ticker.scrollTo({ left: 0 });
     const frame = window.requestAnimationFrame(updateScrollState);
     const resizeObserver = new ResizeObserver(updateScrollState);
@@ -541,6 +544,25 @@ function MatchBoardStrip({
             </div>
           )}
         </div>
+        {hasOverflow && canScrollRight && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-24 items-center justify-end pr-2 lg:hidden">
+            <span
+              className="absolute inset-0 bg-gradient-to-l from-[#171308]/95 via-[#171308]/55 to-transparent backdrop-blur-md"
+              style={{ maskImage: 'linear-gradient(to left, black 0%, black 58%, transparent 100%)' }}
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              onClick={() => scrollTicker(1)}
+              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/40 bg-amber-200/[0.12] text-amber-50 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(251,191,36,0.08)] backdrop-blur-xl transition-colors active:bg-amber-200/25"
+              aria-label="Scroll Match Center right"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -554,14 +576,18 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const winner = prediction?.predicted_winner;
 
   return (
-    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
+    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
       <motion.div
-        className="relative rounded-2xl overflow-hidden border border-white/[0.08]"
+        className="relative min-w-0 w-full max-w-full"
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        whileHover={{ scale: 1.008 }}
+        whileHover={{ y: -5, scale: 1.015 }}
+        whileTap={{ scale: 0.98 }}
       >
+        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
+        <div className="featured-cricket-border relative overflow-hidden rounded-[18px] p-px">
+        <div className="relative overflow-hidden rounded-[17px] bg-[#111008]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
@@ -573,6 +599,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         <div className="absolute top-0 left-0 right-0 h-[2px]"
           style={{ background: `linear-gradient(90deg, ${team1Meta.primaryColor}, ${team2Meta.primaryColor})` }}
         />
+        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.025] to-transparent transition-transform duration-[1200ms] group-hover:translate-x-full" />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
@@ -590,12 +617,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             {/* Team 1 */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <motion.div
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 ring-2 shadow-xl"
+                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
+                  team1Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+                }`}
                 style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
                 whileHover={{ scale: 1.1 }}
               >
                 {team1Meta.countryCode ? (
-                  <img src={getFlagUrl(team1Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 64)} 2x`} alt={match.team1} className="w-full h-full object-cover" />
+                  <img src={getFlagUrl(team1Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 64)} 2x`} alt={match.team1} className="w-full h-full rounded-xl object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team1Meta.primaryColor }}>
                     {team1Meta.shortName.slice(0, 3)}
@@ -640,12 +669,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                 )}
               </div>
               <motion.div
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 ring-2 shadow-xl"
+                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
+                  team2Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+                }`}
                 style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
                 whileHover={{ scale: 1.1 }}
               >
                 {team2Meta.countryCode ? (
-                  <img src={getFlagUrl(team2Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 64)} 2x`} alt={match.team2} className="w-full h-full object-cover" />
+                  <img src={getFlagUrl(team2Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 64)} 2x`} alt={match.team2} className="w-full h-full rounded-xl object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team2Meta.primaryColor }}>
                     {team2Meta.shortName.slice(0, 3)}
@@ -673,6 +704,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
               Full breakdown →
             </span>
           </div>
+        </div>
+        </div>
         </div>
       </motion.div>
     </Link>

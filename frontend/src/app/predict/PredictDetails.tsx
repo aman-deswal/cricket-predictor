@@ -391,9 +391,9 @@ export function PredictDetails() {
       >
         <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10">
+            <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team1Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
               {team1Meta.countryCode ? (
-                <img src={getFlagUrl(team1Meta.countryCode, 32)} alt="" className="h-full w-full object-cover" />
+                <img src={getFlagUrl(team1Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team1Meta.primaryColor }}>
                   {team1Meta.shortName.slice(0, 2)}
@@ -420,9 +420,9 @@ export function PredictDetails() {
             <span className="truncate text-right text-[11px] font-black text-white">
               {team2Meta.shortName} <span className="font-mono text-cricket-300">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
             </span>
-            <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10">
+            <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
               {team2Meta.countryCode ? (
-                <img src={getFlagUrl(team2Meta.countryCode, 32)} alt="" className="h-full w-full object-cover" />
+                <img src={getFlagUrl(team2Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team2Meta.primaryColor }}>
                   {team2Meta.shortName.slice(0, 2)}
@@ -499,7 +499,9 @@ export function PredictDetails() {
               </div>
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
+              className={`w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 overflow-hidden shadow-xl ${
+                team1Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+              }`}
               style={prediction && hasClearPick && prediction.team1_win_probability > prediction.team2_win_probability
                 ? { boxShadow: `0 0 0 3px ${teamColor1}, 0 0 0 5px ${teamColor1}44, 0 0 20px ${teamColor1}55`, outline: 'none' }
                 : { boxShadow: `0 0 0 2px ${team1Meta.primaryColor}55` }
@@ -511,7 +513,7 @@ export function PredictDetails() {
                   src={getFlagUrl(team1Meta.countryCode, 80)}
                   srcSet={`${getFlag2xUrl(team1Meta.countryCode, 80)} 2x`}
                   alt={displayTeam1}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full rounded-xl object-cover"
                 />
               ) : (
                 <div
@@ -626,7 +628,9 @@ export function PredictDetails() {
               </div>
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 rounded-full overflow-hidden shadow-xl"
+              className={`w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 overflow-hidden shadow-xl ${
+                team2Meta.countryCode ? 'rounded-xl' : 'rounded-full'
+              }`}
               style={prediction && hasClearPick && prediction.team2_win_probability > prediction.team1_win_probability
                 ? { boxShadow: `0 0 0 3px ${teamColor2}, 0 0 0 5px ${teamColor2}44, 0 0 20px ${teamColor2}55` }
                 : { boxShadow: `0 0 0 2px ${team2Meta.primaryColor}55` }
@@ -638,7 +642,7 @@ export function PredictDetails() {
                   src={getFlagUrl(team2Meta.countryCode, 80)}
                   srcSet={`${getFlag2xUrl(team2Meta.countryCode, 80)} 2x`}
                   alt={displayTeam2}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full rounded-xl object-cover"
                 />
               ) : (
                 <div
@@ -1574,9 +1578,9 @@ export function PredictDetails() {
                   <div key={squad.team}>
                     {/* Team strip */}
                     <div className="flex items-center gap-2 px-4 py-2" style={{ borderLeft: `3px solid ${meta.primaryColor}`, background: `${meta.primaryColor}10` }}>
-                      <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0">
+                      <div className={`w-4 h-4 overflow-hidden flex-shrink-0 ${meta.countryCode ? 'rounded-sm' : 'rounded-full'}`}>
                         {meta.countryCode ? (
-                          <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                          <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full rounded-sm object-cover" />
                         ) : (
                           <div className="w-full h-full" style={{ backgroundColor: meta.primaryColor }} />
                         )}
@@ -1630,9 +1634,9 @@ export function PredictDetails() {
             ].map(({ team, players, meta }) => (
               <div key={team}>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <div className="w-4 h-4 rounded-full overflow-hidden">
+                  <div className={`w-4 h-4 overflow-hidden ${meta.countryCode ? 'rounded-sm' : 'rounded-full'}`}>
                     {meta.countryCode ? (
-                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full object-cover" />
+                      <img src={getFlagUrl(meta.countryCode, 16)} alt="" className="w-full h-full rounded-sm object-cover" />
                     ) : (
                       <div className="w-full h-full" style={{ backgroundColor: meta.primaryColor }} />
                     )}

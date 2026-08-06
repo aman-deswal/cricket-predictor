@@ -41,7 +41,9 @@ function TeamCrest({
         <img
           src={imageUrl}
           alt={team}
-          className={`h-full w-full ${logoUrl ? 'object-contain' : 'rounded-lg object-cover'}`}
+          className={`h-full w-full ${
+            isInternational ? 'rounded-lg object-cover' : 'object-contain'
+          }`}
           loading="lazy"
           onError={() => setImageFailed(true)}
         />
