@@ -704,7 +704,7 @@ export default function HomePage() {
   if (loading) return <CricketLoader />;
 
   return (
-    <div>
+    <div className="-mt-4 sm:mt-0">
       {matches.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
