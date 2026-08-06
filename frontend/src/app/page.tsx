@@ -105,6 +105,12 @@ function getCompetitionLabel(match: MatchWithPredictions): string {
   return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
+function getCompetitionKind(competition: string, match: MatchWithPredictions): string {
+  if (getMatchSection(match) === 'International') return 'International series';
+  if (/(cup|trophy|championship|qualifier|world|finals?)/i.test(competition)) return 'Tournament';
+  return 'League';
+}
+
 function SparseSlateNotice({ matchCount }: { matchCount: number }) {
   if (matchCount > 2) return null;
 
@@ -215,6 +221,7 @@ function MatchDiscoveryPanel({
   const leadMatch = sectionMatches[0];
   const leadTeam1 = getTeamMeta(leadMatch.team1);
   const leadTeam2 = getTeamMeta(leadMatch.team2);
+  const competitionKind = getCompetitionKind(competition, leadMatch);
 
   return (
     <motion.section
@@ -230,7 +237,7 @@ function MatchDiscoveryPanel({
       />
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Competition</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">{competitionKind}</p>
           <h2 className="mt-1 min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
         </div>
         <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-400">
