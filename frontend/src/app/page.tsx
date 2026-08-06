@@ -274,7 +274,6 @@ function MatchBoardStrip({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const tickerRef = useRef<HTMLDivElement>(null);
-  const tickerInteractionRef = useRef(false);
   const sortedMatches = [...matches].sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
   const filteredMatches = sortedMatches.filter((match) => {
     if (activeFilter === 'live') return isMatchLive(match);
@@ -298,7 +297,7 @@ function MatchBoardStrip({
     const maxScrollLeft = Math.max(0, ticker.scrollWidth - ticker.clientWidth);
     const edgeTolerance = 8;
     setHasOverflow(maxScrollLeft > edgeTolerance);
-    setCanScrollLeft(tickerInteractionRef.current && ticker.scrollLeft > edgeTolerance);
+    setCanScrollLeft(ticker.scrollLeft > edgeTolerance);
     setCanScrollRight(ticker.scrollLeft < maxScrollLeft - edgeTolerance);
   }, []);
 
@@ -306,7 +305,6 @@ function MatchBoardStrip({
     const ticker = tickerRef.current;
     if (!ticker) return;
 
-    tickerInteractionRef.current = true;
     const tile = ticker.querySelector<HTMLElement>('[data-match-center-tile]');
     const gap = Number.parseFloat(window.getComputedStyle(ticker).columnGap) || 12;
     ticker.scrollBy({
@@ -319,7 +317,6 @@ function MatchBoardStrip({
     const ticker = tickerRef.current;
     if (!ticker) return;
 
-    tickerInteractionRef.current = false;
     setCanScrollLeft(false);
     ticker.scrollTo({ left: 0 });
     const frame = window.requestAnimationFrame(updateScrollState);
@@ -422,12 +419,6 @@ function MatchBoardStrip({
           ref={tickerRef}
           className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
           aria-label="Swipe horizontally through Match Center"
-          onPointerDown={() => {
-            tickerInteractionRef.current = true;
-          }}
-          onWheel={() => {
-            tickerInteractionRef.current = true;
-          }}
         >
           {filteredMatches.map((match) => {
             const prediction = getPrimaryPrediction(match);
@@ -553,20 +544,6 @@ function MatchBoardStrip({
             </div>
           )}
         </div>
-        {hasOverflow && canScrollLeft && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-16 items-center bg-gradient-to-r from-[#171308] via-[#171308]/80 to-transparent pl-1 backdrop-blur-[2px] lg:hidden">
-            <button
-              type="button"
-              onClick={() => scrollTicker(-1)}
-              className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/35 bg-amber-200/10 text-amber-100 shadow-lg shadow-black/40 backdrop-blur-md transition-colors active:bg-amber-200/20"
-              aria-label="Scroll Match Center left"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 5l-7 7 7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
         {hasOverflow && canScrollRight && (
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-16 items-center justify-end bg-gradient-to-l from-[#171308] via-[#171308]/80 to-transparent pr-1 backdrop-blur-[2px] lg:hidden">
             <button
