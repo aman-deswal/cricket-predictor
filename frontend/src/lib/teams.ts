@@ -11,6 +11,15 @@ export interface TeamMeta {
   secondaryColor: string;
 }
 
+const INTERNATIONAL_TEAMS = new Set([
+  'India', 'Australia', 'England', 'South Africa', 'New Zealand', 'Pakistan',
+  'Sri Lanka', 'Bangladesh', 'West Indies', 'Afghanistan', 'Zimbabwe', 'Ireland',
+  'Netherlands', 'Scotland', 'Nepal', 'Namibia', 'USA', 'Canada', 'Argentina',
+  'Oman', 'UAE', 'United Arab Emirates', 'India Women', 'Australia Women',
+  'England Women', 'South Africa Women', 'New Zealand Women', 'Pakistan Women',
+  'Sri Lanka Women', 'West Indies Women', 'Bangladesh Women', 'Argentina Women',
+]);
+
 const TEAMS: Record<string, TeamMeta> = {
   // International teams
   'India': { name: 'India', shortName: 'IND', countryCode: 'in', primaryColor: '#0047AB', secondaryColor: '#FF9933' },
@@ -161,6 +170,10 @@ export function getTeamMeta(teamName: string): TeamMeta {
     primaryColor: '#6B7280',
     secondaryColor: '#374151',
   };
+}
+
+export function isInternationalTeam(teamName: string): boolean {
+  return INTERNATIONAL_TEAMS.has(normalizeTeamName(teamName));
 }
 
 export function getFlagUrl(countryCode: string, size: number = 64): string {

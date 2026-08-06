@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -39,6 +39,20 @@ function getSeriesName(match: Match): string {
     return match.name.split(',').slice(1).join(',').trim();
   }
   return match.name || match.venue || 'TBC';
+}
+
+function truncateAtSentence(text: string, maxChars: number): { text: string; truncated: boolean } {
+  if (text.length <= maxChars) return { text, truncated: false };
+
+  const slice = text.slice(0, maxChars);
+  const sentenceEnd = Math.max(slice.lastIndexOf('.'), slice.lastIndexOf('!'), slice.lastIndexOf('?'));
+  if (sentenceEnd > 0) {
+    return { text: `${slice.slice(0, sentenceEnd + 1).trimEnd()}…`, truncated: true };
+  }
+
+  const lastSpace = slice.lastIndexOf(' ');
+  const safeEnd = lastSpace > 0 ? lastSpace : maxChars;
+  return { text: `${slice.slice(0, safeEnd).trimEnd()}…`, truncated: true };
 }
 
 const TRUSTED_SPORTSBOOKS: Record<string, { url: string; priority: number }> = {
@@ -144,6 +158,8 @@ export function PredictDetails() {
     researchNotes: false,
   });
   const [loading, setLoading] = useState(true);
+  const [showStickySummary, setShowStickySummary] = useState(false);
+  const heroRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -197,6 +213,19 @@ export function PredictDetails() {
   useEffect(() => {
     setFlippedBattles(new Set());
   }, [matchId]);
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickySummary(!entry.isIntersecting && entry.boundingClientRect.top < 64);
+      },
+      { rootMargin: '-64px 0px 0px 0px', threshold: 0.05 }
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, [loading, matchId]);
 
   // Live countdown timer
   const getCountdown = useCallback(() => {
@@ -289,12 +318,6 @@ export function PredictDetails() {
   const expertPreview = enrichment?.expert_preview?.trim() || '';
   const playerUpdates = enrichment?.player_updates ?? [];
   const sourceLinks = (enrichment?.source_links ?? []).filter((s) => s.source !== 'demo');
-  const researchNeedsAccordion = expertPreview.length > 260 || playerUpdates.length > 2 || sourceLinks.length > 2;
-  const visiblePreview = expandedSections.researchNotes || expertPreview.length <= 260
-    ? expertPreview
-    : `${expertPreview.slice(0, 260).trimEnd()}…`;
-  const visibleUpdates = expandedSections.researchNotes ? playerUpdates.slice(0, 6) : playerUpdates.slice(0, 2);
-  const visibleSources = expandedSections.researchNotes ? sourceLinks.slice(0, 6) : sourceLinks.slice(0, 2);
   const weakResearchCopy = !expertPreview || /No recent reputable source-backed updates|unavailable until a reliable source is found/i.test(expertPreview);
   const researchFacts = [
     espnData?.venue_name ? `ESPN confirms ${espnData.venue_name}${espnData.venue_city ? `, ${espnData.venue_city}` : ''} as the venue.` : '',
@@ -302,9 +325,16 @@ export function PredictDetails() {
     sportsbookOdds.length > 0 ? `Live market data is available from ${sportsbookOdds.length} trusted ${sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}.` : '',
     squads.length === 0 && !hasSquadOrXi ? 'Confirmed squads or XIs are not available yet.' : '',
   ].filter(Boolean);
-  const researchSummary = weakResearchCopy && researchFacts.length > 0
+  const fullResearchSummary = weakResearchCopy && researchFacts.length > 0
     ? researchFacts.join(' ')
-    : visiblePreview;
+    : expertPreview;
+  const collapsedResearchSummary = truncateAtSentence(fullResearchSummary, 260);
+  const researchSummary = expandedSections.researchNotes
+    ? fullResearchSummary
+    : collapsedResearchSummary.text;
+  const visibleUpdates = expandedSections.researchNotes ? playerUpdates.slice(0, 6) : playerUpdates.slice(0, 2);
+  const visibleSources = expandedSections.researchNotes ? sourceLinks.slice(0, 6) : sourceLinks.slice(0, 2);
+  const researchNeedsAccordion = collapsedResearchSummary.truncated || playerUpdates.length > 2 || sourceLinks.length > 2;
   const h2hLeader = h2hTeam1Wins > h2hTeam2Wins
     ? displayTeam1
     : h2hTeam2Wins > h2hTeam1Wins
@@ -353,6 +383,56 @@ export function PredictDetails() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      <div
+        className={`fixed inset-x-0 top-16 z-40 h-11 border-b border-amber-300/15 bg-[#121010]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 ${
+          showStickySummary ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+        }`}
+        aria-hidden={!showStickySummary}
+      >
+        <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10">
+              {team1Meta.countryCode ? (
+                <img src={getFlagUrl(team1Meta.countryCode, 32)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team1Meta.primaryColor }}>
+                  {team1Meta.shortName.slice(0, 2)}
+                </div>
+              )}
+            </div>
+            <span className="truncate text-[11px] font-black text-white">
+              {team1Meta.shortName} <span className="font-mono text-cricket-300">{prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}</span>
+            </span>
+            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-300">
+              {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team1_odds) : '—'}
+            </span>
+          </div>
+
+          <div className="text-center">
+            <p className="text-[7px] font-black uppercase tracking-[0.18em] text-amber-300">SixSense™ Pick</p>
+            <p className="text-[9px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-300">
+              {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team2_odds) : '—'}
+            </span>
+            <span className="truncate text-right text-[11px] font-black text-white">
+              {team2Meta.shortName} <span className="font-mono text-cricket-300">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
+            </span>
+            <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10">
+              {team2Meta.countryCode ? (
+                <img src={getFlagUrl(team2Meta.countryCode, 32)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team2Meta.primaryColor }}>
+                  {team2Meta.shortName.slice(0, 2)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Back link + Countdown */}
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="flex items-center gap-1.5 text-[clamp(0.75rem,1vw,0.9rem)] text-gray-400 hover:text-white transition-colors group">
@@ -392,6 +472,7 @@ export function PredictDetails() {
         }
       `}</style>
       <motion.div
+        ref={heroRef}
         className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

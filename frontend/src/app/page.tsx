@@ -6,8 +6,8 @@ import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
-import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
-import { BarChartIcon, BowlIcon } from '@/components/CricketIcons';
+import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
+import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
@@ -105,6 +105,50 @@ function getCompetitionLabel(match: MatchWithPredictions): string {
   return section === 'Other' ? `${match.match_type} cricket` : section;
 }
 
+function getCompetitionKind(competition: string, match: MatchWithPredictions): string {
+  if (getMatchSection(match) === 'International') return 'International series';
+  if (/(cup|trophy|championship|qualifier|world|finals?)/i.test(competition)) return 'Tournament';
+  return 'League';
+}
+
+function getCompetitionFilterLabel(competition: string): string {
+  const knownLabels: Array<[RegExp, string]> = [
+    [/Indian Premier League/i, 'IPL'],
+    [/Women'?s Premier League/i, 'WPL'],
+    [/Women'?s Big Bash/i, 'WBBL'],
+    [/Big Bash/i, 'BBL'],
+    [/Major League Cricket/i, 'MLC'],
+    [/Caribbean Premier League/i, 'CPL'],
+    [/Pakistan Super League/i, 'PSL'],
+    [/Lanka Premier League/i, 'LPL'],
+    [/(Men'?s |Women'?s )?Hundred/i, 'The Hundred'],
+  ];
+  return knownLabels.find(([pattern]) => pattern.test(competition))?.[1] ?? competition;
+}
+
+function SparseSlateNotice({ matchCount }: { matchCount: number }) {
+  if (matchCount > 2) return null;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Verified slate</p>
+        <p className="mt-1 text-sm text-gray-300">
+          {matchCount === 1
+            ? 'One scheduled match is available right now. SixSense only displays fixtures received from the live schedule feed.'
+            : 'Two scheduled matches are available right now. More appear automatically as official fixture feeds publish them.'}
+        </p>
+      </div>
+      <Link
+        href="/history"
+        className="shrink-0 text-xs font-black uppercase tracking-widest text-cricket-300 transition-colors hover:text-amber-200"
+      >
+        Recent results →
+      </Link>
+    </div>
+  );
+}
+
 function SectionHeading({
   icon,
   children,
@@ -119,8 +163,8 @@ function SectionHeading({
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <span className={bareIcon
-        ? 'inline-flex h-8 w-8 items-center justify-center'
-        : 'inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
+        ? 'inline-flex h-10 w-10 items-center justify-center'
+        : 'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
       }>
         {icon}
       </span>
@@ -131,19 +175,45 @@ function SectionHeading({
 
 function SixSensePickHeading() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="shrink-0">
-        <Logo size={32} />
-      </div>
-      <div className="leading-none">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">
-          SixSense<sup className="ml-0.5 text-[0.55em] tracking-normal">™</sup>
-        </p>
-        <h1 className="mt-1 text-3xl font-black uppercase tracking-[0.18em] text-white sm:text-4xl">
-          Pick
-        </h1>
-      </div>
-    </div>
+    <SectionHeading icon={<Logo size={40} />} bareIcon>
+      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+        <span className="text-cricket-300">SixSense</span>
+        <sup className="ml-0.5 text-[0.55em] tracking-normal text-cricket-300">™</sup> Pick
+      </h2>
+    </SectionHeading>
+  );
+}
+
+function MatchCenterTeamMark({
+  team,
+  logoUrl,
+}: {
+  team: string;
+  logoUrl?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const meta = getTeamMeta(team);
+  const imageUrl = !imageFailed
+    ? logoUrl || (isInternationalTeam(team) && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
+    : '';
+
+  return (
+    <span
+      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm text-[6px] font-black text-white"
+      style={{ backgroundColor: imageUrl ? 'transparent' : meta.primaryColor }}
+      aria-hidden="true"
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="h-full w-full object-contain"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        meta.shortName.slice(0, 2)
+      )}
+    </span>
   );
 }
 
@@ -156,19 +226,22 @@ function MatchDiscoveryPanel({
   sectionMatches: MatchWithPredictions[];
   sectionIdx: number;
 }) {
+  const leadMatch = sectionMatches[0];
+  const competitionKind = getCompetitionKind(competition, leadMatch);
+
   return (
     <motion.section
       key={competition}
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: sectionIdx * 0.1 }}
-      className="min-w-0 max-w-full rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
+      className="min-w-0 max-w-full"
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
-        <span className="shrink-0 rounded-full border border-cricket-400/30 bg-cricket-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cricket-200">
-          {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
-        </span>
+      <div className="mb-3 px-1">
+        <div className="min-w-0">
+          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">{competitionKind}</p>
+          <h2 className="mt-1 min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
+        </div>
       </div>
 
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -207,8 +280,6 @@ function MatchBoardStrip({
     if (activeFilter === 'upcoming') return !isMatchToday(match) && !isMatchLive(match);
     return true;
   });
-  const predictedCount = matches.filter((match) => Boolean(getPrimaryPrediction(match))).length;
-  const oddsCount = matches.filter((match) => Boolean(match.bookmaker_odds)).length;
   const filterOptions: Array<{ key: MatchCenterFilter; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'live', label: 'Live' },
@@ -266,13 +337,6 @@ function MatchBoardStrip({
               <BowlIcon className="h-5 w-5" />
             </span>
             <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
-          </div>
-          <div className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 sm:flex">
-            <span><span className="text-white">{matches.length}</span> matches</span>
-            <span className="text-gray-700">/</span>
-            <span><span className="text-cricket-300">{predictedCount}</span> predicted</span>
-            <span className="text-gray-700">/</span>
-            <span><span className="text-emerald-300">{oddsCount}</span> odds</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -381,7 +445,7 @@ function MatchBoardStrip({
                 className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
               >
                 <div>
-                  <div className="mb-3 flex items-center gap-2">
+                  <div className="mb-3 flex h-7 items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
                         {match.match_type}
@@ -419,6 +483,7 @@ function MatchBoardStrip({
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
+                        <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
                         <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
                           {team1Meta.shortName}
                         </span>
@@ -438,6 +503,7 @@ function MatchBoardStrip({
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
+                        <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
                         <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
                           {team2Meta.shortName}
                         </span>
@@ -487,23 +553,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
 
-  const ev1 = prediction && match.bookmaker_odds
-    ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
-    : 0;
-  const ev2 = prediction && match.bookmaker_odds
-    ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
-    : 0;
-  // Always pick the team with POSITIVE edge (AI thinks they're underpriced by market)
-  const valueIsT1 = ev1 >= ev2 && ev1 >= 7;
-  const valueIsT2 = !valueIsT1 && ev2 >= 7;
-  const hasEdge = valueIsT1 || valueIsT2;
-  const edgePct  = valueIsT1 ? ev1 : ev2;
-  const edgeTeam = valueIsT1 ? team1Meta.shortName : team2Meta.shortName;
-  const edgeAiPct      = valueIsT1 ? Math.round((prediction?.team1_win_probability ?? 0) * 100) : Math.round((prediction?.team2_win_probability ?? 0) * 100);
-  const edgeImpliedPct = valueIsT1
-    ? Math.round((1 / (match.bookmaker_odds?.team1_odds ?? 1)) * 100)
-    : Math.round((1 / (match.bookmaker_odds?.team2_odds ?? 1)) * 100);
-
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block group">
       <motion.div
@@ -531,17 +580,9 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
               {match.match_type}
             </span>
-            <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">
-              {match.venue?.split(',')[0]}
+            <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-gray-200">
+              {getCompetitionLabel(match)}
             </span>
-            {hasEdge && (
-              <span
-                className="ml-auto text-[9px] font-bold tabular-nums text-emerald-400 cursor-help"
-                title={`${edgeTeam}: AI says ${edgeAiPct}% win chance, bookmaker implies ${edgeImpliedPct}%. Our model sees +${edgePct}% extra value here.`}
-              >
-                ↑ AI Edge +{edgePct}%
-              </span>
-            )}
           </div>
 
           {/* Row 2: Teams + chart */}
@@ -626,10 +667,12 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             </div>
           )}
 
-          {/* CTA hint */}
-          <p className="mt-3 text-[9px] font-semibold text-gray-400 text-right group-hover:text-amber-200 transition-colors">
-            Full breakdown →
-          </p>
+          <div className="mt-3 flex items-center justify-between gap-3 text-[9px] font-semibold">
+            <span className="min-w-0 truncate text-gray-500">{match.venue || 'Venue TBC'}</span>
+            <span className="shrink-0 text-gray-400 transition-colors group-hover:text-amber-200">
+              Full breakdown →
+            </span>
+          </div>
         </div>
       </motion.div>
     </Link>
@@ -639,6 +682,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeCompetition, setActiveCompetition] = useState('all');
+  const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
 
   const featuredMatch = [...matches].sort((a, b) => {
     const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
@@ -661,7 +706,9 @@ export default function HomePage() {
   })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
-
+  const visibleCompetitionGroups = activeCompetition === 'all'
+    ? matchesByCompetition
+    : matchesByCompetition.filter((group) => group.competition === activeCompetition);
   useEffect(() => {
     async function load() {
       try {
@@ -679,49 +726,116 @@ export default function HomePage() {
   if (loading) return <CricketLoader />;
 
   return (
-    <div>
+    <div className="-mt-4 sm:mt-0">
       {matches.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center text-gray-500 py-20 bg-gradient-to-br from-gray-900/50 to-cricket-950/50 rounded-2xl border border-gray-800/30"
+          className="overflow-hidden rounded-2xl border border-amber-300/15 bg-gradient-to-br from-[#171308] to-cricket-950/50 px-6 py-14 text-center"
         >
-          <p className="text-lg font-medium text-gray-400">No upcoming matches</p>
-          <p className="mt-1 text-sm">Check back later for new fixtures</p>
-          <p className="mt-2 text-xs text-gray-400">Use the Demo toggle in the nav to load mock fixtures.</p>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] text-cricket-300">
+            <BowlIcon className="h-6 w-6" />
+          </div>
+          <p className="text-lg font-black text-white">The next slate has not landed yet</p>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-gray-400">
+            SixSense only publishes scheduled fixtures received from its cricket feeds. New matches will appear here automatically when they are available.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/history" className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-4 py-2 text-xs font-black uppercase tracking-widest text-amber-200">
+              Review recent picks
+            </Link>
+            <Link href="/dashboard" className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 transition-colors hover:text-white">
+              Model dashboard →
+            </Link>
+          </div>
         </motion.div>
       ) : (
         <div className="space-y-6">
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
-            <section>
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="mb-4"
-              >
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10"
+            >
+              <div className="border-b border-white/[0.07] px-4 py-3">
                 <SixSensePickHeading />
-              </motion.div>
-              <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
-            </section>
+              </div>
+              <div className="p-3">
+                <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
+              </div>
+            </motion.section>
           )}
 
+          <SparseSlateNotice matchCount={matches.length} />
+
           {/* Match discovery board */}
-          <div className="min-w-0">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <SectionHeading icon={<BarChartIcon className="h-4 w-4" />}>
-                <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
-              </SectionHeading>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
-                {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
-              </span>
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
+                <SectionHeading icon={<GroundsIcon className="h-6 w-6" />}>
+                  <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Around the grounds</h2>
+                </SectionHeading>
+                <div className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setCompetitionFiltersOpen((open) => !open)}
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      competitionFiltersOpen
+                        ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                        : 'border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/50 hover:text-amber-100'
+                    }`}
+                    aria-label="Filter matches by competition"
+                    aria-expanded={competitionFiltersOpen}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 6h16M7 12h10M10 18h4" />
+                    </svg>
+                  </button>
+                </div>
             </div>
 
-            {matchesByCompetition.length > 0 ? (
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
-                {matchesByCompetition.map(({ competition, matches: sectionMatches }, sectionIdx) => (
+            {competitionFiltersOpen && matchesByCompetition.length > 0 && (
+                <div className="flex flex-wrap gap-2 border-b border-white/[0.07] px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCompetition('all');
+                      setCompetitionFiltersOpen(false);
+                    }}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                      activeCompetition === 'all'
+                        ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
+                        : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    All <span className="ml-1 font-mono opacity-70">{discoveryMatchCount}</span>
+                  </button>
+                  {matchesByCompetition.map(({ competition, matches: competitionMatches }) => (
+                    <button
+                      key={competition}
+                      type="button"
+                      onClick={() => {
+                        setActiveCompetition(competition);
+                        setCompetitionFiltersOpen(false);
+                      }}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                        activeCompetition === competition
+                          ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
+                          : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {getCompetitionFilterLabel(competition)} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
+                    </button>
+                  ))}
+                </div>
+            )}
+
+            <div className="p-3">
+            {visibleCompetitionGroups.length > 0 ? (
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleCompetitionGroups.map(({ competition, matches: sectionMatches }, sectionIdx) => (
                   <MatchDiscoveryPanel
                     key={competition}
                     competition={competition}
@@ -735,7 +849,8 @@ export default function HomePage() {
                 <p className="text-sm font-bold text-gray-200">Only the spotlight match is available right now.</p>
               </div>
             )}
-          </div>
+            </div>
+          </section>
         </div>
       )}
     </div>

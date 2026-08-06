@@ -167,6 +167,8 @@ export type MatchWithPredictions = Match & {
   predictions: Prediction[];
   spotlight_signals?: MatchSpotlightSignals;
   competition_name?: string;
+  team1_logo_url?: string;
+  team2_logo_url?: string;
 };
 
 export interface MatchOdds {
@@ -477,7 +479,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .select('match_id, venue_name, confidence, expert_preview, player_updates, key_players, possible_xi, source_links'),
     supabase
       .from('espn_match_data')
-      .select('match_id, venue_name, head_to_head, series_note'),
+      .select('match_id, venue_name, head_to_head, series_note, rosters'),
     supabase
       .from('match_odds')
       .select('match_id, bookmaker, team1_odds, team2_odds')
@@ -490,10 +492,23 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   const espnVenue = new Map<string, string>();
   const espnH2H = new Map<string, string>();
   const espnCompetition = new Map<string, string>();
-  (espnData ?? []).forEach((e: { match_id: string; venue_name: string | null; head_to_head: string | null; series_note: string | null }) => {
+  const espnRosters = new Map<string, ESPNRoster[]>();
+  (espnData ?? []).forEach((e: {
+    match_id: string;
+    venue_name: string | null;
+    head_to_head: string | null;
+    series_note: string | null;
+    rosters: ESPNRoster[] | string | null;
+  }) => {
     if (e.venue_name) espnVenue.set(e.match_id, e.venue_name);
     if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
     if (e.series_note) espnCompetition.set(e.match_id, e.series_note);
+    if (e.rosters) {
+      try {
+        const rosters = typeof e.rosters === 'string' ? JSON.parse(e.rosters) : e.rosters;
+        if (Array.isArray(rosters)) espnRosters.set(e.match_id, rosters);
+      } catch {}
+    }
   });
   const enrichmentVenue = new Map<string, string>();
   const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
@@ -568,11 +583,22 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
         }
       } catch {}
     }
+    const rosters = espnRosters.get(match.match_id) ?? [];
+    const findTeamLogo = (teamName: string): string | undefined => {
+      const teamMeta = getTeamMeta(teamName);
+      const normalizedName = teamName.toLowerCase();
+      return rosters.find((roster) =>
+        roster.team_name?.toLowerCase() === normalizedName
+        || roster.team_abbr?.toUpperCase() === teamMeta.shortName.toUpperCase()
+      )?.team_logo || undefined;
+    };
 
     return {
       ...match,
       venue: match.venue || espnVenue.get(match.match_id) || enrichmentVenue.get(match.match_id) || '',
       competition_name: espnCompetition.get(match.match_id),
+      team1_logo_url: findTeamLogo(match.team1),
+      team2_logo_url: findTeamLogo(match.team2),
       team1_recent_form: team1Form,
       team2_recent_form: team2Form,
       bookmaker_odds: oddsMap.get(match.match_id),
