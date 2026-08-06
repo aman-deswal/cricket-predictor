@@ -1,10 +1,8 @@
 name: Enrich Matches
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
   workflow_run:
-    workflows: ["Fetch Results"]
+    workflows: ["Run Predictions"]
     types: [completed]
   workflow_dispatch:
 
@@ -12,8 +10,15 @@ permissions:
   contents: read
   models: read
 
+concurrency:
+  # Garnish refreshes may be superseded and never queue ahead of deterministic writes.
+  group: optional-match-enrichment
+  cancel-in-progress: true
+
 jobs:
   enrich:
+    # Enrichment is an optional post-prediction pass and never runs after a failed upstream refresh.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

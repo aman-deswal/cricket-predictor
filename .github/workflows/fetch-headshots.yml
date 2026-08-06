@@ -1,12 +1,14 @@
 name: Fetch Headshots
 
 on:
-  schedule:
-    - cron: '0 5 1 * *'  # Monthly on the 1st at 5 AM UTC
-  workflow_dispatch:
+  workflow_dispatch:  # Manual full-refresh recovery; scheduled headshots belong to Fetch Squads & Player Stats
 
 permissions:
   contents: read
+
+concurrency:
+  group: deterministic-data-writes
+  cancel-in-progress: false
 
 jobs:
   headshots:

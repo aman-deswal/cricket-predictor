@@ -2,12 +2,15 @@ name: Fetch Fixtures
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # Every 2 hours (ESPN is free/unlimited)
+    - cron: '7 */2 * * *'  # Every 2 hours; owns fixture discovery and ESPN match context
   workflow_dispatch:
 
 permissions:
   contents: read
-  models: read
+
+concurrency:
+  group: deterministic-data-writes
+  cancel-in-progress: false
 
 jobs:
   fetch:
@@ -35,57 +38,3 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python pipeline/fetch_espn.py --limit 50
-
-      - name: Fetch odds
-        env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: |
-          if [ -n "$ODDS_API_KEY" ]; then
-            python pipeline/fetch_odds.py
-          else
-            echo "ODDS_API_KEY not set — skipping odds fetch."
-          fi
-
-      - name: Fetch squads
-        env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_squads.py
-
-      - name: Fetch player stats
-        env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_player_stats.py
-
-      - name: Fetch headshots for new squads
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_headshots.py
-
-      - name: Generate predictions and enrichment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
-          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
-          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
-          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
-          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
-          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
-        run: python pipeline/predict.py --force
-
-      - name: Backup score pending results
-        if: ${{ always() }}
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          RESULT_CHECK_BATCH_SIZE: '25'
-        run: python pipeline/fetch_results.py

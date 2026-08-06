@@ -103,13 +103,13 @@ flowchart LR
 
 | Workflow | Schedule | Purpose |
 |---|---|---|
-| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures from ESPN, use Cricbuzz JSON-LD as a fixture-horizon fallback, backup score pass |
+| `fetch-fixtures.yml` | every 2 hours | Pull upcoming fixtures and ESPN match context |
 | `fetch-results.yml` | hourly | Score unscored predictions on completed matches (ESPN only) |
-| `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN; player stats + headshots (CricAPI optional) |
-| `fetch-headshots.yml` | monthly | Full headshot refresh pass |
+| `fetch-squads.yml` | every 6 hours | Fetch confirmed XI from ESPN, player stats, and headshots for new squads (CricAPI optional) |
+| `fetch-headshots.yml` | manual | Full headshot recovery pass; no separate schedule |
 | `fetch-odds.yml` | every 2 hours | Pull bookmaker market data and map to matches |
-| `enrich-matches.yml` | every 6 hours + after results run | Data-backed enrichment, with optional AI garnish when explicitly enabled |
-| `run-predictions.yml` | daily (06:00 UTC) | Generate deterministic probabilities, reasoning, toss insight, and edge score |
+| `run-predictions.yml` | after successful odds run | Generate deterministic probabilities, reasoning, toss insight, and edge score without fetching upstream data |
+| `enrich-matches.yml` | after successful predictions | Optional, non-blocking data-backed enrichment and AI garnish |
 | `copilot-setup-steps.yml` | on demand / changes to Copilot config | Prepare GitHub Copilot cloud agent with Python deps and deterministic pipeline tooling |
 | `calibrate.yml` | weekly | Compute isotonic calibration bins |
 | `deploy.yml` | on `main` push / manual | Build static frontend and deploy to GitHub Pages |

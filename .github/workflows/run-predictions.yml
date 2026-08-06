@@ -1,16 +1,23 @@
 name: Run Predictions
 
 on:
-  schedule:
-    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_run:
+    workflows: ["Fetch Sportsbook Odds"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
   models: read
 
+concurrency:
+  group: deterministic-data-writes
+  cancel-in-progress: false
+
 jobs:
   predict:
+    # Manual recovery is always allowed; automatic runs require fresh successful odds.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,24 +30,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Fetch match context
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_espn.py --limit 50
-
-      - name: Fetch odds
-        env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: |
-          if [ -n "$ODDS_API_KEY" ]; then
-            python pipeline/fetch_odds.py
-          else
-            echo "ODDS_API_KEY not set — skipping odds fetch."
-          fi
 
       - name: Generate predictions
         env:

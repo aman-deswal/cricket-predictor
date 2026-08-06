@@ -2,11 +2,15 @@ name: Fetch Sportsbook Odds
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # Every 2 hours — odds shift closer to match time
+    - cron: '22 */2 * * *'  # Every 2 hours; sole scheduled odds owner
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: deterministic-data-writes
+  cancel-in-progress: false
 
 jobs:
   fetch-odds:
