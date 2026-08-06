@@ -9,14 +9,6 @@ interface MatchCardProps {
   match: Match;
   prediction: Prediction | null;
   index?: number;
-  hot?: boolean;
-}
-
-function getMatchDescriptor(match: Match): string {
-  if (match.name?.includes(',')) {
-    return match.name.split(',').slice(1).join(',').trim();
-  }
-  return match.name || match.venue;
 }
 
 /** Win/Loss dots — tight, readable, right-aligned */
@@ -62,18 +54,6 @@ function ProbBar({ team1Prob, c1, c2 }: { team1Prob: number; c1: string; c2: str
   );
 }
 
-function toAmericanOdds(p: number): string {
-  if (p <= 0 || p >= 1) return '-';
-  if (p >= 0.5) return Math.round(-100 * p / (1 - p)).toString();
-  return '+' + Math.round(100 * (1 - p) / p).toString();
-}
-
-function decimalToAmerican(d: number): string {
-  if (d <= 1) return '-';
-  if (d >= 2) return '+' + Math.round((d - 1) * 100).toString();
-  return Math.round(-100 / (d - 1)).toString();
-}
-
 function getMatchTime(date: string): string {
   const raw = date.endsWith('Z') || date.includes('+') ? date : date + 'Z';
   const d = new Date(raw);
@@ -87,117 +67,50 @@ function getMatchTime(date: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-/** AI Edge badge — compact, always shows the value (positive) side */
-function AIEdgeBadge({ valueTeamName, edgePct, aiPct, impliedPct }: {
-  valueTeamName: string;
-  edgePct: number;   // always positive
-  aiPct: number;
-  impliedPct: number;
-}) {
-  const tooltip = `${valueTeamName}: AI says ${aiPct}% win chance, bookmaker implies ${impliedPct}%. Our model sees +${edgePct}% extra value here.`;
-
-  return (
-    <motion.div
-      className="relative flex items-center"
-      initial={{ scale: 0.6, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, delay: 0.5 }}
-      title={tooltip}
-    >
-      <span className="absolute inset-0 rounded-full animate-ev-ping bg-emerald-400/25" />
-      <span className="relative flex items-center gap-0.5 px-1.5 py-[3px] rounded-full text-[9px] font-bold border cursor-help bg-emerald-500/15 border-emerald-400/35 text-emerald-300">
-        <svg className="w-[7px] h-[7px]" viewBox="0 0 8 8" fill="currentColor">
-          <path d="M4 1L7 4H5v3H3V4H1L4 1z" />
-        </svg>
-        +{edgePct}%
-      </span>
-    </motion.div>
-  );
-}
-
-export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCardProps) {
+export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
 
-  // EV calculations
-  const aiProb1 = prediction?.team1_win_probability ?? null;
-  const aiProb2 = prediction?.team2_win_probability ?? null;
-  const odds1 = match.bookmaker_odds?.team1_odds ?? null;
-  const odds2 = match.bookmaker_odds?.team2_odds ?? null;
-
-  // Who has the EV edge (pick the bigger one to feature)
-  const ev1Pct = aiProb1 && odds1 ? Math.round((aiProb1 - 1 / odds1) * 100) : 0;
-  const ev2Pct = aiProb2 && odds2 ? Math.round((aiProb2 - 1 / odds2) * 100) : 0;
-
-  // Confidence colour
-  const confidenceColor =
-    prediction?.confidence === 'high'   ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30' :
-    prediction?.confidence === 'medium' ? 'text-amber-300   bg-amber-500/15   border-amber-500/30'   :
-                                          'text-red-300     bg-red-500/15     border-red-500/30';
-
   return (
-    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="block relative group">
+    <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block min-w-0 w-full max-w-full">
       <motion.div
+        className="min-w-0 w-full max-w-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: index * 0.08 }}
         whileHover={{ y: -5, scale: 1.015 }}
         whileTap={{ scale: 0.98 }}
       >
-        {/* Ambient glow — cinematic for hot, subtle hover for rest */}
-        <div className={`absolute -inset-0.5 rounded-[20px] blur-md transition-all duration-500 ${
-          hot
-            ? 'bg-gradient-to-br from-orange-500/40 via-amber-400/30 to-red-500/25 animate-pulse-slow'
-            : 'bg-gradient-to-r from-cricket-500/0 to-amber-500/0 group-hover:from-cricket-500/15 group-hover:to-amber-500/15'
-        }`} />
+        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
 
-        <div className={`relative bg-[#18130a]/95 backdrop-blur-xl rounded-[18px] border overflow-hidden transition-all duration-300 ${
-          hot
-            ? 'border-amber-500/50 shadow-lg shadow-amber-900/30'
-            : 'border-white/[0.07] group-hover:border-white/[0.13]'
-        }`}>
-
-          {/* Top accent line */}
-          {hot && (
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-400 to-red-500" />
-          )}
+        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#18130a]/95 backdrop-blur-xl transition-all duration-300 group-hover:border-white/[0.13]">
 
           {/* Shimmer sweep on hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.025] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] pointer-events-none" />
 
           <div className="p-4">
             {/* ── Header row ── */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1.5">
+            <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 {/* Match type pill */}
                 <span className="text-[9px] font-bold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 border border-cricket-400/15">
                   {match.match_type}
                 </span>
 
-                {/* HOT badge — only on non-hero cards (hero already calls this out as Best Bet) */}
-                {hot && (
-                  <motion.span
-                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500/25 to-red-500/25 border border-orange-500/40 text-[9px] font-black uppercase tracking-widest text-orange-300"
-                    animate={{ opacity: [1, 0.75, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    🔥 Best Bet
-                  </motion.span>
-                )}
               </div>
 
               {/* Time */}
-              <span className="text-[10px] text-gray-300 font-semibold tabular-nums">
+              <span className="shrink-0 text-[10px] font-semibold tabular-nums text-gray-300">
                 {getMatchTime(match.date)}
               </span>
             </div>
 
             {/* ── Teams ── */}
-            <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
 
               {/* Team 1 */}
-              <div className="flex-1 text-center">
+              <div className="min-w-0 flex-1 text-center">
                 <motion.div
                   className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
                   style={{
@@ -214,7 +127,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                     </div>
                   )}
                 </motion.div>
-                <p className="font-bold text-white text-sm leading-tight">{team1Meta.shortName}</p>
+                <p className="truncate text-sm font-bold leading-tight text-white">{team1Meta.shortName}</p>
                 <FormDots form={match.team1_recent_form} />
                 {prediction && (
                   <motion.p
@@ -228,33 +141,12 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                 )}
               </div>
 
-              {/* VS + AI Edge signal — always shows the value (positive) side */}
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex shrink-0 flex-col items-center gap-1.5">
                 <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">vs</span>
-                {prediction && odds1 && odds2 && (() => {
-                  // Always pick whichever team has POSITIVE edge (AI > market)
-                  // If ev1 > 0 → Team 1 is underpriced; if ev2 > 0 → Team 2 is underpriced
-                  // Mathematically one will be positive and one negative (roughly), so prefer positive
-                  const valueIsT1 = ev1Pct >= ev2Pct && ev1Pct >= 7;
-                  const valueIsT2 = !valueIsT1 && ev2Pct >= 7;
-                  if (!valueIsT1 && !valueIsT2) return null;
-                  const edgePct = valueIsT1 ? ev1Pct : ev2Pct;
-                  const aiProb  = valueIsT1 ? aiProb1! : aiProb2!;
-                  const bOdds   = valueIsT1 ? odds1 : odds2;
-                  const vTeam   = valueIsT1 ? team1Meta.shortName : team2Meta.shortName;
-                  return (
-                    <AIEdgeBadge
-                      valueTeamName={vTeam}
-                      edgePct={edgePct}
-                      aiPct={Math.round(aiProb * 100)}
-                      impliedPct={Math.round((1 / bOdds) * 100)}
-                    />
-                  );
-                })()}
               </div>
 
               {/* Team 2 */}
-              <div className="flex-1 text-center">
+              <div className="min-w-0 flex-1 text-center">
                 <motion.div
                   className="w-11 h-11 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-offset-1 shadow-lg transition-all duration-300"
                   style={{
@@ -271,7 +163,7 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
                     </div>
                   )}
                 </motion.div>
-                <p className="font-bold text-white text-sm leading-tight">{team2Meta.shortName}</p>
+                <p className="truncate text-sm font-bold leading-tight text-white">{team2Meta.shortName}</p>
                 <FormDots form={match.team2_recent_form} />
                 {prediction && (
                   <motion.p
@@ -291,36 +183,11 @@ export function MatchCard({ match, prediction, index = 0, hot = false }: MatchCa
               <ProbBar team1Prob={prediction.team1_win_probability} c1={team1Meta.primaryColor} c2={team2Meta.primaryColor} />
             )}
 
-            {/* ── Footer: series name + odds ── */}
-            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
-              <p className="text-[10px] text-gray-400 truncate mb-2">{getMatchDescriptor(match)}</p>
-
-              {(match.bookmaker_odds || prediction) && (
-                <div className="flex items-center justify-between">
-                  <span className="text-[8px] text-gray-400 uppercase tracking-widest font-bold">Odds</span>
-                  <div className="flex items-center gap-2">
-                    {/* Team 1 odds */}
-                    <div className="flex flex-col items-center">
-                      <span className="text-[8px] text-gray-400 mb-0.5">{team1Meta.shortName}</span>
-                      <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
-                        ev1Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev1Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
-                      }`}>
-                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : prediction ? toAmericanOdds(prediction.team1_win_probability) : '-'}
-                      </span>
-                    </div>
-                    <span className="text-gray-600 text-[10px]">·</span>
-                    {/* Team 2 odds */}
-                    <div className="flex flex-col items-center">
-                      <span className="text-[8px] text-gray-400 mb-0.5">{team2Meta.shortName}</span>
-                      <span className={`text-[11px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/[0.04] border ${
-                        ev2Pct >= 7 ? 'text-emerald-300 border-emerald-500/30' : ev2Pct <= -7 ? 'text-red-400 border-red-500/20' : 'text-gray-300 border-white/[0.06]'
-                      }`}>
-                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : prediction ? toAmericanOdds(prediction.team2_win_probability) : '-'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">
+              <p className="min-w-0 truncate text-[10px] text-gray-400">{match.venue || 'Venue TBD'}</p>
+              <span className="shrink-0 text-[9px] font-semibold text-gray-300 transition-colors group-hover:text-amber-200">
+                View match →
+              </span>
             </div>
           </div>
         </div>

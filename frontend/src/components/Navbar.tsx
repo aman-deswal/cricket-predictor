@@ -49,6 +49,7 @@ export function Navbar() {
             >
               <span className="bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Six</span>
               <span className="text-white">Sense</span>
+              <sup className="ml-0.5 align-super text-[0.4em] font-black text-amber-200">™</sup>
             </span>
             {demoEnabled && (
               <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-amber-500/10 text-amber-300 border border-amber-500/20">

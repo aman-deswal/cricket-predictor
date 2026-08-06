@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getMatchSection, getUpcomingMatches, MATCH_SECTIONS, MatchWithPredictions } from '@/lib/supabase';
+import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
@@ -96,6 +96,8 @@ function decimalToAmerican(d: number): string {
 }
 
 function getCompetitionLabel(match: MatchWithPredictions): string {
+  if (match.competition_name?.trim()) return match.competition_name.trim();
+
   const namedCompetition = match.name.split(',').slice(1).join(',').trim();
   if (namedCompetition) return namedCompetition;
 
@@ -134,7 +136,9 @@ function SixSensePickHeading() {
         <Logo size={32} />
       </div>
       <div className="leading-none">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">SixSense</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">
+          SixSense<sup className="ml-0.5 text-[0.55em] tracking-normal">™</sup>
+        </p>
         <h1 className="mt-1 text-3xl font-black uppercase tracking-[0.18em] text-white sm:text-4xl">
           Pick
         </h1>
@@ -144,37 +148,36 @@ function SixSensePickHeading() {
 }
 
 function MatchDiscoveryPanel({
-  section,
+  competition,
   sectionMatches,
   sectionIdx,
 }: {
-  section: string;
+  competition: string;
   sectionMatches: MatchWithPredictions[];
   sectionIdx: number;
 }) {
   return (
     <motion.section
-      key={section}
+      key={competition}
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: sectionIdx * 0.1 }}
-      className="rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
+      className="min-w-0 max-w-full rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
     >
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-white uppercase tracking-[0.16em]">{section}</h2>
+        <h2 className="min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
         <span className="shrink-0 rounded-full border border-cricket-400/30 bg-cricket-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cricket-200">
           {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
         </span>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
         {sectionMatches.map((match, idx) => (
           <MatchCard
             key={match.match_id}
             match={match}
             prediction={getPrimaryPrediction(match)}
             index={idx}
-            hot={sectionIdx === 0 && idx === 0}
           />
         ))}
       </div>
@@ -184,8 +187,10 @@ function MatchDiscoveryPanel({
 
 function MatchBoardStrip({
   matches,
+  featuredMatchId,
 }: {
   matches: MatchWithPredictions[];
+  featuredMatchId: string | null;
 }) {
   type MatchCenterFilter = 'all' | 'live' | 'today' | 'upcoming';
 
@@ -276,6 +281,32 @@ function MatchBoardStrip({
               {selectedFilterLabel}
             </span>
           )}
+          {hasOverflow && (
+            <div className="hidden items-center gap-1 lg:flex">
+              <button
+                type="button"
+                onClick={() => scrollTicker(-1)}
+                disabled={!canScrollLeft}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/25 bg-amber-400/[0.08] text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
+                aria-label="Scroll Match Center left"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 5l-7 7 7 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollTicker(1)}
+                disabled={!canScrollRight}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/25 bg-amber-400/[0.08] text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
+                aria-label="Scroll Match Center right"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
@@ -319,7 +350,7 @@ function MatchBoardStrip({
       <div className="relative">
         <div
           ref={tickerRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 pl-6 pr-16 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] sm:px-16 [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
           aria-label="Swipe horizontally through Match Center"
         >
           {filteredMatches.map((match) => {
@@ -340,6 +371,7 @@ function MatchBoardStrip({
               : 0;
             const edgePct = Math.max(ev1, ev2);
             const hasEdge = edgePct >= 7;
+            const isFeatured = match.match_id === featuredMatchId;
 
             return (
               <Link
@@ -348,72 +380,91 @@ function MatchBoardStrip({
                 data-match-center-tile
                 className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
               >
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
-                      {match.match_type}
-                    </span>
-                    {hasEdge && (
-                      <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
-                        +{edgePct} edge
+                <div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+                        {match.match_type}
                       </span>
+                      {isFeatured && (
+                        <span
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-amber-300/20 bg-black/25 px-1.5"
+                          title="SixSense Pick"
+                          aria-label="SixSense Pick"
+                        >
+                          <Logo size={18} />
+                          <span className="leading-none">
+                            <span className="block text-[6px] font-black uppercase tracking-[0.2em] text-amber-300">
+                              SixSense<sup className="ml-px text-[0.55em] tracking-normal">™</sup>
+                            </span>
+                            <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.2em] text-white">Pick</span>
+                          </span>
+                        </span>
+                      )}
+                      {hasEdge && (
+                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                          +{edgePct} edge
+                        </span>
+                      )}
+                    </div>
+                    {isMatchLive(match) ? (
+                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-300">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
                     )}
                   </div>
-                  {isMatchLive(match) ? (
-                    <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-300">
-                      Live
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
-                  )}
-                </div>
 
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
-                        {team1Meta.shortName}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
+                          {team1Meta.shortName}
+                        </span>
+                        <span
+                          className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
+                          title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                        >
+                          {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
+                        </span>
                       </span>
                       <span
-                        className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                        title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                        title={team1Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
                       >
-                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
+                        {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}
                       </span>
-                    </span>
-                    <span
-                      className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}
-                      title={team1Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
-                    >
-                      {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
-                        {team2Meta.shortName}
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
+                          {team2Meta.shortName}
+                        </span>
+                        <span
+                          className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
+                          title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                        >
+                          {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
+                        </span>
                       </span>
                       <span
-                        className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                        title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                        title={team2Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
                       >
-                        {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
+                        {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}
                       </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2">
+                    <span className="truncate text-[10px] font-semibold text-gray-400">
+                      {getCompetitionLabel(match)}
                     </span>
-                    <span
-                      className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}
-                      title={team2Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
-                    >
-                      {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}
+                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
+                      Open →
                     </span>
                   </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2">
-                  <span className="truncate text-[10px] font-semibold text-gray-400">
-                    {getCompetitionLabel(match)}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">Open →</span>
                 </div>
               </Link>
             );
@@ -424,36 +475,6 @@ function MatchBoardStrip({
             </div>
           )}
         </div>
-        {hasOverflow && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 hidden items-center bg-gradient-to-r from-[#171308] via-[#171308]/90 to-transparent pl-3 pr-10 sm:flex">
-            <button
-              type="button"
-              onClick={() => scrollTicker(-1)}
-              disabled={!canScrollLeft}
-              className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100 disabled:cursor-default disabled:border-white/[0.08] disabled:bg-black/20 disabled:text-gray-700 disabled:shadow-none"
-              aria-label="Scroll Match Center left"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 5l-7 7 7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
-        {hasOverflow && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center bg-gradient-to-l from-[#171308] via-[#171308]/90 to-transparent pl-10 pr-3 sm:flex">
-            <button
-              type="button"
-              onClick={() => scrollTicker(1)}
-              disabled={!canScrollRight}
-              className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/15 text-amber-200 shadow-lg shadow-black/20 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25 hover:text-amber-100 disabled:cursor-default disabled:border-white/[0.08] disabled:bg-black/20 disabled:text-gray-700 disabled:shadow-none"
-              aria-label="Scroll Match Center right"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
       </div>
     </section>
   );
@@ -629,18 +650,17 @@ export default function HomePage() {
     ? matches.filter((match) => match.match_id !== featuredMatch.match_id)
     : matches;
 
-  const matchesBySection = MATCH_SECTIONS.map((section) => ({
-    section,
-    matches: sectionPool
-      .filter((match) => getMatchSection(match) === section)
-      .sort((a, b) => {
-        const aScore = a.predictions?.length ? 1 : 0;
-        const bScore = b.predictions?.length ? 1 : 0;
-        return bScore - aScore;
-      }),
-  })).filter(({ matches }) => matches.length > 0);
+  const competitionGroups = new Map<string, MatchWithPredictions[]>();
+  sectionPool.forEach((match) => {
+    const competition = getCompetitionLabel(match);
+    competitionGroups.set(competition, [...(competitionGroups.get(competition) ?? []), match]);
+  });
+  const matchesByCompetition = Array.from(competitionGroups, ([competition, competitionMatches]) => ({
+    competition,
+    matches: competitionMatches.sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b)),
+  })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
 
-  const boardMatchCount = matchesBySection.reduce((count, section) => count + section.matches.length, 0);
+  const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
 
   useEffect(() => {
     async function load() {
@@ -672,7 +692,7 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          <MatchBoardStrip matches={matches} />
+          <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
             <section>
@@ -684,7 +704,7 @@ export default function HomePage() {
               >
                 <SixSensePickHeading />
               </motion.div>
-              <FeaturedHero match={featuredMatch} />
+              <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
             </section>
           )}
 
@@ -692,19 +712,19 @@ export default function HomePage() {
           <div className="min-w-0">
             <div className="mb-5 flex items-center justify-between gap-3">
               <SectionHeading icon={<BarChartIcon className="h-4 w-4" />}>
-                <h2 className="text-lg font-black text-white tracking-tight">Match discovery</h2>
+                <h2 className="text-lg font-black text-white tracking-tight">Browse competitions</h2>
               </SectionHeading>
               <span className="text-[10px] font-bold uppercase tracking-widest text-cricket-300">
-                {boardMatchCount} match{boardMatchCount === 1 ? '' : 'es'}
+                {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
               </span>
             </div>
 
-            {matchesBySection.length > 0 ? (
-              <div className="grid gap-5 lg:grid-cols-2">
-                {matchesBySection.map(({ section, matches: sectionMatches }, sectionIdx) => (
+            {matchesByCompetition.length > 0 ? (
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
+                {matchesByCompetition.map(({ competition, matches: sectionMatches }, sectionIdx) => (
                   <MatchDiscoveryPanel
-                    key={section}
-                    section={section}
+                    key={competition}
+                    competition={competition}
                     sectionMatches={sectionMatches}
                     sectionIdx={sectionIdx}
                   />
