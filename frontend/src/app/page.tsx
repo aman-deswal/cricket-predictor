@@ -234,8 +234,6 @@ function MatchDiscoveryPanel({
   sectionIdx: number;
 }) {
   const leadMatch = sectionMatches[0];
-  const leadTeam1 = getTeamMeta(leadMatch.team1);
-  const leadTeam2 = getTeamMeta(leadMatch.team2);
   const competitionKind = getCompetitionKind(competition, leadMatch);
 
   return (
@@ -244,20 +242,13 @@ function MatchDiscoveryPanel({
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: sectionIdx * 0.1 }}
-      className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-4 shadow-xl shadow-black/10"
+      className="min-w-0 max-w-full"
     >
-      <div
-        className="absolute inset-x-0 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, ${leadTeam1.primaryColor}, ${leadTeam2.primaryColor})` }}
-      />
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-3 px-1">
         <div className="min-w-0">
           <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">{competitionKind}</p>
           <h2 className="mt-1 min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
         </div>
-        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-400">
-          {sectionMatches.length} match{sectionMatches.length > 1 ? 'es' : ''}
-        </span>
       </div>
 
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
