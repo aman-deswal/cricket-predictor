@@ -545,11 +545,16 @@ function MatchBoardStrip({
           )}
         </div>
         {hasOverflow && canScrollRight && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-16 items-center justify-end bg-gradient-to-l from-[#171308] via-[#171308]/80 to-transparent pr-1 backdrop-blur-[2px] lg:hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-24 items-center justify-end pr-2 lg:hidden">
+            <span
+              className="absolute inset-0 bg-gradient-to-l from-[#171308]/95 via-[#171308]/55 to-transparent backdrop-blur-md"
+              style={{ maskImage: 'linear-gradient(to left, black 0%, black 58%, transparent 100%)' }}
+              aria-hidden="true"
+            />
             <button
               type="button"
               onClick={() => scrollTicker(1)}
-              className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/35 bg-amber-200/10 text-amber-100 shadow-lg shadow-black/40 backdrop-blur-md transition-colors active:bg-amber-200/20"
+              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/40 bg-amber-200/[0.12] text-amber-50 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(251,191,36,0.08)] backdrop-blur-xl transition-colors active:bg-amber-200/25"
               aria-label="Scroll Match Center right"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
