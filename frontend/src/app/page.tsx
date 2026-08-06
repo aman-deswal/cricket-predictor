@@ -185,12 +185,8 @@ function MatchDiscoveryPanel({
 
 function MatchBoardStrip({
   matches,
-  selectedMatchId,
-  onSelectMatch,
 }: {
   matches: MatchWithPredictions[];
-  selectedMatchId: string | null;
-  onSelectMatch: (matchId: string) => void;
 }) {
   type MatchCenterFilter = 'all' | 'live' | 'today' | 'upcoming';
 
@@ -371,27 +367,15 @@ function MatchBoardStrip({
               : 0;
             const edgePct = Math.max(ev1, ev2);
             const hasEdge = edgePct >= 7;
-            const isSelected = match.match_id === selectedMatchId;
 
             return (
-              <article
+              <Link
                 key={match.match_id}
+                href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className={`group relative min-w-[17rem] snap-start rounded-xl border bg-black/20 px-3 py-3 transition-colors sm:min-w-[18.5rem] ${
-                  isSelected
-                    ? 'border-amber-400/55 bg-amber-400/[0.06]'
-                    : 'border-white/[0.08] hover:border-amber-400/50'
-                }`}
+                className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
               >
-                <button
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => onSelectMatch(match.match_id)}
-                  className="absolute inset-0 z-0 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300/60"
-                >
-                  <span className="sr-only">Show {match.team1} versus {match.team2} in SixSense Pick</span>
-                </button>
-                <div className="pointer-events-none relative z-10">
+                <div>
                   <div className="mb-3 flex items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
@@ -457,20 +441,12 @@ function MatchBoardStrip({
                     <span className="truncate text-[10px] font-semibold text-gray-400">
                       {getCompetitionLabel(match)}
                     </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      {isSelected && (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-300">Selected</span>
-                      )}
-                      <Link
-                        href={`/predict?id=${encodeURIComponent(match.match_id)}`}
-                        className="pointer-events-auto -mr-2 inline-flex min-h-8 items-center rounded-md px-2 text-[10px] font-bold text-gray-300 transition-colors hover:bg-white/[0.05] hover:text-amber-200 focus-visible:bg-white/[0.05] focus-visible:text-amber-200 focus-visible:outline-none"
-                      >
-                        Open →
-                      </Link>
+                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
+                      Open →
                     </span>
                   </div>
                 </div>
-              </article>
+              </Link>
             );
           })}
           {filteredMatches.length === 0 && (
@@ -643,14 +619,12 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
 
-  const rankedFeaturedMatch = [...matches].sort((a, b) => {
+  const featuredMatch = [...matches].sort((a, b) => {
     const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
     if (scoreDiff !== 0) return scoreDiff;
     return getMatchTimestamp(a) - getMatchTimestamp(b);
   })[0] ?? null;
-  const featuredMatch = matches.find((match) => match.match_id === selectedMatchId) ?? rankedFeaturedMatch;
 
   const sectionPool = featuredMatch
     ? matches.filter((match) => match.match_id !== featuredMatch.match_id)
@@ -698,11 +672,7 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          <MatchBoardStrip
-            matches={matches}
-            selectedMatchId={featuredMatch?.match_id ?? null}
-            onSelectMatch={setSelectedMatchId}
-          />
+          <MatchBoardStrip matches={matches} />
 
           {featuredMatch && (
             <section>
