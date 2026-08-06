@@ -175,7 +175,7 @@ function SectionHeading({
 
 function SixSensePickHeading() {
   return (
-    <SectionHeading icon={<Logo size={28} />}>
+    <SectionHeading icon={<Logo size={40} />} bareIcon>
       <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
         <span className="text-cricket-300">SixSense</span>
         <sup className="ml-0.5 text-[0.55em] tracking-normal text-cricket-300">™</sup> Pick
