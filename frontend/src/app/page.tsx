@@ -136,7 +136,9 @@ function SixSensePickHeading() {
         <Logo size={32} />
       </div>
       <div className="leading-none">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">SixSense</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cricket-300">
+          SixSense<sup className="ml-0.5 text-[0.55em] tracking-normal">™</sup>
+        </p>
         <h1 className="mt-1 text-3xl font-black uppercase tracking-[0.18em] text-white sm:text-4xl">
           Pick
         </h1>
@@ -185,8 +187,10 @@ function MatchDiscoveryPanel({
 
 function MatchBoardStrip({
   matches,
+  featuredMatchId,
 }: {
   matches: MatchWithPredictions[];
+  featuredMatchId: string | null;
 }) {
   type MatchCenterFilter = 'all' | 'live' | 'today' | 'upcoming';
 
@@ -367,6 +371,7 @@ function MatchBoardStrip({
               : 0;
             const edgePct = Math.max(ev1, ev2);
             const hasEdge = edgePct >= 7;
+            const isFeatured = match.match_id === featuredMatchId;
 
             return (
               <Link
@@ -441,8 +446,15 @@ function MatchBoardStrip({
                     <span className="truncate text-[10px] font-semibold text-gray-400">
                       {getCompetitionLabel(match)}
                     </span>
-                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
-                      Open →
+                    <span className="flex shrink-0 items-center gap-2">
+                      {isFeatured && (
+                        <span className="rounded-full border border-amber-300/30 bg-[#fff2c2]/[0.08] px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-[#f7dfa0]">
+                          SixSense™ Pick
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
+                        Open →
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -672,7 +684,7 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          <MatchBoardStrip matches={matches} />
+          <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
             <section>

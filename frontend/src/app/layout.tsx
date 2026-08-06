@@ -16,19 +16,19 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'SixSense | AI Cricket Predictions',
+  title: 'SixSense™ | AI Cricket Predictions',
   description: 'AI-powered cricket match predictions — your sixth sense for the game',
   metadataBase: new URL('https://aman-deswal.github.io'),
   openGraph: {
-    title: 'SixSense | AI Cricket Predictions',
+    title: 'SixSense™ | AI Cricket Predictions',
     description: 'AI-powered cricket match predictions with Edge Score analysis, sportsbook odds, and head-to-head breakdowns.',
-    siteName: 'SixSense',
+    siteName: 'SixSense™',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SixSense | AI Cricket Predictions',
+    title: 'SixSense™ | AI Cricket Predictions',
     description: 'AI-powered cricket match predictions — your sixth sense for the game',
   },
   icons: {
@@ -58,7 +58,7 @@ export default function RootLayout({
         <footer className="relative border-t border-amber-800/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-[11px] text-gray-600">
-              SixSense, Reserved 2026
+              SixSense<sup className="ml-0.5 text-[0.65em]">™</sup>, Reserved 2026
             </p>
             <div className="flex items-center gap-4">
               <span className="text-[10px] text-gray-700">v1.0</span>
