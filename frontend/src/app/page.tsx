@@ -834,7 +834,7 @@ export default function HomePage() {
 
             <div className="p-3">
             {visibleCompetitionGroups.length > 0 ? (
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {visibleCompetitionGroups.map(({ competition, matches: sectionMatches }, sectionIdx) => (
                   <MatchDiscoveryPanel
                     key={competition}
