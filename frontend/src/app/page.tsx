@@ -347,7 +347,7 @@ function MatchBoardStrip({
             </span>
           )}
           {hasOverflow && (
-            <div className="flex items-center gap-1">
+            <div className="hidden items-center gap-1 lg:flex">
               <button
                 type="button"
                 onClick={() => scrollTicker(-1)}
@@ -542,6 +542,32 @@ function MatchBoardStrip({
             </div>
           )}
         </div>
+        {hasOverflow && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-10 flex items-center justify-between px-1 lg:hidden">
+            <button
+              type="button"
+              onClick={() => scrollTicker(-1)}
+              disabled={!canScrollLeft}
+              className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/35 bg-[#171308]/90 text-amber-100 shadow-lg shadow-black/40 backdrop-blur transition-all disabled:pointer-events-none disabled:opacity-0"
+              aria-label="Scroll Match Center left"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTicker(1)}
+              disabled={!canScrollRight}
+              className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/35 bg-[#171308]/90 text-amber-100 shadow-lg shadow-black/40 backdrop-blur transition-all disabled:pointer-events-none disabled:opacity-0"
+              aria-label="Scroll Match Center right"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
