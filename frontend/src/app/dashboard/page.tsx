@@ -33,12 +33,12 @@ function StatCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="relative bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30 overflow-hidden group hover:border-cricket-600/30 transition-colors"
+      className="relative bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/40 overflow-hidden group hover:border-amber-600/30 transition-colors"
     >
-      <div className="absolute top-4 right-4 text-gray-700 group-hover:text-gray-500 transition-colors">
+      <div className="absolute top-4 right-4 text-slate-600 group-hover:text-slate-400 transition-colors">
         {icon}
       </div>
-      <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-semibold">{label}</p>
+      <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-semibold">{label}</p>
       <motion.p
         className="text-3xl font-black text-white mt-2"
         initial={{ scale: 0.5 }}
@@ -47,7 +47,7 @@ function StatCard({
       >
         {value}
       </motion.p>
-      <p className="text-xs text-gray-500 mt-1">{sub}</p>
+      <p className="text-xs text-slate-500 mt-1">{sub}</p>
     </motion.div>
   );
 }
@@ -70,9 +70,9 @@ export default function DashboardPage() {
     <div>
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-          <span className="text-cricket-400">Dashboard</span>
+          <span className="text-amber-600">Dashboard</span>
         </h1>
-        <p className="text-gray-500 mb-8 text-sm">Prediction accuracy and model performance</p>
+        <p className="text-slate-500 mb-8 text-sm">Prediction accuracy and model performance</p>
       </motion.div>
 
       {stats && (
@@ -128,4 +128,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

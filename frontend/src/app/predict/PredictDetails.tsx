@@ -119,25 +119,25 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-const detailTileClass = 'bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-cricket-800/30';
-const detailTileStrongClass = 'bg-gradient-to-br from-gray-900/90 to-cricket-950/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-cricket-600/30';
+const detailTileClass = 'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-700/40';
+const detailTileStrongClass = 'bg-gradient-to-br from-[#141c25]/95 to-[#0c1218]/95 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-600/25';
 const detailTileTitleClass = 'text-[clamp(0.8rem,1vw,1rem)] font-bold text-white uppercase tracking-wider flex items-center gap-1.5';
 const detailTileMetaClass = 'text-[clamp(0.65rem,0.8vw,0.8rem)]';
-const detailTileBodyClass = 'text-[clamp(0.875rem,1.05vw,1.05rem)] text-gray-300 leading-relaxed';
+const detailTileBodyClass = 'text-[clamp(0.875rem,1.05vw,1.05rem)] text-slate-300 leading-relaxed';
 
 function ComingSoonTile({ title, body, eyebrow = 'Coming soon' }: { title: string; body: string; eyebrow?: string }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-gray-950 via-gray-900 to-cricket-950 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-      <div className="absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-cricket-400/15 blur-3xl" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cricket-300/60 to-transparent" />
-      <div className="relative mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-cricket-300/25 bg-cricket-300/10 text-cricket-200">
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-amber-600/10 blur-3xl" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+      <div className="relative mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-amber-600/25 bg-amber-600/10 text-amber-500">
         <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
           <path d="M3 13h10M4 10l2-5 2 3 2-5 2 7" />
         </svg>
       </div>
-      <p className={`${detailTileMetaClass} relative mb-1 font-black uppercase tracking-[0.24em] text-cricket-300`}>{eyebrow}</p>
+      <p className={`${detailTileMetaClass} relative mb-1 font-black uppercase tracking-[0.24em] text-amber-500`}>{eyebrow}</p>
       <p className="relative text-[clamp(0.95rem,1.15vw,1.15rem)] font-black text-white">{title}</p>
-      <p className={`${detailTileMetaClass} relative mx-auto mt-1 max-w-md text-gray-400`}>{body}</p>
+      <p className={`${detailTileMetaClass} relative mx-auto mt-1 max-w-md text-slate-400`}>{body}</p>
     </div>
   );
 }
@@ -159,6 +159,7 @@ export function PredictDetails() {
   });
   const [loading, setLoading] = useState(true);
   const [showStickySummary, setShowStickySummary] = useState(false);
+  const [scrollDepth, setScrollDepth] = useState(0);
   const heroRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -227,6 +228,31 @@ export function PredictDetails() {
     return () => observer.disconnect();
   }, [loading, matchId]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let raf = 0;
+    const updateScrollDepth = () => {
+      const start = 80;
+      const end = 520;
+      const depth = (window.scrollY - start) / (end - start);
+      setScrollDepth(Math.max(0, Math.min(1, depth)));
+      raf = 0;
+    };
+
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(updateScrollDepth);
+    };
+
+    updateScrollDepth();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
+
   // Live countdown timer
   const getCountdown = useCallback(() => {
     if (!match) return null;
@@ -253,7 +279,7 @@ export function PredictDetails() {
 
   if (!matchId || !match) {
     return (
-      <motion.div {...fadeUp} className="text-center text-gray-300 py-16">
+      <motion.div {...fadeUp} className="text-center text-slate-300 py-16">
         <p className="text-xl">Match not found</p>
       </motion.div>
     );
@@ -384,9 +410,12 @@ export function PredictDetails() {
   return (
     <div className="max-w-7xl mx-auto">
       <div
-        className={`fixed inset-x-0 top-16 z-40 h-11 border-b border-amber-300/15 bg-[#121010]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 ${
+        className={`fixed inset-x-0 top-16 z-40 border-b border-amber-600/15 bg-[#10151b]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 ${
           showStickySummary ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         }`}
+        style={{
+          height: '44px',
+        }}
         aria-hidden={!showStickySummary}
       >
         <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
@@ -400,25 +429,25 @@ export function PredictDetails() {
                 </div>
               )}
             </div>
-            <span className="truncate text-[11px] font-black text-white">
-              {team1Meta.shortName} <span className="font-mono text-cricket-300">{prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}</span>
+            <span className="truncate text-[12px] sm:text-[13px] font-black text-white">
+              {team1Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}</span>
             </span>
-            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-300">
+            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] font-bold text-gray-300">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team1_odds) : '—'}
             </span>
           </div>
 
           <div className="text-center">
-            <p className="text-[7px] font-black uppercase tracking-[0.18em] text-amber-300">SixSense™ Pick</p>
-            <p className="text-[9px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
+            <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.18em] text-amber-500">SixSense™ Pick</p>
+            <p className="text-[10px] sm:text-[11px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
           </div>
 
           <div className="flex min-w-0 items-center justify-end gap-2">
-            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-300">
+            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] font-bold text-gray-300">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team2_odds) : '—'}
             </span>
-            <span className="truncate text-right text-[11px] font-black text-white">
-              {team2Meta.shortName} <span className="font-mono text-cricket-300">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
+            <span className="truncate text-right text-[12px] sm:text-[13px] font-black text-white">
+              {team2Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
             </span>
             <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
               {team2Meta.countryCode ? (
@@ -434,23 +463,27 @@ export function PredictDetails() {
       </div>
 
       {/* Back link + Countdown */}
-      <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="flex items-center gap-1.5 text-[clamp(0.75rem,1vw,0.9rem)] text-gray-400 hover:text-white transition-colors group">
-          <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
+        >
+          <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
           All Matches
         </Link>
         {countdown && (
-          <div className="flex items-center gap-1.5 text-[clamp(0.7rem,0.9vw,0.85rem)] text-gray-400">
-            <svg className="w-3 h-3 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
-            <span className="font-mono">
+          <div className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300">
+            <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
+            <span className="font-semibold whitespace-nowrap">Begins in</span>
+            <span className="font-mono tracking-[0.02em] whitespace-nowrap">
               {countdown.days > 0 && <span className="text-white font-semibold">{countdown.days}</span>}
-              {countdown.days > 0 && <span className="text-gray-300">d </span>}
+              {countdown.days > 0 && <span className="text-slate-300">d </span>}
               <span className="text-white font-semibold">{String(countdown.hours).padStart(2, '0')}</span>
-              <span className="text-gray-300">h </span>
+              <span className="text-slate-300">h </span>
               <span className="text-white font-semibold">{String(countdown.mins).padStart(2, '0')}</span>
-              <span className="text-gray-300">m </span>
+              <span className="text-slate-300">m </span>
               <span className="text-white font-semibold">{String(countdown.secs).padStart(2, '0')}</span>
-              <span className="text-gray-300">s</span>
+              <span className="text-slate-300">s</span>
             </span>
           </div>
         )}
@@ -459,12 +492,12 @@ export function PredictDetails() {
       <style>{`
         @keyframes pickEntrance {
           0%   { opacity: 0; box-shadow: 0 0 0 0 rgba(251,191,36,0); transform: scale(0.88); }
-          55%  { opacity: 1; box-shadow: 0 0 22px 5px rgba(251,191,36,0.45); transform: scale(1.06); }
-          100% { opacity: 1; box-shadow: 0 0 8px 1px rgba(251,191,36,0.22); transform: scale(1); }
+          55%  { opacity: 1; box-shadow: 0 0 24px 6px rgba(245,158,11,0.48); transform: scale(1.06); }
+          100% { opacity: 1; box-shadow: 0 0 10px 2px rgba(245,158,11,0.28); transform: scale(1); }
         }
         @keyframes pickBreath {
-          0%, 100% { box-shadow: 0 0 6px 1px rgba(251,191,36,0.18); }
-          50%       { box-shadow: 0 0 14px 3px rgba(251,191,36,0.34); }
+          0%, 100% { box-shadow: 0 0 6px 1px rgba(245,158,11,0.20); }
+          50%       { box-shadow: 0 0 16px 4px rgba(245,158,11,0.36); }
         }
         .pick-badge {
           animation: pickEntrance 0.65s cubic-bezier(0.22,1,0.36,1) forwards,
@@ -473,13 +506,13 @@ export function PredictDetails() {
       `}</style>
       <motion.div
         ref={heroRef}
-        className="relative rounded-3xl bg-gradient-to-br from-gray-900 via-cricket-950 to-gray-900 border border-cricket-800/30 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
+        className="relative rounded-3xl bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 border border-slate-700/40 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
       >
         {/* Background glow */}
-        <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-cricket-500/10 blur-3xl rounded-full" />
+        <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
 
         <div className="relative flex items-center justify-between gap-4 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
@@ -492,7 +525,7 @@ export function PredictDetails() {
             {/* Pick badge above flag */}
             {prediction && hasClearPick && prediction.team1_win_probability > prediction.team2_win_probability ? (
               <div className="mb-2 flex items-center justify-center">
-                <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
+                <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.42)', boxShadow: '0 0 0 1px rgba(245,158,11,0.08) inset' }}>
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
                   Our Pick
                 </span>
@@ -527,9 +560,9 @@ export function PredictDetails() {
             <h2 className="text-[clamp(1rem,1.5vw,1.35rem)] font-bold text-white">{team1Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {team1Form.length > 0 && (
-              <div className="flex items-center justify-center gap-1 mt-1.5">
+              <div className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-0.5 sm:gap-1 px-1">
                 {team1Form.map((r, i) => (
-                  <span key={`t1f-${i}`} className={`h-5 sm:h-6 w-5 sm:w-6 flex items-center justify-center rounded text-[9px] sm:text-[11px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
+                  <span key={`t1f-${i}`} className={`flex h-4 w-4 items-center justify-center rounded text-[7px] leading-none font-bold text-white sm:h-6 sm:w-6 sm:text-[11px] ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
               </div>
             )}
@@ -545,7 +578,7 @@ export function PredictDetails() {
               <span
                 className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
                   featuredBookmakerUrl
-                    ? 'border-cricket-400/35 bg-cricket-400/10 text-gray-100 cursor-pointer hover:bg-cricket-400/20'
+                    ? 'border-amber-600/35 bg-amber-600/10 text-gray-100 cursor-pointer hover:bg-amber-600/20'
                     : 'border-white/15 bg-white/5 text-gray-200'
                 }`}
                 onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
@@ -597,15 +630,15 @@ export function PredictDetails() {
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-cricket-300/20 bg-gradient-to-br from-gray-950 via-gray-900 to-cricket-950 flex items-center justify-center overflow-hidden shadow-[0_0_40px_rgba(251,146,60,0.12)]">
-                  <div className="absolute inset-5 rounded-full border border-dashed border-cricket-300/20" />
-                  <div className="absolute h-16 w-16 rounded-full bg-cricket-400/10 blur-2xl" />
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-amber-600/20 bg-gradient-to-br from-[#121922] via-[#0c1218] to-[#121922] flex items-center justify-center overflow-hidden shadow-[0_0_40px_rgba(217,119,6,0.12)]">
+                  <div className="absolute inset-5 rounded-full border border-dashed border-amber-600/20" />
+                  <div className="absolute h-16 w-16 rounded-full bg-amber-600/10 blur-2xl" />
                   <div className="relative text-center">
-                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-cricket-300">Coming</p>
-                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-cricket-300">Soon</p>
+                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-amber-500">Coming</p>
+                    <p className="text-[clamp(0.62rem,0.8vw,0.8rem)] font-black uppercase tracking-[0.22em] text-amber-500">Soon</p>
                   </div>
                 </div>
-                <p className={`${detailTileMetaClass} max-w-40 text-center text-gray-500`}>SixSense model run is warming up</p>
+                <p className={`${detailTileMetaClass} max-w-40 text-center text-slate-500`}>SixSense model run is warming up</p>
               </div>
             )}
 
@@ -621,7 +654,7 @@ export function PredictDetails() {
             {/* Pick badge above flag */}
             {prediction && hasClearPick && prediction.team2_win_probability > prediction.team1_win_probability ? (
               <div className="mb-2 flex items-center justify-center">
-                <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.1)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.32)' }}>
+                <span className="pick-badge inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.42)', boxShadow: '0 0 0 1px rgba(245,158,11,0.08) inset' }}>
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
                   Our Pick
                 </span>
@@ -656,9 +689,9 @@ export function PredictDetails() {
             <h2 className="text-[clamp(1rem,1.5vw,1.35rem)] font-bold text-white">{team2Meta.shortName}</h2>
             {/* Form strip — last 5 */}
             {team2Form.length > 0 && (
-              <div className="flex items-center justify-center gap-1 mt-1.5">
+              <div className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-0.5 sm:gap-1 px-1">
                 {team2Form.map((r, i) => (
-                  <span key={`t2f-${i}`} className={`h-5 sm:h-6 w-5 sm:w-6 flex items-center justify-center rounded text-[9px] sm:text-[11px] font-bold text-white ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
+                  <span key={`t2f-${i}`} className={`flex h-4 w-4 items-center justify-center rounded text-[7px] leading-none font-bold text-white sm:h-6 sm:w-6 sm:text-[11px] ${r === 'W' ? 'bg-emerald-500' : 'bg-red-500/80'}`}>{r}</span>
                 ))}
               </div>
             )}
@@ -674,7 +707,7 @@ export function PredictDetails() {
               <span
                 className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
                   featuredBookmakerUrl
-                    ? 'border-cricket-400/35 bg-cricket-400/10 text-gray-100 cursor-pointer hover:bg-cricket-400/20'
+                    ? 'border-amber-500/30 bg-amber-500/10 text-gray-100 cursor-pointer hover:bg-amber-500/15'
                     : 'border-white/15 bg-white/5 text-gray-200'
                 }`}
                 onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
@@ -697,12 +730,12 @@ export function PredictDetails() {
 
         {/* Match info bar */}
         <motion.div
-          className="relative mt-4 pt-3 border-t border-gray-800/50 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-gray-400"
+          className="relative mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-slate-400"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <span className="uppercase font-semibold text-cricket-400">
+          <span className="uppercase font-semibold text-amber-500">
             {(() => {
               const scoreline = espnData?.series_scoreline || '';
               const levelMatch = scoreline.match(/level\s+(\d+)-(\d+)/);
@@ -725,17 +758,17 @@ export function PredictDetails() {
         {/* Sportsbook Odds */}
         <motion.div
           className={`${detailTileClass} transition-all ${
-            sportsbookOdds.length > 0 ? 'border-cricket-800/30' : 'border-cricket-800/20'
+            sportsbookOdds.length > 0 ? 'border-white/10' : 'border-white/[0.06]'
           }`}
           {...fadeUp}
           transition={{ delay: 0.22 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className={detailTileTitleClass}>
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
+              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
               Sportsbook Odds
             </h2>
-            {sportsbookOdds.length > 0 && <span className={`${detailTileMetaClass} text-gray-300`}>{sportsbookOdds.length} trusted {sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}</span>}
+            {sportsbookOdds.length > 0 && <span className={`${detailTileMetaClass} text-slate-300`}>{sportsbookOdds.length} trusted {sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}</span>}
           </div>
           {sportsbookOdds.length > 0 ? (
             <div className="space-y-2">
@@ -754,20 +787,20 @@ export function PredictDetails() {
                       const url = getBookmakerMarketUrl(o.bookmaker);
                       if (url) openExternalMarket(url);
                     }}
-                    className="w-full appearance-none flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-cricket-500/40 hover:bg-gray-800/65 transition-colors text-left"
+                    className="w-full appearance-none flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white/[0.04] border border-white/10 hover:border-amber-500/25 hover:bg-white/[0.06] transition-colors text-left"
                   >
-                    <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-gray-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
+                    <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-slate-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
                     <div className="flex items-center gap-2.5">
                       <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
                         {decimalToAmerican(o.team1_odds)}
                         {isValue1 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
                       </span>
-                      <span className="text-gray-400 text-[clamp(0.7rem,0.85vw,0.85rem)]">|</span>
+                      <span className="text-slate-500 text-[clamp(0.7rem,0.85vw,0.85rem)]">|</span>
                       <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
                         {decimalToAmerican(o.team2_odds)}
                         {isValue2 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
                       </span>
-                      <svg className="w-3 h-3 text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
+                      <svg className="w-3 h-3 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
                     </div>
                   </button>
                 );
@@ -790,7 +823,7 @@ export function PredictDetails() {
           >
             <div className="flex items-center justify-between mb-3">
               <h2 className={detailTileTitleClass}>
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
+                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
                 Our Take
               </h2>
               <span
@@ -807,7 +840,7 @@ export function PredictDetails() {
             </div>
             <div className="space-y-2.5">
               {visibleReasoning.map((sentence: string, i: number) => (
-                  <div key={i} className={`pl-3 border-l-2 border-cricket-500/40 ${detailTileBodyClass}`}>
+                  <div key={i} className={`pl-3 border-l-2 border-amber-500/30 ${detailTileBodyClass}`}>
                     {sentence.trim()}
                   </div>
                 ))}
@@ -816,7 +849,7 @@ export function PredictDetails() {
               <button
                 type="button"
                 onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
-                className="mt-3 text-[clamp(0.75rem,0.9vw,0.9rem)] font-medium text-cricket-300 hover:text-cricket-200 transition-colors"
+                className="mt-3 text-[clamp(0.75rem,0.9vw,0.9rem)] font-medium text-amber-400 hover:text-amber-300 transition-colors"
               >
                 {expandedSections.ourTake ? 'Show less' : 'Show more'}
               </button>
@@ -859,7 +892,7 @@ export function PredictDetails() {
         const worstEdge = edge1 >= edge2 ? edge2 : edge1;
         const worstEdgeTeam = edge1 >= edge2 ? team2Meta.shortName : team1Meta.shortName;
         let verdict = '';
-        let verdictColor = 'text-gray-400';
+        let verdictColor = 'text-slate-400';
         if (bestEdge >= 7) {
           verdict = `${bestEdgeTeam} underpriced by ${bestEdge}pts — value exists`;
           verdictColor = 'text-emerald-400';
@@ -868,7 +901,7 @@ export function PredictDetails() {
           verdictColor = 'text-amber-400';
         } else {
           verdict = 'Market fairly priced — no exploitable edge detected';
-          verdictColor = 'text-gray-400';
+          verdictColor = 'text-slate-400';
         }
 
         const EdgeRow = ({ shortName, color, aiPct, impliedPct, edgePct, mktOddsStr, fairOddsStr }: {
@@ -885,7 +918,7 @@ export function PredictDetails() {
                   <div className="flex items-center gap-1.5 text-[clamp(0.7rem,0.85vw,0.85rem)] font-mono">
                     <span className="text-gray-500">Fair</span>
                     <span className="font-black text-gray-200">{fairOddsStr}</span>
-                    <span className="text-gray-600">·</span>
+                    <span className="text-slate-500">·</span>
                     <span className="text-gray-500">Mkt</span>
                     <span className="font-black" style={{ color }}>{mktOddsStr}</span>
                   </div>
@@ -894,14 +927,14 @@ export function PredictDetails() {
                       ↑ +{edgePct}pt
                     </span>
                   ) : (
-                    <span className="text-[clamp(0.7rem,0.85vw,0.85rem)] text-gray-600 font-semibold">No edge</span>
+                    <span className="text-[clamp(0.7rem,0.85vw,0.85rem)] text-slate-500 font-semibold">No edge</span>
                   )}
                 </div>
               </div>
               {/* AI bar */}
               <div className="flex items-center gap-2.5 mb-2">
-                <span className="text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest text-gray-400 w-9 shrink-0">AI</span>
-                <div className="flex-1 h-3 bg-gray-800/70 rounded-full overflow-hidden">
+                <span className="text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest text-slate-400 w-9 shrink-0">AI</span>
+                <div className="flex-1 h-3 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -916,13 +949,13 @@ export function PredictDetails() {
               {/* Market bar */}
               <div className="flex items-center gap-2.5">
                 <span className="text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest text-gray-500 w-9 shrink-0">MKT</span>
-                <div className="flex-1 h-3 bg-gray-800/70 rounded-full overflow-hidden">
+                <div className="flex-1 h-3 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full opacity-40"
                     style={{ width: `${impliedPct}%`, backgroundColor: color }}
                   />
                 </div>
-                <span className="text-[clamp(0.9rem,1.1vw,1.1rem)] font-black tabular-nums w-11 text-right text-gray-400">{impliedPct}%</span>
+                <span className="text-[clamp(0.9rem,1.1vw,1.1rem)] font-black tabular-nums w-11 text-right text-slate-400">{impliedPct}%</span>
               </div>
             </div>
           );
@@ -930,21 +963,21 @@ export function PredictDetails() {
 
         return (
           <motion.div
-            className={`${detailTileStrongClass} border-cricket-600/20 mb-4`}
+            className={`${detailTileStrongClass} border-amber-500/15 mb-4`}
             {...fadeUp}
             transition={{ delay: 0.15 }}
           >
             {/* Header with info tooltip */}
             <div className="flex items-center justify-between mb-4">
               <h2 className={detailTileTitleClass}>
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h12M8 2v12" /><circle cx="8" cy="8" r="6" /></svg>
+                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h12M8 2v12" /><circle cx="8" cy="8" r="6" /></svg>
                 AI vs Market
                 <span
                   className="ml-0.5 w-4 h-4 rounded-full border border-gray-600 text-gray-500 text-[clamp(0.65rem,0.8vw,0.8rem)] font-bold flex items-center justify-center cursor-help"
                   title="Compares our AI win probability against the bookmaker's implied probability. When AI sees a team as meaningfully more likely to win than the market price suggests, that gap is a value signal."
                 >i</span>
               </h2>
-              <span className={`${detailTileMetaClass} text-gray-400 bg-gray-800/50 px-2 py-0.5 rounded-full`}>
+              <span className={`${detailTileMetaClass} text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-full`}>
                 via {o.bookmaker}
               </span>
             </div>
@@ -972,12 +1005,12 @@ export function PredictDetails() {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
-              <svg className="w-4 h-4 text-cricket-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.5 9.5L3 21M3 3l18 18M21 3L3 21" /><path d="M9.5 14.5L21 3" />
               </svg>
               Key Battles
             </h2>
-            <span className={`${detailTileMetaClass} font-semibold text-gray-400 tracking-wide`}>
+            <span className={`${detailTileMetaClass} font-semibold text-slate-400 tracking-wide`}>
               {enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -1003,7 +1036,7 @@ export function PredictDetails() {
               return (
                 <div
                   key={i}
-                  className="mx-1 sm:mx-0 rounded-xl overflow-hidden border border-gray-700/25 cursor-pointer select-none transition-transform duration-150"
+                  className="mx-1 sm:mx-0 rounded-xl overflow-hidden border border-white/10 cursor-pointer select-none transition-transform duration-150"
                   style={{
                     perspective: '1200px',
                     transform: pressedBattle === i ? 'scale(0.985)' : 'scale(1)',
@@ -1057,14 +1090,14 @@ export function PredictDetails() {
                                 <p className="hidden sm:block text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-gray-200 mt-2 leading-none whitespace-nowrap">{batterStats.batting_avg?.toFixed(0)} AVG · {batterStats.batting_sr?.toFixed(0)} SR</p>
                               ) : null}
                               {h2h && (
-                                <p className="text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-cricket-300 mt-1.5 leading-none">{h2h.runs_scored} runs vs {bowlerLast}</p>
+                                <p className="text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-amber-400 mt-1.5 leading-none">{h2h.runs_scored} runs vs {bowlerLast}</p>
                               )}
                             </div>
                           </div>
                           {/* Form strip — last 5 scores */}
                           {battle.batter_scores && (
                             <div className="flex items-center gap-1 mt-auto pt-2">
-                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-gray-400 mr-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-slate-400 mr-0.5 shrink-0">Last 5</span>
                               {battle.batter_scores.slice(0, 5).map((score, fi) => (
                                 <span key={fi} className="min-w-[20px] sm:min-w-[28px] px-1 h-5 sm:h-7 rounded text-[clamp(0.65rem,0.8vw,0.8rem)] font-black flex items-center justify-center shrink-0" style={{
                                   background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
@@ -1076,12 +1109,12 @@ export function PredictDetails() {
                           )}
                         </div>
                         {/* VS divider */}
-                        <div className="w-10 sm:w-12 flex flex-col items-center justify-center bg-gray-900/50 shrink-0 gap-1 border-x border-gray-700/40">
+                        <div className="w-10 sm:w-12 flex flex-col items-center justify-center bg-white/[0.04] shrink-0 gap-1 border-x border-white/10">
                           <span className="text-[8px] font-black text-gray-500 tracking-widest">VS</span>
                           {h2h ? (
                             <>
                               <span className="text-[20px] font-black text-white leading-none">{h2h.dismissals}</span>
-                              <span className="text-[7px] font-black tracking-wider text-gray-300">WKT</span>
+                              <span className="text-[7px] font-black tracking-wider text-slate-300">WKT</span>
                             </>
                           ) : (
                             <span className="text-[7px] text-gray-500">—</span>
@@ -1124,16 +1157,16 @@ export function PredictDetails() {
                                   border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
                                 }}>{wkts}W</span>
                               ))}
-                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-gray-400 ml-0.5 shrink-0">Last 5</span>
+                              <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-slate-400 ml-0.5 shrink-0">Last 5</span>
                             </div>
                           )}
                         </div>
                       </div>
                       {/* Insight strip — single row */}
                       {insightParts && (
-                        <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-gray-700/30 bg-gray-900/40 flex items-center gap-2.5 sm:gap-3">
-                          <div className="text-[clamp(0.72rem,2.8vw,0.875rem)] md:text-[clamp(0.95rem,1.15vw,1.125rem)] text-gray-300 leading-snug flex-1 min-w-0 line-clamp-2 flex items-start gap-1.5 sm:gap-2">
-                            <SparkleIcon className="w-[clamp(0.85rem,3vw,1rem)] md:w-4 h-[clamp(0.85rem,3vw,1rem)] md:h-4 text-cricket-300 shrink-0 mt-px" />
+                        <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-white/10 bg-white/[0.04] flex items-center gap-2.5 sm:gap-3">
+                          <div className="text-[clamp(0.72rem,2.8vw,0.875rem)] md:text-[clamp(0.95rem,1.15vw,1.125rem)] text-slate-300 leading-snug flex-1 min-w-0 line-clamp-2 flex items-start gap-1.5 sm:gap-2">
+                            <SparkleIcon className="w-[clamp(0.85rem,3vw,1rem)] md:w-4 h-[clamp(0.85rem,3vw,1rem)] md:h-4 text-amber-400 shrink-0 mt-px" />
                             <span>{insightParts.map((part, j) => {
                               const isNum = /^\d/.test(part);
                               return isNum
@@ -1141,7 +1174,7 @@ export function PredictDetails() {
                                 : <span key={j}>{part}</span>;
                             })}</span>
                           </div>
-                          <span className="inline-flex items-center rounded-full border border-gray-600/60 bg-gray-800/70 px-2 sm:px-4 py-0.5 sm:py-1.5 text-[clamp(0.65rem,0.85vw,0.9rem)] font-semibold uppercase tracking-wider text-gray-300 shrink-0 whitespace-nowrap cursor-pointer">
+                          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 sm:px-4 py-0.5 sm:py-1.5 text-[clamp(0.65rem,0.85vw,0.9rem)] font-semibold uppercase tracking-wider text-slate-300 shrink-0 whitespace-nowrap cursor-pointer">
                             <span className="relative mr-1 flex h-2 w-2">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cricket-300 opacity-75" />
                               <span className="relative inline-flex h-2 w-2 rounded-full bg-cricket-200" />
@@ -1229,8 +1262,8 @@ export function PredictDetails() {
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <div className="text-center px-2">
-                              <p className={`${detailTileMetaClass} font-bold text-gray-400 mb-1`}>Stats loading</p>
-                              <p className="text-[8px] text-gray-600 leading-tight">H2H data will appear once<br/>Cricsheet delivery data is fetched</p>
+                              <p className={`${detailTileMetaClass} font-bold text-slate-400 mb-1`}>Stats loading</p>
+                              <p className="text-[8px] text-slate-500 leading-tight">H2H data will appear once<br/>Cricsheet delivery data is fetched</p>
                             </div>
                           </div>
                         )}
@@ -1297,14 +1330,14 @@ export function PredictDetails() {
             {/* Header */}
             <div className="flex items-center justify-between mb-1">
               <h2 className={detailTileTitleClass}>
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
+                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
                 Who has the edge?
               </h2>
-              <span className={`${detailTileMetaClass} text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded-full`}>
+              <span className={`${detailTileMetaClass} text-slate-300 bg-white/[0.04] px-2 py-0.5 rounded-full`}>
                 SixSense Edge Score™
               </span>
             </div>
-            <p className={`${detailTileMetaClass} text-gray-300 mb-4 pl-5`}>Based on form, venue, rankings & head-to-head stats</p>
+            <p className={`${detailTileMetaClass} text-slate-300 mb-4 pl-5`}>Based on form, venue, rankings & head-to-head stats</p>
 
             {/* Tug-of-war bar */}
             <div className="mb-5">
@@ -1347,7 +1380,7 @@ export function PredictDetails() {
                     {/* Factor label */}
                     <div className="w-28 sm:w-32 shrink-0">
                     <div className="text-[clamp(0.75rem,0.95vw,0.95rem)] font-semibold text-gray-100 leading-tight">{label}</div>
-                    <div className={`${detailTileMetaClass} text-gray-300 leading-tight`}>{desc}</div>
+                    <div className={`${detailTileMetaClass} text-slate-300 leading-tight`}>{desc}</div>
                     </div>
 
                     {/* Score left */}
@@ -1392,10 +1425,10 @@ export function PredictDetails() {
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className={detailTileTitleClass}>
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
+              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" /></svg>
               Who has the edge?
             </h2>
-            <span className={`${detailTileMetaClass} text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded-full`}>
+            <span className={`${detailTileMetaClass} text-slate-300 bg-white/[0.04] px-2 py-0.5 rounded-full`}>
               SixSense Edge Score™
             </span>
           </div>
@@ -1410,13 +1443,13 @@ export function PredictDetails() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <motion.div
           className={`${detailTileClass} transition-all md:col-span-2 lg:col-span-3 ${
-            enrichment || researchFacts.length > 0 ? 'border-cricket-800/30' : 'border-cricket-800/20'
+            enrichment || researchFacts.length > 0 ? 'border-white/10' : 'border-white/[0.06]'
           }`}
           {...fadeUp}
           transition={{ delay: 0.3 }}
         >
           <h2 className={`${detailTileTitleClass} mb-3`}>
-            <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="1" width="10" height="14" rx="1" /><line x1="5" y1="5" x2="11" y2="5" /><line x1="5" y1="8" x2="11" y2="8" /><line x1="5" y1="11" x2="9" y2="11" /></svg>
+            <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="1" width="10" height="14" rx="1" /><line x1="5" y1="5" x2="11" y2="5" /><line x1="5" y1="8" x2="11" y2="8" /><line x1="5" y1="11" x2="9" y2="11" /></svg>
             Research Notes
           </h2>
           {enrichment || researchFacts.length > 0 ? (
@@ -1435,7 +1468,7 @@ export function PredictDetails() {
                           href={source.url}
                           target="_blank"
                           rel="noreferrer"
-                          className={`inline-flex items-center gap-1 ${detailTileMetaClass} font-semibold text-cricket-400 hover:text-cricket-300 bg-cricket-400/8 hover:bg-cricket-400/15 border border-cricket-400/20 px-2 py-0.5 rounded-full transition-colors`}
+                          className={`inline-flex items-center gap-1 ${detailTileMetaClass} font-semibold text-amber-600 hover:text-amber-500 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 rounded-full transition-colors`}
                         >
                           <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 2H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V6M6 1h3v3M9 1L5 5"/></svg>
                           {source.source || `[${index + 1}]`}
@@ -1459,12 +1492,12 @@ export function PredictDetails() {
                       return (
                         <div
                           key={`${update.player ?? 'update'}-${index}`}
-                          className="flex min-w-0 items-start gap-2 rounded-lg bg-gray-800/40 border border-gray-700/30 px-3 py-2"
+                          className="flex min-w-0 items-start gap-2 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2"
                         >
                           <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
                           <div className="min-w-0">
                             <span className={`${detailTileMetaClass} font-bold text-white`}>{update.player ?? update.team ?? 'Update'}</span>
-                            <span className={`${detailTileMetaClass} text-gray-400 ml-1.5`}>{update.status}</span>
+                            <span className={`${detailTileMetaClass} text-slate-400 ml-1.5`}>{update.status}</span>
                           </div>
                         </div>
                       );
@@ -1476,7 +1509,7 @@ export function PredictDetails() {
                 <button
                   type="button"
                   onClick={() => setExpandedSections((prev) => ({ ...prev, researchNotes: !prev.researchNotes }))}
-                  className={`mt-3 ${detailTileMetaClass} font-medium text-cricket-300 hover:text-cricket-200 transition-colors`}
+                  className={`mt-3 ${detailTileMetaClass} font-medium text-amber-400 hover:text-amber-300 transition-colors`}
                 >
                   {expandedSections.researchNotes ? 'Show less' : 'Show more'}
                 </button>
@@ -1503,7 +1536,7 @@ export function PredictDetails() {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
+                  <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
                   <h2 className={detailTileTitleClass}>Toss Factor</h2>
                 </div>
                 {(() => {
@@ -1535,7 +1568,7 @@ export function PredictDetails() {
               transition={{ delay: 0.35 }}
             >
               <h2 className={`${detailTileTitleClass} mb-3`}>
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
+                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M5 6h6M5 10h6" /></svg>
                 Toss Factor
               </h2>
               <ComingSoonTile
@@ -1548,8 +1581,8 @@ export function PredictDetails() {
 
         {/* Squad — wider (3/5), clean avatar grid */}
         <motion.div
-          className={`lg:col-span-3 bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl overflow-hidden border transition-all ${
-            squads.length > 0 || hasSquadOrXi ? 'border-cricket-800/30' : 'border-cricket-800/20'
+          className={`lg:col-span-3 bg-gradient-to-br from-[#111722]/85 to-[#0b1117]/85 backdrop-blur-xl rounded-2xl overflow-hidden border transition-all ${
+            squads.length > 0 || hasSquadOrXi ? 'border-white/10' : 'border-white/[0.06]'
           }`}
           {...fadeUp}
           transition={{ delay: 0.4 }}
@@ -1557,11 +1590,11 @@ export function PredictDetails() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <h2 className={detailTileTitleClass}>
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="4" r="2.5" /><circle cx="11" cy="4" r="2.5" /><path d="M1 13c0-2.2 1.8-4 4-4s4 1.8 4 4" /><path d="M8 13c0-2.2 1.3-4 3-4s3 1.8 3 4" /></svg>
+              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="4" r="2.5" /><circle cx="11" cy="4" r="2.5" /><path d="M1 13c0-2.2 1.8-4 4-4s4 1.8 4 4" /><path d="M8 13c0-2.2 1.3-4 3-4s3 1.8 3 4" /></svg>
               Squad
             </h2>
             {squads.length > 0 && (
-              <span className={`${detailTileMetaClass} text-gray-400 uppercase tracking-wider`}>
+              <span className={`${detailTileMetaClass} text-slate-400 uppercase tracking-wider`}>
                 {squads.some(s => s.is_confirmed) ? 'Confirmed XI' : 'Probable'}
               </span>
             )}
@@ -1617,7 +1650,7 @@ export function PredictDetails() {
                                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-yellow-400 flex items-center justify-center text-[7px] font-black text-gray-900 leading-none">C</span>
                               )}
                             </div>
-                            <span className="text-[8px] text-gray-400 text-center leading-tight w-full truncate px-0.5">{player.name.split(' ').pop()}</span>
+                            <span className="text-[8px] text-slate-400 text-center leading-tight w-full truncate px-0.5">{player.name.split(' ').pop()}</span>
                           </div>
                         );
                       })}
@@ -1645,7 +1678,7 @@ export function PredictDetails() {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {players.map((p) => (
-                    <span key={p} className={`${detailTileMetaClass} text-gray-400 px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-800/30`}>
+                    <span key={p} className={`${detailTileMetaClass} text-slate-400 px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10`}>
                       {p.split(' ').pop()}
                     </span>
                   ))}
@@ -1675,12 +1708,12 @@ export function PredictDetails() {
             {/* Header + win record summary */}
             <div className="flex items-center justify-between mb-3">
               <h2 className={detailTileTitleClass}>
-                <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
+                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
                 Head to Head
               </h2>
               <div className={`flex items-center gap-2 ${detailTileMetaClass} font-black`}>
                 <span style={{ color: teamColor1 }}>{team1Meta.shortName} {h2hTeam1Wins}</span>
-                <span className="text-gray-600">—</span>
+                <span className="text-slate-500">—</span>
                 <span style={{ color: teamColor2 }}>{h2hTeam2Wins} {team2Meta.shortName}</span>
                 <span className="text-gray-500 font-normal ml-1">last {h2hLast5.length}</span>
               </div>
@@ -1743,7 +1776,7 @@ export function PredictDetails() {
             transition={{ delay: 0.55 }}
           >
             <h2 className={`${detailTileTitleClass} mb-3`}>
-              <svg className="w-3.5 h-3.5 text-cricket-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
+              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3v10M12 3v10M4 8h8" /></svg>
               Head to Head
             </h2>
             <ComingSoonTile
