@@ -7,6 +7,7 @@ import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
+import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
@@ -195,7 +196,7 @@ function MatchCenterTeamMark({
   const meta = getTeamMeta(team);
   const isInternational = isInternationalTeam(team);
   const imageUrl = !imageFailed
-    ? logoUrl || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
+    ? logoUrl || getFranchiseLogoUrl(team) || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 24) : '')
     : '';
 
   return (

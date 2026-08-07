@@ -101,6 +101,11 @@ function makePrediction(match: Match, winner: string, team1Prob: number, confide
   };
 }
 
+const IPL_LOGOS: Record<string, string> = {
+  'Mumbai Indians': 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Mumbai_Indians_Logo.svg/1280px-Mumbai_Indians_Logo.svg.png',
+  'Chennai Super Kings': 'https://upload.wikimedia.org/wikipedia/en/thumb/2/2b/Chennai_Super_Kings_Logo.svg/1280px-Chennai_Super_Kings_Logo.svg.png',
+};
+
 const demoMatches: MatchWithPredictions[] = sortMatches([
   {
     match_id: 'demo-ind-vs-aus-odi',
@@ -139,6 +144,8 @@ const demoMatches: MatchWithPredictions[] = sortMatches([
     team1_recent_form: ['W', 'L', 'W', 'W', 'L'],
     team2_recent_form: ['W', 'W', 'W', 'L', 'W'],
     bookmaker_odds: { bookmaker: 'SkyBet', team1_odds: 1.94, team2_odds: 1.87 },
+    team1_logo_url: IPL_LOGOS['Mumbai Indians'],
+    team2_logo_url: IPL_LOGOS['Chennai Super Kings'],
     predictions: [makePrediction({
       match_id: 'demo-mi-vs-csk-ipl',
       name: 'Mumbai Indians vs Chennai Super Kings, Indian Premier League 2026',

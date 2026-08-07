@@ -125,6 +125,8 @@ Core tables used by the current app/pipelines:
 - `stats_cache` — team/venue/H2H + calibration data
 - `match_enrichment` — venue confidence, XI candidates, updates, source links, preview
 - `espn_match_data` — verified venue/toss/rosters/H2H/standings/series context
+- `franchise_logos` — persistent franchise logo lookup populated from ESPN rosters
+  and seeded IPL franchise defaults
 - `match_squads` — team squad or XI snapshots with player metadata + image URLs
 - `player_stats` — player batting/bowling aggregates by format
 - `match_odds` — bookmaker odds snapshots
@@ -135,6 +137,7 @@ SQL assets in repo:
 - `supabase/match_enrichment.sql`
 - `supabase/stats_cache.sql`
 - `supabase/migrations/003_espn_match_data.sql`
+- `supabase/migrations/004_franchise_logos.sql`
 
 ---
 
@@ -159,7 +162,7 @@ python pipeline/compute_stats.py --types t20s ipl
 # Fixtures + mappings (ESPN primary, Cricbuzz upcoming fallback)
 python pipeline/fetch_fixtures.py
 
-# Optional ESPN deep fetch for upcoming matches
+# Optional ESPN deep fetch for upcoming matches + franchise logo refresh
 python pipeline/fetch_espn.py --limit 20
 
 # Enrichment pass
