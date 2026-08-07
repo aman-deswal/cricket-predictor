@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { MatchWithPredictions, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
+import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 
 interface MatchCardProps {
   match: MatchWithPredictions;
@@ -26,7 +27,7 @@ function TeamCrest({
   const isInternational = isInternationalTeam(team);
   const imageUrl = imageFailed
     ? ''
-    : logoUrl || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 64) : '');
+    : logoUrl || getFranchiseLogoUrl(team) || (isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 64) : '');
 
   return (
     <motion.div

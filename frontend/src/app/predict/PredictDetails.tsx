@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
+import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon, SparkleIcon } from '@/components/CricketIcons';
 import { CricketLoader } from '@/components/CricketLoader';
@@ -423,8 +424,8 @@ export function PredictDetails() {
         <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team1Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
-              {team1LogoUrl ? (
-                <img src={team1LogoUrl} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
+              {team1LogoUrl || getFranchiseLogoUrl(displayTeam1) ? (
+                <img src={team1LogoUrl || getFranchiseLogoUrl(displayTeam1)} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
               ) : team1Meta.countryCode ? (
                 <img src={getFlagUrl(team1Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
@@ -454,8 +455,8 @@ export function PredictDetails() {
               {team2Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
             </span>
             <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
-              {team2LogoUrl ? (
-                <img src={team2LogoUrl} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
+              {team2LogoUrl || getFranchiseLogoUrl(displayTeam2) ? (
+                <img src={team2LogoUrl || getFranchiseLogoUrl(displayTeam2)} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
               ) : team2Meta.countryCode ? (
                 <img src={getFlagUrl(team2Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
@@ -547,9 +548,9 @@ export function PredictDetails() {
               }
               whileHover={{ scale: 1.1 }}
             >
-              {team1LogoUrl ? (
+              {team1LogoUrl || getFranchiseLogoUrl(displayTeam1) ? (
                 <img
-                  src={team1LogoUrl}
+                  src={team1LogoUrl || getFranchiseLogoUrl(displayTeam1)}
                   alt={displayTeam1}
                   className="w-full h-full rounded-xl object-contain bg-slate-950/30 p-1"
                 />
@@ -682,9 +683,9 @@ export function PredictDetails() {
               }
               whileHover={{ scale: 1.1 }}
             >
-              {team2LogoUrl ? (
+              {team2LogoUrl || getFranchiseLogoUrl(displayTeam2) ? (
                 <img
-                  src={team2LogoUrl}
+                  src={team2LogoUrl || getFranchiseLogoUrl(displayTeam2)}
                   alt={displayTeam2}
                   className="w-full h-full rounded-xl object-contain bg-slate-950/30 p-1"
                 />

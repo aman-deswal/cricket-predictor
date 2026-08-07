@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getTeamMeta } from './teams';
+import { getFranchiseLogoUrl } from './franchise-logos';
 import { getStoredDemoMode } from './demo-mode';
 import {
   getMockAccuracyTrend,
@@ -639,7 +640,8 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
           || (rosterAbbr ? rosterAbbr === teamMeta.shortName.toUpperCase() : false);
       })?.team_logo;
 
-      return rosterLogo
+      return getFranchiseLogoUrl(teamName)
+        || rosterLogo
         || franchiseLogosByName.get(normalizedName)
         || franchiseLogosByName.get(normalizeLogoTeamName(teamMeta.name))
         || (competitionName && franchiseLogosByCompetitionAbbr.get(`${competitionName}::${teamMeta.shortName.toUpperCase()}`))
@@ -719,11 +721,13 @@ export async function getMatch(matchId: string): Promise<Match | null> {
   match.team2_recent_form = recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [];
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
-  match.team1_logo_url = franchiseLogosByName.get(normalizeLogoTeamName(match.team1))
+  match.team1_logo_url = getFranchiseLogoUrl(match.team1)
+    || franchiseLogosByName.get(normalizeLogoTeamName(match.team1))
     || franchiseLogosByName.get(normalizeLogoTeamName(team1Meta.name))
     || franchiseLogosByAbbr.get(team1Meta.shortName.toUpperCase())
     || undefined;
-  match.team2_logo_url = franchiseLogosByName.get(normalizeLogoTeamName(match.team2))
+  match.team2_logo_url = getFranchiseLogoUrl(match.team2)
+    || franchiseLogosByName.get(normalizeLogoTeamName(match.team2))
     || franchiseLogosByName.get(normalizeLogoTeamName(team2Meta.name))
     || franchiseLogosByAbbr.get(team2Meta.shortName.toUpperCase())
     || undefined;
