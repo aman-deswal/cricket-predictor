@@ -42,6 +42,8 @@ export interface Match {
   team1_recent_form?: Array<'W' | 'L'>;
   team2_recent_form?: Array<'W' | 'L'>;
   bookmaker_odds?: { bookmaker: string; team1_odds: number; team2_odds: number };
+  team1_logo_url?: string;
+  team2_logo_url?: string;
 }
 
 export interface EdgeScoreFactors {
@@ -170,6 +172,14 @@ export type MatchWithPredictions = Match & {
   team1_logo_url?: string;
   team2_logo_url?: string;
 };
+
+interface FranchiseLogoRow {
+  normalized_team_name: string;
+  team_name: string;
+  team_abbr: string | null;
+  logo_url: string;
+  competition_name: string | null;
+}
 
 export interface MatchOdds {
   match_id: string;
@@ -392,6 +402,15 @@ function normalizeTeam(team: string): string {
   return team.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
 }
 
+function normalizeLogoTeamName(team: string): string {
+  return team
+    .replace(/\s*\((Men|Women)\)\s*$/i, '')
+    .replace(/\s+(Men|Women)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function inferTeamGender(team: string): string {
   return team.includes('Women') ? 'female' : 'male';
 }
@@ -464,7 +483,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   }
 
   const now = Date.now();
-  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: oddsData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: franchiseLogoData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
@@ -480,6 +499,9 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     supabase
       .from('espn_match_data')
       .select('match_id, venue_name, head_to_head, series_note, rosters'),
+    supabase
+      .from('franchise_logos')
+      .select('normalized_team_name, team_name, team_abbr, logo_url, competition_name'),
     supabase
       .from('match_odds')
       .select('match_id, bookmaker, team1_odds, team2_odds')
@@ -508,6 +530,27 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
         const rosters = typeof e.rosters === 'string' ? JSON.parse(e.rosters) : e.rosters;
         if (Array.isArray(rosters)) espnRosters.set(e.match_id, rosters);
       } catch {}
+    }
+  });
+  const franchiseLogosByName = new Map<string, string>();
+  const franchiseLogosByAbbr = new Map<string, string>();
+  const franchiseLogosByCompetitionAbbr = new Map<string, string>();
+  (franchiseLogoData ?? []).forEach((row: FranchiseLogoRow) => {
+    const logoUrl = row.logo_url?.trim();
+    if (!logoUrl) return;
+
+    const normalizedName = normalizeLogoTeamName(row.team_name || row.normalized_team_name);
+    if (normalizedName) franchiseLogosByName.set(normalizedName, logoUrl);
+
+    const normalizedAlias = normalizeLogoTeamName(row.normalized_team_name);
+    if (normalizedAlias) franchiseLogosByName.set(normalizedAlias, logoUrl);
+
+    const abbr = row.team_abbr?.trim().toUpperCase();
+    if (abbr) franchiseLogosByAbbr.set(abbr, logoUrl);
+
+    const competition = normalizeLogoTeamName(row.competition_name ?? '');
+    if (competition && abbr) {
+      franchiseLogosByCompetitionAbbr.set(`${competition}::${abbr}`, logoUrl);
     }
   });
   const enrichmentVenue = new Map<string, string>();
@@ -586,11 +629,22 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     const rosters = espnRosters.get(match.match_id) ?? [];
     const findTeamLogo = (teamName: string): string | undefined => {
       const teamMeta = getTeamMeta(teamName);
-      const normalizedName = teamName.toLowerCase();
-      return rosters.find((roster) =>
-        roster.team_name?.toLowerCase() === normalizedName
-        || roster.team_abbr?.toUpperCase() === teamMeta.shortName.toUpperCase()
-      )?.team_logo || undefined;
+      const normalizedName = normalizeLogoTeamName(teamName);
+      const competitionName = normalizeLogoTeamName(espnCompetition.get(match.match_id) ?? '');
+      const rosterLogo = rosters.find((roster) => {
+        const rosterName = normalizeLogoTeamName(roster.team_name ?? '');
+        const rosterAbbr = roster.team_abbr?.toUpperCase();
+        return rosterName === normalizedName
+          || rosterName === normalizeLogoTeamName(teamMeta.name)
+          || (rosterAbbr ? rosterAbbr === teamMeta.shortName.toUpperCase() : false);
+      })?.team_logo;
+
+      return rosterLogo
+        || franchiseLogosByName.get(normalizedName)
+        || franchiseLogosByName.get(normalizeLogoTeamName(teamMeta.name))
+        || (competitionName && franchiseLogosByCompetitionAbbr.get(`${competitionName}::${teamMeta.shortName.toUpperCase()}`))
+        || franchiseLogosByAbbr.get(teamMeta.shortName.toUpperCase())
+        || undefined;
     };
 
     return {
@@ -618,7 +672,7 @@ export async function getMatch(matchId: string): Promise<Match | null> {
     return getMockMatch(matchId);
   }
 
-  const [{ data, error }, { data: statsData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: franchiseLogoData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*')
@@ -628,12 +682,26 @@ export async function getMatch(matchId: string): Promise<Match | null> {
       .from('stats_cache')
       .select('stat_type, match_type, data')
       .eq('stat_type', 'team_stats'),
+    supabase
+      .from('franchise_logos')
+      .select('normalized_team_name, team_name, team_abbr, logo_url, competition_name'),
   ]);
 
   if (error || !data) return null;
 
   const match = data as Match;
   const statsMatchType = getStatsMatchType(match.match_type);
+  const franchiseLogosByName = new Map<string, string>();
+  const franchiseLogosByAbbr = new Map<string, string>();
+  (franchiseLogoData ?? []).forEach((row: FranchiseLogoRow) => {
+    const logoUrl = row.logo_url?.trim();
+    if (!logoUrl) return;
+    const normalizedName = normalizeLogoTeamName(row.team_name || row.normalized_team_name);
+    if (normalizedName) franchiseLogosByName.set(normalizedName, logoUrl);
+    if (row.normalized_team_name) franchiseLogosByName.set(normalizeLogoTeamName(row.normalized_team_name), logoUrl);
+    const abbr = row.team_abbr?.trim().toUpperCase();
+    if (abbr) franchiseLogosByAbbr.set(abbr, logoUrl);
+  });
 
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
   ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
@@ -649,6 +717,16 @@ export async function getMatch(matchId: string): Promise<Match | null> {
 
   match.team1_recent_form = recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [];
   match.team2_recent_form = recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [];
+  const team1Meta = getTeamMeta(match.team1);
+  const team2Meta = getTeamMeta(match.team2);
+  match.team1_logo_url = franchiseLogosByName.get(normalizeLogoTeamName(match.team1))
+    || franchiseLogosByName.get(normalizeLogoTeamName(team1Meta.name))
+    || franchiseLogosByAbbr.get(team1Meta.shortName.toUpperCase())
+    || undefined;
+  match.team2_logo_url = franchiseLogosByName.get(normalizeLogoTeamName(match.team2))
+    || franchiseLogosByName.get(normalizeLogoTeamName(team2Meta.name))
+    || franchiseLogosByAbbr.get(team2Meta.shortName.toUpperCase())
+    || undefined;
 
   return match;
 }

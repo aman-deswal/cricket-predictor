@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -28,6 +29,89 @@ from utils.db import get_client, get_upcoming_matches
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def _normalize_team_name(name: str) -> str:
+    """Return a stable lookup key for franchise logos."""
+    cleaned = name.strip()
+    cleaned = re.sub(r"\s*\((Men|Women)\)\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+(Men|Women)\s*$", "", cleaned, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _build_franchise_logo_rows(match_id: str, espn_data: dict) -> list[dict]:
+    competition_name = espn_data.get("series_note", "") or ""
+    rows: dict[str, dict] = {}
+
+    for roster in espn_data.get("rosters", []):
+        team_name = (roster.get("team_name") or "").strip()
+        logo_url = (roster.get("team_logo") or "").strip()
+        if not team_name or not logo_url:
+            continue
+
+        normalized_team_name = _normalize_team_name(team_name)
+        rows[normalized_team_name] = {
+            "normalized_team_name": normalized_team_name,
+            "team_name": team_name,
+            "team_abbr": (roster.get("team_abbr") or "").strip(),
+            "logo_url": logo_url,
+            "competition_name": competition_name,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    return list(rows.values())
+
+
+def store_franchise_logos(client, match_id: str, espn_data: dict) -> None:
+    """Persist franchise logos extracted from ESPN rosters."""
+    rows = _build_franchise_logo_rows(match_id, espn_data)
+    if not rows:
+        return
+
+    try:
+        client.table("franchise_logos").upsert(
+            rows, on_conflict="normalized_team_name"
+        ).execute()
+        logger.info("  Stored %d franchise logos for match %s", len(rows), match_id)
+    except Exception as exc:
+        logger.warning("  Failed to store franchise logos: %s", exc)
+
+
+def backfill_franchise_logos(client) -> None:
+    """Backfill franchise logos from existing ESPN match data rows."""
+    try:
+        response = client.table("espn_match_data").select("match_id, rosters, series_note").execute()
+    except Exception as exc:
+        logger.warning("  Failed to load ESPN logo backfill data: %s", exc)
+        return
+
+    rows_by_team: dict[str, dict] = {}
+    for row in response.data or []:
+        rosters = row.get("rosters", [])
+        if isinstance(rosters, str):
+            try:
+                rosters = json.loads(rosters)
+            except Exception:
+                rosters = []
+
+        espn_data = {
+            "rosters": rosters,
+            "series_note": row.get("series_note", ""),
+        }
+        for logo_row in _build_franchise_logo_rows(row.get("match_id", ""), espn_data):
+            rows_by_team[logo_row["normalized_team_name"]] = logo_row
+
+    if not rows_by_team:
+        logger.info("  No franchise logos found to backfill")
+        return
+
+    try:
+        client.table("franchise_logos").upsert(
+            list(rows_by_team.values()), on_conflict="normalized_team_name"
+        ).execute()
+        logger.info("  Backfilled %d franchise logos", len(rows_by_team))
+    except Exception as exc:
+        logger.warning("  Failed to backfill franchise logos: %s", exc)
 
 
 def store_espn_data(client, match_id: str, espn_data: dict) -> None:
@@ -72,6 +156,7 @@ def store_espn_data(client, match_id: str, espn_data: dict) -> None:
             row, on_conflict="match_id"
         ).execute()
         logger.info("  Stored ESPN data for match %s (event %s)", match_id, espn_data.get("espn_event_id"))
+        store_franchise_logos(client, match_id, espn_data)
     except Exception as exc:
         logger.error("  Failed to store ESPN data: %s", exc)
 
@@ -160,6 +245,7 @@ def process_match(client, match: dict) -> bool:
 
 def main(limit: int = 50, match_id: Optional[str] = None) -> None:
     client = get_client()
+    backfill_franchise_logos(client)
     matches = get_upcoming_matches(future_only=True)
 
     if match_id:

@@ -289,6 +289,8 @@ export function PredictDetails() {
   const displayTeam2 = prediction?.team2 ?? match.team2;
   const team1Meta = getTeamMeta(displayTeam1);
   const team2Meta = getTeamMeta(displayTeam2);
+  const team1LogoUrl = match.team1_logo_url;
+  const team2LogoUrl = match.team2_logo_url;
   const predictionMargin = prediction ? Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) : 0;
   const hasClearPick = predictionMargin >= 0.01;
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
@@ -421,7 +423,9 @@ export function PredictDetails() {
         <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team1Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
-              {team1Meta.countryCode ? (
+              {team1LogoUrl ? (
+                <img src={team1LogoUrl} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
+              ) : team1Meta.countryCode ? (
                 <img src={getFlagUrl(team1Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team1Meta.primaryColor }}>
@@ -450,7 +454,9 @@ export function PredictDetails() {
               {team2Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
             </span>
             <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
-              {team2Meta.countryCode ? (
+              {team2LogoUrl ? (
+                <img src={team2LogoUrl} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
+              ) : team2Meta.countryCode ? (
                 <img src={getFlagUrl(team2Meta.countryCode, 32)} alt="" className="h-full w-full rounded-md object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: team2Meta.primaryColor }}>
@@ -541,7 +547,13 @@ export function PredictDetails() {
               }
               whileHover={{ scale: 1.1 }}
             >
-              {team1Meta.countryCode ? (
+              {team1LogoUrl ? (
+                <img
+                  src={team1LogoUrl}
+                  alt={displayTeam1}
+                  className="w-full h-full rounded-xl object-contain bg-slate-950/30 p-1"
+                />
+              ) : team1Meta.countryCode ? (
                 <img
                   src={getFlagUrl(team1Meta.countryCode, 80)}
                   srcSet={`${getFlag2xUrl(team1Meta.countryCode, 80)} 2x`}
@@ -670,7 +682,13 @@ export function PredictDetails() {
               }
               whileHover={{ scale: 1.1 }}
             >
-              {team2Meta.countryCode ? (
+              {team2LogoUrl ? (
+                <img
+                  src={team2LogoUrl}
+                  alt={displayTeam2}
+                  className="w-full h-full rounded-xl object-contain bg-slate-950/30 p-1"
+                />
+              ) : team2Meta.countryCode ? (
                 <img
                   src={getFlagUrl(team2Meta.countryCode, 80)}
                   srcSet={`${getFlag2xUrl(team2Meta.countryCode, 80)} 2x`}
