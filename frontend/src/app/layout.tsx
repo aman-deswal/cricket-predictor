@@ -44,25 +44,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
-      <body className="bg-[#111008] text-white min-h-screen antialiased flex flex-col" style={{ fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif' }}>
-        {/* Background gradient orbs — amber theme */}
+      <body className="bg-[#0e1116] text-white min-h-screen antialiased flex flex-col" style={{ fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif' }}>
+        {/* Background gradient orbs — muted and low-contrast */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-500/8 rounded-full blur-3xl" />
-          <div className="absolute top-1/2 -left-40 w-80 h-80 bg-yellow-600/8 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-slate-500/8 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 -left-40 w-80 h-80 bg-cyan-500/6 rounded-full blur-3xl" />
         </div>
 
         <Navbar />
         <main className="relative flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-10 pb-6">
           {children}
         </main>
-        <footer className="relative border-t border-amber-800/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-[11px] text-gray-600">
+        <footer className="relative border-t border-slate-700/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-center">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-600">
               SixSense<sup className="ml-0.5 text-[0.65em]">™</sup>, Reserved 2026
             </p>
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] text-gray-700">v1.0</span>
-            </div>
           </div>
         </footer>
       </body>
