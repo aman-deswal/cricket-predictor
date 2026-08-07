@@ -73,7 +73,7 @@ function ConfidencePill({ value }: { value?: string }) {
   if (!value) return null;
   const styles: Record<string, string> = {
     high: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20',
-    medium: 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20',
+    medium: 'bg-amber-600/15 text-amber-500 ring-1 ring-amber-600/20',
     low: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/20',
   };
   return (
@@ -86,8 +86,8 @@ function ConfidencePill({ value }: { value?: string }) {
 function ProbBar({ label, prob, isWinner, isPredicted }: { label: string; prob: number; isWinner: boolean; isPredicted: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <span className={`text-xs w-24 truncate font-medium ${isWinner ? 'text-white' : 'text-gray-400'}`}>{label}</span>
-      <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+      <span className={`text-xs w-24 truncate font-medium ${isWinner ? 'text-white' : 'text-slate-400'}`}>{label}</span>
+      <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
         <motion.div
           className="h-full rounded-full"
           style={{ backgroundColor: isWinner ? '#f59e0b' : '#4b5563' }}
@@ -96,10 +96,10 @@ function ProbBar({ label, prob, isWinner, isPredicted }: { label: string; prob: 
           transition={{ duration: 0.55, ease: 'easeOut' }}
         />
       </div>
-      <span className={`text-xs font-bold w-10 text-right ${isWinner ? 'text-cricket-400' : 'text-gray-500'}`}>
+      <span className={`text-xs font-bold w-10 text-right ${isWinner ? 'text-amber-600' : 'text-slate-500'}`}>
         {(prob * 100).toFixed(0)}%
       </span>
-      {isPredicted && <span className="text-[10px] text-gray-600">AI pick</span>}
+      {isPredicted && <span className="text-[10px] text-slate-500">AI pick</span>}
     </div>
   );
 }
@@ -121,33 +121,33 @@ function AccuracyStrip({
       transition={{ delay: 0.08 }}
     >
       {/* International */}
-      <div className="bg-gray-800/50 border border-gray-700/40 rounded-xl px-4 py-3 flex items-center gap-3">
-        <GlobeIcon className="w-5 h-5 text-cricket-400 shrink-0" />
+      <div className="bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+        <GlobeIcon className="w-5 h-5 text-amber-600 shrink-0" />
         <div className="min-w-0">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">International · {periodLabel}</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider">International · {periodLabel}</p>
           {intl ? (
             <p className="text-xl font-black text-white">
               {intl.pct}%
               <span className="text-xs font-normal text-gray-500 ml-2">{intl.correct}/{intl.total}</span>
             </p>
           ) : (
-            <p className="text-sm text-gray-600">No data</p>
+            <p className="text-sm text-slate-500">No data</p>
           )}
         </div>
       </div>
 
       {/* League */}
-      <div className="bg-gray-800/50 border border-gray-700/40 rounded-xl px-4 py-3 flex items-center gap-3">
-        <ShieldIcon className="w-5 h-5 text-gray-500 shrink-0" />
+      <div className="bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+          <ShieldIcon className="w-5 h-5 text-slate-500 shrink-0" />
         <div className="min-w-0">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">League · {periodLabel}</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider">League · {periodLabel}</p>
           {league ? (
             <p className="text-xl font-black text-white">
               {league.pct}%
               <span className="text-xs font-normal text-gray-500 ml-2">{league.correct}/{league.total}</span>
             </p>
           ) : (
-            <p className="text-sm text-gray-600">No data</p>
+            <p className="text-sm text-slate-500">No data</p>
           )}
         </div>
       </div>
@@ -171,13 +171,13 @@ function MatchupVisual({ result }: { result: PredictionHistoryItem }) {
         <p className="text-[11px] font-semibold text-white text-center truncate max-w-[80px]">{team1}</p>
         <div className="flex flex-col items-center gap-0.5 min-h-[30px] justify-end">
           {t1Won && <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-400"><TrophyIcon className="w-3 h-3" /> Won</span>}
-          {aiT1 && <span className="flex items-center gap-0.5 text-[9px] font-semibold text-cricket-400"><SparkleIcon className="w-3 h-3" /> AI pick</span>}
+          {aiT1 && <span className="flex items-center gap-0.5 text-[9px] font-semibold text-amber-600"><SparkleIcon className="w-3 h-3" /> AI pick</span>}
         </div>
       </div>
 
       {/* Centre verdict */}
       <div className="flex flex-col items-center justify-center gap-1 shrink-0 w-12">
-        <span className="text-[9px] text-gray-700 font-bold uppercase tracking-widest">vs</span>
+        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">vs</span>
         <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black ${
           result.correct ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
         }`}>
@@ -191,7 +191,7 @@ function MatchupVisual({ result }: { result: PredictionHistoryItem }) {
         <p className="text-[11px] font-semibold text-white text-center truncate max-w-[80px]">{team2}</p>
         <div className="flex flex-col items-center gap-0.5 min-h-[30px] justify-end">
           {t2Won && <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-400"><TrophyIcon className="w-3 h-3" /> Won</span>}
-          {aiT2 && <span className="flex items-center gap-0.5 text-[9px] font-semibold text-cricket-400"><SparkleIcon className="w-3 h-3" /> AI pick</span>}
+          {aiT2 && <span className="flex items-center gap-0.5 text-[9px] font-semibold text-amber-600"><SparkleIcon className="w-3 h-3" /> AI pick</span>}
         </div>
       </div>
     </div>
@@ -204,7 +204,7 @@ function ReasoningToggle({ text }: { text: string }) {
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+        className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
       >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.15 }}>
           <ChevronDownIcon className="w-3 h-3" />
@@ -239,7 +239,7 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.02, 0.35), duration: 0.22 }}
-      className="bg-gray-800/40 border border-gray-700/40 rounded-2xl overflow-hidden hover:border-cricket-700/30 transition-colors"
+      className="bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 border border-slate-700/40 rounded-2xl overflow-hidden hover:border-amber-600/30 transition-colors"
     >
       <button
         className="w-full text-left px-4 py-3.5"
@@ -252,15 +252,15 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
           </div>
 
           {/* Right meta */}
-          <div className="flex flex-col items-end gap-1.5 shrink-0 pl-3 border-l border-gray-700/40 min-w-[80px]">
-            <p className="text-[10px] text-gray-600">
+          <div className="flex flex-col items-end gap-1.5 shrink-0 pl-3 border-l border-white/10 min-w-[80px]">
+            <p className="text-[10px] text-slate-500">
               {new Date(result.scored_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
             </p>
             <ConfidencePill value={result.confidence} />
-            <span className="text-[11px] text-gray-500">{(result.predicted_probability * 100).toFixed(0)}% conf.</span>
+            <span className="text-[11px] text-slate-500">{(result.predicted_probability * 100).toFixed(0)}% conf.</span>
             {hasDetail && (
               <motion.span animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.18 }}>
-                <ChevronDownIcon className="w-3.5 h-3.5 text-gray-600" />
+                <ChevronDownIcon className="w-3.5 h-3.5 text-slate-500" />
               </motion.span>
             )}
           </div>
@@ -277,7 +277,7 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
             transition={{ duration: 0.22, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 pt-3 border-t border-gray-700/40 space-y-4">
+            <div className="px-5 pb-5 pt-3 border-t border-white/10 space-y-4">
 
               {/* ── Verdict banner ── */}
               <div className={`rounded-xl px-4 py-3 flex items-start gap-3 ${
@@ -293,9 +293,9 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
                     {result.correct ? 'AI called it' : 'AI missed this one'}
                   </p>
                   {result.result_text ? (
-                    <p className="text-xs text-gray-400 mt-0.5">{result.result_text}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{result.result_text}</p>
                   ) : (
-                    <p className="text-xs text-gray-600 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {result.actual_winner} won
                     </p>
                   )}
@@ -311,11 +311,11 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
                     {(() => {
                       const edge = Math.round((Math.max(result.team1_win_probability, result.team2_win_probability) - 0.5) * 100);
                       return edge >= 5 ? (
-                        <span className="text-[10px] font-bold text-cricket-400 bg-cricket-900/40 border border-cricket-700/30 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-600/10 border border-amber-600/25 px-2 py-0.5 rounded-full">
                           +{edge}% above coinflip
                         </span>
                       ) : (
-                        <span className="text-[10px] text-gray-700 bg-gray-900/40 border border-gray-700/30 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] text-slate-500 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
                           Near 50/50
                         </span>
                       );
@@ -330,12 +330,12 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
               <div className="space-y-2">
 
                 {/* AI's call + outcome */}
-                <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                <div className="flex items-center justify-between bg-white/[0.04] rounded-xl px-3.5 py-2.5">
                   <div className="flex items-center gap-2">
                     <SparkleIcon className="w-3.5 h-3.5 text-cricket-500 shrink-0" />
-                    <span className="text-xs text-gray-400">AI picked</span>
+                    <span className="text-xs text-slate-400">AI picked</span>
                     <span className="text-xs font-semibold text-white">{result.predicted_winner}</span>
-                    <span className="text-xs text-gray-600">at {(result.predicted_probability * 100).toFixed(0)}%</span>
+                    <span className="text-xs text-slate-500">at {(result.predicted_probability * 100).toFixed(0)}%</span>
                   </div>
                   <span className={`text-xs font-bold ${result.correct ? 'text-emerald-400' : 'text-red-400'}`}>
                     {result.correct ? 'Correct' : `${result.actual_winner} won`}
@@ -348,12 +348,12 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
                   if (edge < 3) return null;
                   const strong = edge >= 15;
                   return (
-                    <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center justify-between bg-white/[0.04] rounded-xl px-3.5 py-2.5">
                       <div className="flex items-center gap-2">
-                        <TargetIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                        <span className="text-xs text-gray-400">Signal strength</span>
+                        <TargetIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-xs text-slate-400">Signal strength</span>
                       </div>
-                      <span className={`text-xs font-bold ${strong ? 'text-cricket-400' : 'text-amber-400'}`}>
+                      <span className={`text-xs font-bold ${strong ? 'text-amber-600' : 'text-amber-500'}`}>
                         +{edge}% above coinflip · {strong ? 'Strong edge' : 'Moderate edge'}
                       </span>
                     </div>
@@ -362,13 +362,13 @@ function HistoryCard({ result, index }: { result: PredictionHistoryItem; index: 
 
                 {/* Toss outcome — structured data if available */}
                 {result.toss_winner && (
-                  <div className="flex items-center justify-between bg-gray-900/50 rounded-xl px-3.5 py-2.5">
+                  <div className="flex items-center justify-between bg-white/[0.04] rounded-xl px-3.5 py-2.5">
                     <div className="flex items-center gap-2">
                       <CoinIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                      <span className="text-xs text-gray-400">Toss</span>
+                      <span className="text-xs text-slate-400">Toss</span>
                       <span className="text-xs font-semibold text-white">{result.toss_winner}</span>
                       {result.toss_decision && (
-                        <span className="text-xs text-gray-600">→ chose to {result.toss_decision}</span>
+                        <span className="text-xs text-slate-500">→ chose to {result.toss_decision}</span>
                       )}
                     </div>
                     <span className={`text-xs font-bold ${
@@ -404,10 +404,10 @@ function SectionBlock({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-gray-400">{icon}</span>
-        <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest">{title}</h2>
-        <span className="text-[10px] text-gray-600 px-2 py-0.5 rounded-full bg-gray-800/60 border border-gray-700/40">{badge}</span>
-        <div className="flex-1 h-px bg-gray-800/50" />
+        <span className="text-slate-400">{icon}</span>
+        <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest">{title}</h2>
+        <span className="text-[10px] text-slate-500 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/10">{badge}</span>
+        <div className="flex-1 h-px bg-white/10" />
       </div>
       <div className="space-y-3">
         {items.map((r, i) => <HistoryCard key={r.prediction_id} result={r} index={i} />)}
@@ -463,9 +463,9 @@ export default function HistoryPage() {
     <div>
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-          Prediction <span className="text-cricket-400">History</span>
+          Prediction <span className="text-amber-600">History</span>
         </h1>
-        <p className="text-gray-500 mb-5 text-sm">Tap any result to see the full AI breakdown</p>
+        <p className="text-slate-500 mb-5 text-sm">Tap any result to see the full AI breakdown</p>
       </motion.div>
 
       {/* Accuracy strip — always reflects period, never outcome filter */}
@@ -479,15 +479,15 @@ export default function HistoryPage() {
         transition={{ delay: 0.12 }}
       >
         {/* Period tabs */}
-        <div className="flex bg-gray-900/60 border border-gray-700/40 rounded-xl p-1 gap-0.5">
+        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1 gap-0.5">
           {periodOptions.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setPeriod(key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 period === key
-                  ? 'bg-cricket-500 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {label}
@@ -498,7 +498,7 @@ export default function HistoryPage() {
         <div className="w-px h-5 bg-gray-700/60 hidden sm:block" />
 
         {/* Outcome filter */}
-        <div className="flex bg-gray-900/60 border border-gray-700/40 rounded-xl p-1 gap-0.5">
+        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1 gap-0.5">
           {outcomeOptions.map(({ key, label }) => (
             <button
               key={key}
@@ -507,8 +507,8 @@ export default function HistoryPage() {
                 outcome === key
                   ? outcome === 'correct' ? 'bg-emerald-500/20 text-emerald-400'
                   : outcome === 'incorrect' ? 'bg-red-500/20 text-red-400'
-                  : 'bg-gray-700/60 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  : 'bg-slate-700/60 text-white'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {label}
@@ -516,14 +516,14 @@ export default function HistoryPage() {
           ))}
         </div>
 
-        <p className="ml-auto text-xs text-gray-600">{filtered.length} results</p>
+        <p className="ml-auto text-xs text-slate-500">{filtered.length} results</p>
       </motion.div>
 
       {filtered.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center text-gray-500 py-20 bg-gray-900/40 rounded-2xl border border-gray-800/30"
+          className="text-center text-slate-500 py-20 bg-white/[0.04] rounded-2xl border border-white/10"
         >
           <p>No results for this period</p>
         </motion.div>

@@ -29,8 +29,8 @@ export function TeamBadge({ teamName, size = 'md', showName = true, probability,
       transition={{ duration: 0.4 }}
     >
       <motion.div
-        className={`${container} ${meta.countryCode ? flagRadius : 'rounded-full'} overflow-hidden ring-2 ring-offset-2 ring-offset-cricket-950 shadow-lg`}
-        style={{ ['--tw-ring-color' as string]: isWinner ? meta.primaryColor : 'rgba(134, 239, 172, 0.3)' }}
+        className={`${container} ${meta.countryCode ? flagRadius : 'rounded-full'} overflow-hidden ring-2 ring-offset-2 ring-offset-[#111820] shadow-lg`}
+        style={{ ['--tw-ring-color' as string]: isWinner ? meta.primaryColor : 'rgba(217, 119, 6, 0.28)' }}
         whileHover={{ scale: 1.1 }}
         transition={{ type: 'spring', stiffness: 300 }}
       >
@@ -55,13 +55,13 @@ export function TeamBadge({ teamName, size = 'md', showName = true, probability,
       {showName && (
         <div className="text-center">
           <p className={`font-semibold text-white ${text}`}>{meta.shortName}</p>
-          <p className="text-[10px] text-gray-400 leading-tight max-w-[80px] truncate">{teamName}</p>
+          <p className="text-[10px] text-slate-400 leading-tight max-w-[80px] truncate">{teamName}</p>
         </div>
       )}
 
       {probability !== undefined && (
         <motion.p
-          className={`font-bold ${probText} ${isWinner ? 'text-cricket-300' : 'text-gray-400'}`}
+          className={`font-bold ${probText} ${isWinner ? 'text-amber-600' : 'text-slate-400'}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}

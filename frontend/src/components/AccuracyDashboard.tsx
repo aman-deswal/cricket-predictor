@@ -22,14 +22,14 @@ interface CalibrationBin {
   count: number;
 }
 
-// Shared amber palette — matches the rest of the app
-const GRID   = '#451a03';   // cricket-950
-const AXIS   = '#92400e';   // cricket-800
-const LABEL  = '#fcd34d';   // cricket-300
-const LINE   = '#f59e0b';   // cricket-500 (amber)
-const DOTS   = '#fbbf24';   // cricket-400
-const TT_BG  = '#111008';   // app bg
-const TT_BORDER = 'rgba(251,191,36,0.15)';
+// Shared muted-gold palette — matches the rest of the app
+const GRID   = '#1f2937';
+const AXIS   = '#94a3b8';
+const LABEL  = '#d97706';
+const LINE   = '#f59e0b';
+const DOTS   = '#fbbf24';
+const TT_BG  = '#111820';
+const TT_BORDER = 'rgba(217,119,6,0.16)';
 
 export function AccuracyDashboard() {
   const [calibrationData, setCalibrationData] = useState<CalibrationBin[]>([]);
@@ -41,7 +41,7 @@ export function AccuracyDashboard() {
   }, []);
 
   const cardClass =
-    'bg-gradient-to-br from-gray-900/80 to-cricket-950/80 backdrop-blur-xl rounded-2xl p-6 border border-cricket-800/30';
+    'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/40';
 
   return (
     <div className="space-y-6">
@@ -50,7 +50,7 @@ export function AccuracyDashboard() {
         <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-1">
           Accuracy Trend
         </h3>
-        <p className="text-[10px] text-gray-500 mb-5">Rolling 10-match window</p>
+        <p className="text-[10px] text-slate-500 mb-5">Rolling 10-match window</p>
         {trendData.length > 0 ? (
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: -12 }}>
@@ -81,7 +81,7 @@ export function AccuracyDashboard() {
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-gray-600 text-center py-10 text-sm">Not enough data for trend yet</p>
+          <p className="text-slate-500 text-center py-10 text-sm">Not enough data for trend yet</p>
         )}
       </div>
 
@@ -90,7 +90,7 @@ export function AccuracyDashboard() {
         <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-1">
           Calibration Plot
         </h3>
-        <p className="text-[10px] text-gray-500 mb-5">
+        <p className="text-[10px] text-slate-500 mb-5">
           Dots on the diagonal = perfect model confidence. Dots above = model underestimates.
         </p>
         {calibrationData.length > 0 ? (
@@ -132,7 +132,7 @@ export function AccuracyDashboard() {
             </ScatterChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-gray-600 text-center py-10 text-sm">
+          <p className="text-slate-500 text-center py-10 text-sm">
             Need 50+ predictions for calibration chart
           </p>
         )}
@@ -140,4 +140,3 @@ export function AccuracyDashboard() {
     </div>
   );
 }
-
