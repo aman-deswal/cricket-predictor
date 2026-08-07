@@ -30,7 +30,7 @@ function TeamCrest({
 
   return (
     <motion.div
-      className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-black/20 p-1.5 shadow-lg"
+      className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-slate-950/30 p-1.5 shadow-lg"
       style={{
         borderColor: selected ? `${meta.primaryColor}aa` : 'rgba(255,255,255,0.09)',
         boxShadow: selected ? `0 0 18px ${meta.primaryColor}30` : undefined,
@@ -130,18 +130,18 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
         whileHover={{ y: -5, scale: 1.015 }}
         whileTap={{ scale: 0.98 }}
       >
-        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
+        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-slate-400/0 via-amber-200/0 to-cyan-400/0 blur-md transition-all duration-500 group-hover:from-slate-400/12 group-hover:via-amber-200/8 group-hover:to-cyan-400/12" />
 
-        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#15120b]/95 backdrop-blur-xl transition-all duration-300 group-hover:border-white/[0.13]">
+        <div className="relative overflow-hidden rounded-[18px] border border-slate-700/45 bg-[#131922]/95 backdrop-blur-xl transition-all duration-300 group-hover:border-slate-500/55">
 
           {/* Shimmer sweep on hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.025] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] pointer-events-none" />
           <div
-            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 opacity-[0.08]"
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 opacity-[0.07]"
             style={{ background: `radial-gradient(circle at 20% 45%, ${team1Meta.primaryColor}, transparent 65%)` }}
           />
           <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-[0.08]"
+            className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-[0.07]"
             style={{ background: `radial-gradient(circle at 80% 45%, ${team2Meta.primaryColor}, transparent 65%)` }}
           />
 
@@ -150,7 +150,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
             <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
                 {/* Match type pill */}
-                <span className="text-[9px] font-bold text-cricket-400 uppercase tracking-widest px-2 py-0.5 rounded-full bg-cricket-400/10 border border-cricket-400/15">
+                <span className="text-[9px] font-bold text-slate-200 uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
                   {match.match_type}
                 </span>
 
@@ -173,7 +173,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
                 <FormDots form={match.team1_recent_form} />
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-cricket-300' : 'text-gray-400'}`}
+                    className={`text-sm font-black tabular-nums ${winner === match.team1 ? 'text-amber-100' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -195,7 +195,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
                 <FormDots form={match.team2_recent_form} />
                 {prediction && (
                   <motion.p
-                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-cricket-300' : 'text-gray-400'}`}
+                    className={`text-sm font-black tabular-nums ${winner === match.team2 ? 'text-amber-100' : 'text-gray-400'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
@@ -213,7 +213,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
 
             <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">
               <p className="min-w-0 truncate text-[10px] text-gray-400">{match.venue || 'Venue TBD'}</p>
-              <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-200 transition-colors group-hover:text-amber-100">
+              <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-100 transition-colors group-hover:text-white">
                 Match preview →
               </span>
             </div>

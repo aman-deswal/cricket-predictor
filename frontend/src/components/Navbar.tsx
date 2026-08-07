@@ -36,23 +36,23 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="relative border-b border-amber-800/30 bg-[#121010]/95 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-amber-900/5">
+    <nav className="relative border-b border-slate-700/35 bg-[#10151b]/95 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-black/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center space-x-3 group" onClick={() => setMobileOpen(false)}>
             <div className="group-hover:scale-110 transition-transform">
-              <Logo size={42} />
+              <Logo size={48} />
             </div>
             <span
               className="text-xl tracking-tight"
               style={{ fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 900, letterSpacing: '-0.02em' }}
             >
-              <span className="bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Six</span>
+              <span className="bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 bg-clip-text text-transparent">Six</span>
               <span className="text-white">Sense</span>
-              <sup className="ml-0.5 align-super text-[0.4em] font-black text-amber-200">™</sup>
+              <sup className="ml-0.5 align-super text-[0.4em] font-black text-amber-600">™</sup>
             </span>
             {demoEnabled && (
-              <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 text-slate-300 border border-slate-500/20">
                 Demo
               </span>
             )}
@@ -64,16 +64,16 @@ export function Navbar() {
               <Link
                 key={href}
                 href={href}
-                className={`relative px-3 py-1.5 rounded-lg text-sm transition-all ${
+                className={`relative px-3 py-1.5 rounded-lg text-sm font-display transition-all ${
                   isActive(href)
-                    ? 'text-amber-300 bg-amber-500/10'
-                    : 'text-gray-400 hover:text-amber-300 hover:bg-amber-500/5'
+                    ? 'text-white bg-white/5'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 {label}
                 {isActive(href) && (
                   <motion.div
-                    className="absolute -bottom-[13px] left-2 right-2 h-[2px] bg-amber-400 rounded-full"
+                    className="absolute -bottom-[13px] left-2 right-2 h-[2px] bg-amber-600 rounded-full"
                     layoutId="nav-underline"
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
@@ -82,7 +82,7 @@ export function Navbar() {
             ))}
             <button
               onClick={toggleDemoMode}
-              className="ml-2 px-2 py-1 rounded text-[10px] uppercase tracking-[0.18em] text-gray-600 hover:text-amber-300 hover:bg-amber-500/5 opacity-40 hover:opacity-100 transition-all"
+              className="ml-2 px-2 py-1 rounded text-[10px] font-display uppercase tracking-[0.18em] text-gray-600 hover:text-white hover:bg-white/5 opacity-40 hover:opacity-100 transition-all"
               title="Toggle demo data"
             >
               {demoEnabled ? 'Demo on' : 'Demo off'}
@@ -91,7 +91,7 @@ export function Navbar() {
 
           {/* Mobile hamburger */}
           <button
-            className="sm:hidden p-2 rounded-lg text-gray-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
+            className="sm:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
           >
@@ -117,7 +117,7 @@ export function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            className="sm:hidden border-t border-amber-800/20 bg-[#121010]/98 backdrop-blur-xl"
+            className="sm:hidden border-t border-slate-700/25 bg-[#10151b]/98 backdrop-blur-xl"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -129,10 +129,10 @@ export function Navbar() {
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`block px-3 py-2 rounded-lg text-sm transition-all ${
+                  className={`block px-3 py-2 rounded-lg text-sm font-display transition-all ${
                     isActive(href)
-                      ? 'text-amber-300 bg-amber-500/10 font-medium'
-                      : 'text-gray-400 hover:text-amber-300 hover:bg-amber-500/5'
+                      ? 'text-white bg-white/5 font-medium'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   {label}
@@ -140,7 +140,7 @@ export function Navbar() {
               ))}
               <button
                 onClick={toggleDemoMode}
-                className="w-full text-left mt-2 px-3 py-2 rounded-lg text-xs uppercase tracking-[0.18em] text-gray-500 hover:text-amber-300 hover:bg-amber-500/5 opacity-70 transition-all"
+                className="w-full text-left mt-2 px-3 py-2 rounded-lg text-xs font-display uppercase tracking-[0.18em] text-gray-500 hover:text-white hover:bg-white/5 opacity-70 transition-all"
               >
                 {demoEnabled ? 'Demo mode: on' : 'Demo mode: off'}
               </button>

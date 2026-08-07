@@ -22,11 +22,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(251, 191, 36, 0.15);
+    background: rgba(148, 163, 184, 0.22);
     border-radius: 99px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.22);
   }
 }
 
@@ -37,7 +37,7 @@
 
   /* Neon glow helpers */
   .glow-amber {
-    box-shadow: 0 0 12px rgba(251, 191, 36, 0.25), 0 0 32px rgba(251, 191, 36, 0.1);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.12), 0 0 24px rgba(251, 191, 36, 0.05);
   }
   .glow-green {
     box-shadow: 0 0 10px rgba(52, 211, 153, 0.3), 0 0 24px rgba(52, 211, 153, 0.12);
@@ -84,13 +84,13 @@
     inset: -75%;
     background: conic-gradient(
       transparent 0deg 28deg,
-      rgba(251, 191, 36, 0.75) 36deg,
-      rgba(255, 251, 235, 0.95) 41deg,
-      rgba(251, 191, 36, 0.75) 46deg,
+      rgba(148, 163, 184, 0.55) 36deg,
+      rgba(226, 232, 240, 0.85) 41deg,
+      rgba(148, 163, 184, 0.55) 46deg,
       transparent 54deg 208deg,
-      rgba(251, 191, 36, 0.75) 216deg,
-      rgba(255, 251, 235, 0.95) 221deg,
-      rgba(251, 191, 36, 0.75) 226deg,
+      rgba(148, 163, 184, 0.55) 216deg,
+      rgba(226, 232, 240, 0.85) 221deg,
+      rgba(148, 163, 184, 0.55) 226deg,
       transparent 234deg 360deg
     );
     opacity: 0;

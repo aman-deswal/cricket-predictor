@@ -130,9 +130,9 @@ function SparseSlateNotice({ matchCount }: { matchCount: number }) {
   if (matchCount > 2) return null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-slate-500/20 bg-slate-500/[0.05] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Verified slate</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-200">Verified slate</p>
         <p className="mt-1 text-sm text-gray-300">
           {matchCount === 1
             ? 'One scheduled match is available right now. SixSense only displays fixtures received from the live schedule feed.'
@@ -141,7 +141,7 @@ function SparseSlateNotice({ matchCount }: { matchCount: number }) {
       </div>
       <Link
         href="/history"
-        className="shrink-0 text-xs font-black uppercase tracking-widest text-cricket-300 transition-colors hover:text-amber-200"
+        className="shrink-0 text-xs font-black uppercase tracking-widest text-amber-600 transition-colors hover:text-amber-500"
       >
         Recent results →
       </Link>
@@ -164,7 +164,7 @@ function SectionHeading({
     <div className={`flex items-center gap-3 ${className}`}>
       <span className={bareIcon
         ? 'inline-flex h-10 w-10 items-center justify-center'
-        : 'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/10 text-cricket-300 shadow-[0_0_18px_rgba(251,191,36,0.08)]'
+        : 'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-500/25 bg-white/[0.04] text-amber-600 shadow-[0_0_18px_rgba(148,163,184,0.08)]'
       }>
         {icon}
       </span>
@@ -177,8 +177,8 @@ function SixSensePickHeading() {
   return (
     <SectionHeading icon={<Logo size={40} />} bareIcon>
       <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
-        <span className="text-cricket-300">SixSense</span>
-        <sup className="ml-0.5 text-[0.55em] tracking-normal text-cricket-300">™</sup> Pick
+        <span className="text-amber-600">SixSense</span>
+        <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
       </h2>
     </SectionHeading>
   );
@@ -240,7 +240,7 @@ function MatchDiscoveryPanel({
     >
       <div className="mb-3 px-1">
         <div className="min-w-0">
-          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">{competitionKind}</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-300">{competitionKind}</p>
           <h2 className="mt-1 min-w-0 truncate text-sm font-black uppercase tracking-[0.12em] text-white">{competition}</h2>
         </div>
       </div>
@@ -332,11 +332,11 @@ function MatchBoardStrip({
   }, [activeFilter, filteredMatchKey, updateScrollState]);
 
   return (
-    <section className="rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
+    <section className="rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10">
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/35 bg-gradient-to-br from-amber-400/20 to-amber-900/10 text-cricket-200 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-500/35 bg-gradient-to-br from-slate-200/12 to-slate-900/10 text-amber-600 shadow-[0_0_24px_rgba(148,163,184,0.12)]">
               <BowlIcon className="h-5 w-5" />
             </span>
             <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
@@ -344,7 +344,7 @@ function MatchBoardStrip({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {activeFilter !== 'all' && (
-            <span className="text-[9px] font-black uppercase tracking-widest text-amber-300">
+            <span className="text-[9px] font-black uppercase tracking-widest text-amber-600">
               {selectedFilterLabel}
             </span>
           )}
@@ -354,7 +354,7 @@ function MatchBoardStrip({
                 type="button"
                 onClick={() => scrollTicker(-1)}
                 disabled={!canScrollLeft}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/25 bg-amber-400/[0.08] text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-500/25 bg-white/[0.04] text-slate-200 transition-colors hover:border-slate-300/40 hover:bg-white/[0.07] disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
                 aria-label="Scroll Match Center left"
               >
                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -365,7 +365,7 @@ function MatchBoardStrip({
                 type="button"
                 onClick={() => scrollTicker(1)}
                 disabled={!canScrollRight}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/25 bg-amber-400/[0.08] text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-500/25 bg-white/[0.04] text-slate-200 transition-colors hover:border-slate-300/40 hover:bg-white/[0.07] disabled:cursor-default disabled:border-white/[0.07] disabled:bg-transparent disabled:text-gray-700"
                 aria-label="Scroll Match Center right"
               >
                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -379,8 +379,8 @@ function MatchBoardStrip({
             onClick={() => setFiltersOpen((open) => !open)}
             className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
               filtersOpen
-                ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
-                : 'border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/50 hover:text-amber-100'
+                ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
+                : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
             }`}
             aria-label="Filter matches by status"
             aria-expanded={filtersOpen}
@@ -404,8 +404,8 @@ function MatchBoardStrip({
               }}
               className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
                 activeFilter === option.key
-                  ? 'border-amber-400/40 bg-amber-400/15 text-amber-200'
-                  : 'border-white/[0.1] bg-black/20 text-gray-400 hover:border-white/[0.18] hover:text-gray-200'
+                  ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
+                  : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
               }`}
             >
               {option.label}
@@ -445,23 +445,25 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group min-w-[17rem] snap-start rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3 transition-colors hover:border-amber-400/50 sm:min-w-[18.5rem]"
+                className="group min-w-[17rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
               >
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
                 <div>
                   <div className="mb-3 flex h-7 items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <span className="shrink-0 rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+                      <span className="shrink-0 rounded-full border border-slate-500/25 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-500">
                         {match.match_type}
                       </span>
                       {isFeatured && (
                         <span
-                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-amber-300/20 bg-black/25 px-1.5"
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
                           title="SixSense Pick"
                           aria-label="SixSense Pick"
                         >
                           <Logo size={18} />
                           <span className="leading-none">
-                            <span className="block text-[6px] font-black uppercase tracking-[0.2em] text-amber-300">
+                            <span className="block text-[6px] font-black uppercase tracking-[0.2em] text-amber-500">
                               SixSense<sup className="ml-px text-[0.55em] tracking-normal">™</sup>
                             </span>
                             <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.2em] text-white">Pick</span>
@@ -469,13 +471,13 @@ function MatchBoardStrip({
                         </span>
                       )}
                       {hasEdge && (
-                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-200">
                           +{edgePct} edge
                         </span>
                       )}
                     </div>
                     {isMatchLive(match) ? (
-                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-300">
+                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
                         Live
                       </span>
                     ) : (
@@ -498,7 +500,7 @@ function MatchBoardStrip({
                         </span>
                       </span>
                       <span
-                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-amber-100' : 'text-gray-400'}`}
                         title={team1Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
                       >
                         {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}
@@ -518,7 +520,7 @@ function MatchBoardStrip({
                         </span>
                       </span>
                       <span
-                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-cricket-300' : 'text-gray-400'}`}
+                        className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-amber-100' : 'text-gray-400'}`}
                         title={team2Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
                       >
                         {prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}
@@ -530,7 +532,7 @@ function MatchBoardStrip({
                     <span className="truncate text-[10px] font-semibold text-gray-400">
                       {getCompetitionLabel(match)}
                     </span>
-                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-amber-200">
+                    <span className="shrink-0 text-[10px] font-bold text-gray-300 transition-colors group-hover:text-white">
                       Open →
                     </span>
                   </div>
@@ -547,14 +549,14 @@ function MatchBoardStrip({
         {hasOverflow && canScrollRight && (
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-24 items-center justify-end pr-2 lg:hidden">
             <span
-              className="absolute inset-0 bg-gradient-to-l from-[#171308]/95 via-[#171308]/55 to-transparent backdrop-blur-md"
+              className="absolute inset-0 bg-gradient-to-l from-[#111820]/95 via-[#111820]/55 to-transparent"
               style={{ maskImage: 'linear-gradient(to left, black 0%, black 58%, transparent 100%)' }}
               aria-hidden="true"
             />
             <button
               type="button"
               onClick={() => scrollTicker(1)}
-              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/40 bg-amber-200/[0.12] text-amber-50 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(251,191,36,0.08)] backdrop-blur-xl transition-colors active:bg-amber-200/25"
+              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/30 bg-slate-200/[0.10] text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(148,163,184,0.08)] backdrop-blur-xl transition-colors active:bg-slate-200/20"
               aria-label="Scroll Match Center right"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -585,29 +587,29 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         whileHover={{ y: -5, scale: 1.015 }}
         whileTap={{ scale: 0.98 }}
       >
-        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-cricket-500/0 to-amber-500/0 blur-md transition-all duration-500 group-hover:from-cricket-500/15 group-hover:to-amber-500/15" />
+        <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-slate-400/0 via-amber-200/0 to-cyan-400/0 blur-md transition-all duration-500 group-hover:from-slate-400/12 group-hover:via-amber-200/8 group-hover:to-cyan-400/12" />
         <div className="featured-cricket-border relative overflow-hidden rounded-[18px] p-px">
-        <div className="relative overflow-hidden rounded-[17px] bg-[#111008]">
+        <div className="relative overflow-hidden rounded-[17px] bg-[#10161d]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(105deg, ${team1Meta.primaryColor}22 0%, #111008 40%, #111008 60%, ${team2Meta.primaryColor}22 100%)`,
+            background: `linear-gradient(105deg, ${team1Meta.primaryColor}18 0%, #10161d 40%, #10161d 60%, ${team2Meta.primaryColor}18 100%)`,
           }}
         />
         {/* Top neon line */}
         <div className="absolute top-0 left-0 right-0 h-[2px]"
           style={{ background: `linear-gradient(90deg, ${team1Meta.primaryColor}, ${team2Meta.primaryColor})` }}
         />
-        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.025] to-transparent transition-transform duration-[1200ms] group-hover:translate-x-full" />
+        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.02] to-transparent transition-transform duration-[1200ms] group-hover:translate-x-full" />
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="rounded-full border border-cricket-400/25 bg-cricket-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cricket-300">
+            <span className="rounded-full border border-slate-500/25 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-100">
               {match.match_type}
             </span>
-            <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-gray-200">
+            <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
           </div>
@@ -640,7 +642,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   </p>
                 )}
                 {match.bookmaker_odds && (
-                  <p className="text-[10px] font-mono text-gray-300 mt-1">
+                  <p className="text-[10px] font-mono text-slate-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team1_odds)}
                   </p>
                 )}
@@ -649,7 +651,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
             {/* Center VS */}
             <div className="flex flex-col items-center flex-shrink-0 px-2">
-              <span className="text-xs font-black text-gray-500 uppercase tracking-widest">vs</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">vs</span>
             </div>
 
             {/* Team 2 */}
@@ -663,7 +665,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   </p>
                 )}
                 {match.bookmaker_odds && (
-                  <p className="text-[10px] font-mono text-gray-300 mt-1">
+                  <p className="text-[10px] font-mono text-slate-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team2_odds)}
                   </p>
                 )}
@@ -699,8 +701,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
           )}
 
           <div className="mt-3 flex items-center justify-between gap-3 text-[9px] font-semibold">
-            <span className="min-w-0 truncate text-gray-500">{match.venue || 'Venue TBC'}</span>
-            <span className="shrink-0 text-gray-400 transition-colors group-hover:text-amber-200">
+            <span className="min-w-0 truncate text-slate-500">{match.venue || 'Venue TBC'}</span>
+            <span className="shrink-0 text-slate-400 transition-colors group-hover:text-white">
               Full breakdown →
             </span>
           </div>
@@ -764,9 +766,9 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="overflow-hidden rounded-2xl border border-amber-300/15 bg-gradient-to-br from-[#171308] to-cricket-950/50 px-6 py-14 text-center"
+          className="overflow-hidden rounded-2xl border border-slate-600/25 bg-gradient-to-br from-[#111820] to-slate-950/60 px-6 py-14 text-center"
         >
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] text-cricket-300">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-500/25 bg-white/[0.04] text-amber-100">
             <BowlIcon className="h-6 w-6" />
           </div>
           <p className="text-lg font-black text-white">The next slate has not landed yet</p>
@@ -774,7 +776,7 @@ export default function HomePage() {
             SixSense only publishes scheduled fixtures received from its cricket feeds. New matches will appear here automatically when they are available.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/history" className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-4 py-2 text-xs font-black uppercase tracking-widest text-amber-200">
+            <Link href="/history" className="rounded-lg border border-slate-500/25 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-widest text-amber-100">
               Review recent picks
             </Link>
             <Link href="/dashboard" className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 transition-colors hover:text-white">
@@ -791,7 +793,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10"
+              className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
                 <SixSensePickHeading />
@@ -805,7 +807,7 @@ export default function HomePage() {
           <SparseSlateNotice matchCount={matches.length} />
 
           {/* Match discovery board */}
-          <section className="min-w-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-[#171308]/95 shadow-xl shadow-black/10">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10">
             <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
                 <SectionHeading icon={<GroundsIcon className="h-6 w-6" />}>
                   <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Around the grounds</h2>
@@ -816,8 +818,8 @@ export default function HomePage() {
                     onClick={() => setCompetitionFiltersOpen((open) => !open)}
                     className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
                       competitionFiltersOpen
-                        ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
-                        : 'border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/50 hover:text-amber-100'
+                        ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
+                        : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
                     }`}
                     aria-label="Filter matches by competition"
                     aria-expanded={competitionFiltersOpen}
@@ -839,8 +841,8 @@ export default function HomePage() {
                     }}
                     className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
                       activeCompetition === 'all'
-                        ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
-                        : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                        ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
+                        : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
                     }`}
                   >
                     All <span className="ml-1 font-mono opacity-70">{discoveryMatchCount}</span>
@@ -855,8 +857,8 @@ export default function HomePage() {
                       }}
                       className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
                         activeCompetition === competition
-                          ? 'border-amber-300/35 bg-amber-300/[0.12] text-amber-200'
-                          : 'border-white/[0.1] bg-white/[0.03] text-gray-400 hover:text-white'
+                          ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
+                          : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
                       }`}
                     >
                       {getCompetitionFilterLabel(competition)} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
@@ -878,7 +880,7 @@ export default function HomePage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/[0.1] bg-[#171308]/90 p-6 text-center">
+              <div className="rounded-2xl border border-white/[0.1] bg-[#111820]/90 p-6 text-center">
                 <p className="text-sm font-bold text-gray-200">Only the spotlight match is available right now.</p>
               </div>
             )}
