@@ -1,4 +1,4 @@
-"""Fetch upcoming cricket fixtures and store in Supabase.
+"""Fetch current cricket fixtures and store authoritative states in Supabase.
 
 Uses ESPN Cricinfo as the primary source and Cricbuzz JSON-LD as a fallback
 for upcoming fixtures when ESPN's header feed is too current-day biased.
@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
-from utils.db import get_client, replace_upcoming_matches
+from utils.db import get_client
 from utils.cricbuzz import get_cricbuzz_upcoming_fixtures
 from utils.espn import (
     _normalize_team,
@@ -34,6 +34,19 @@ def _status_rank(status: str) -> int:
     if status == "pre":
         return 1
     return 0
+
+
+ESPN_TO_MATCH_STATUS = {
+    "pre": "upcoming",
+    "in": "live",
+    "post": "completed",
+}
+
+MATCH_STATUS_RANK = {
+    "upcoming": 1,
+    "live": 2,
+    "completed": 3,
+}
 
 
 def _merge_fixtures_by_event(fixtures: list[dict]) -> list[dict]:
@@ -120,11 +133,16 @@ def _merge_fixtures_by_identity(fixtures: list[dict]) -> list[dict]:
         current_source = current.get("source", "espn")
         incoming_source = fixture.get("source", "espn")
         if current_source != "espn" and incoming_source == "espn":
-            merged[match_index] = fixture
+            canonical = dict(fixture)
+            if current.get("venue") and not canonical.get("venue"):
+                canonical["venue"] = current["venue"]
+            merged[match_index] = canonical
             continue
 
         if fixture.get("venue") and not current.get("venue"):
-            merged[match_index] = fixture
+            enriched = dict(current)
+            enriched["venue"] = fixture["venue"]
+            merged[match_index] = enriched
 
     return merged
 
@@ -226,14 +244,14 @@ def _reconcile_provisional_fixtures(client, espn_fixtures: list[dict]) -> int:
         client.table("matches")
         .select("match_id, team1, team2, date")
         .like("match_id", "espn-%")
-        .eq("status", "upcoming")
+        .in_("status", ["upcoming", "live", "completed"])
         .execute()
         .data
         or []
     )
     canonical_fixtures = [
         f for f in espn_fixtures
-        if f.get("status") == "pre" and f.get("espn_event_id")
+        if f.get("status") in ESPN_TO_MATCH_STATUS and f.get("espn_event_id")
     ]
     canonical_fixtures.extend(existing_espn_matches)
 
@@ -409,14 +427,15 @@ def _fixture_source_id(fixture: dict) -> Optional[str]:
 
 
 def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
-    """Convert 'pre' (upcoming) fixtures to matches-table rows.
+    """Convert authoritative fixture states to matches-table rows.
 
     Uses '<source>-<source_id>' as a stable match_id so records from multiple
     fixture sources can coexist without collisions.
     """
     matches = []
     for f in fixtures:
-        if f.get("status") != "pre":
+        match_status = ESPN_TO_MATCH_STATUS.get(f.get("status", ""))
+        if not match_status:
             continue
         source = f.get("source", "espn")
         source_id = _fixture_source_id(f)
@@ -426,7 +445,7 @@ def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
         team2 = f.get("team2", "")
         if not team1 or not team2:
             continue
-        matches.append({
+        match = {
             "match_id": f"{source}-{source_id}",
             "name": f"{team1} vs {team2}",
             "team1": team1,
@@ -434,8 +453,11 @@ def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
             "date": f.get("date", ""),
             "venue": f.get("venue", ""),
             "match_type": _infer_match_type(f.get("league_name", "")),
-            "status": "upcoming",
-        })
+            "status": match_status,
+        }
+        if source == "espn":
+            match["espn_event_id"] = source_id
+        matches.append(match)
     return matches
 
 
@@ -444,10 +466,114 @@ def _espn_fixtures_to_matches(espn_fixtures: list[dict]) -> list[dict]:
     return _fixtures_to_matches(espn_fixtures)
 
 
+def _allowed_current_statuses(incoming_status: str) -> list[str]:
+    """Return states an incoming fixture is allowed to replace."""
+    incoming_rank = MATCH_STATUS_RANK.get(incoming_status, 0)
+    return [
+        status
+        for status, rank in MATCH_STATUS_RANK.items()
+        if rank <= incoming_rank
+    ]
+
+
+def _persist_fixture_matches(client, matches: list[dict]) -> int:
+    """Persist fixture rows without allowing match status to move backwards."""
+    if not matches:
+        return 0
+
+    match_ids = [match["match_id"] for match in matches]
+    existing_response = (
+        client.table("matches")
+        .select("match_id,status")
+        .in_("match_id", match_ids)
+        .execute()
+    )
+    existing_statuses = {
+        row["match_id"]: row.get("status", "")
+        for row in (existing_response.data or [])
+    }
+
+    persisted = 0
+    for match in matches:
+        match_id = match["match_id"]
+        incoming_status = match["status"]
+        current_status = existing_statuses.get(match_id)
+
+        if current_status is None:
+            try:
+                client.table("matches").insert(match).execute()
+                existing_statuses[match_id] = incoming_status
+                persisted += 1
+                logger.info("Persisted fixture state: %s -> %s", match_id, incoming_status)
+                continue
+            except Exception:
+                # Another writer may have inserted the canonical row after our read.
+                current_response = (
+                    client.table("matches")
+                    .select("match_id,status")
+                    .eq("match_id", match_id)
+                    .execute()
+                )
+                if not current_response.data:
+                    raise
+                current_status = current_response.data[0].get("status", "")
+                existing_statuses[match_id] = current_status
+
+        if MATCH_STATUS_RANK.get(incoming_status, 0) < MATCH_STATUS_RANK.get(current_status, 0):
+            logger.info(
+                "Skipping stale status for %s: current=%s incoming=%s",
+                match_id,
+                current_status,
+                incoming_status,
+            )
+            continue
+
+        # The status predicate protects against another workflow completing the
+        # match between our initial read and this update.
+        update_response = (
+            client.table("matches")
+            .update(match)
+            .eq("match_id", match_id)
+            .in_("status", _allowed_current_statuses(incoming_status))
+            .execute()
+        )
+        updated_rows = update_response.data or []
+        if not any(
+            row.get("match_id") == match_id and row.get("status") == incoming_status
+            for row in updated_rows
+        ):
+            current_response = (
+                client.table("matches")
+                .select("match_id,status")
+                .eq("match_id", match_id)
+                .execute()
+            )
+            final_status = (
+                current_response.data[0].get("status", "")
+                if current_response.data
+                else ""
+            )
+            if final_status != incoming_status:
+                logger.info(
+                    "Fixture state advanced concurrently: %s current=%s incoming=%s",
+                    match_id,
+                    final_status or "missing",
+                    incoming_status,
+                )
+                existing_statuses[match_id] = final_status
+                continue
+
+        existing_statuses[match_id] = incoming_status
+        persisted += 1
+        logger.info("Persisted fixture state: %s -> %s", match_id, incoming_status)
+
+    return persisted
+
+
 def main(match_types: Optional[list[str]] = None) -> None:
     """
     Fetch current fixtures from ESPN (free, unlimited).
-    Upserts upcoming matches and scores completed ones.
+    Persists upcoming/live/completed matches and scores completed ones.
 
     Args:
         match_types: Unused — kept for CLI backward compatibility.
@@ -475,15 +601,15 @@ def main(match_types: Optional[list[str]] = None) -> None:
     all_fixtures = _merge_fixtures_by_identity([*espn_merged, *cricbuzz_fixtures])
     logger.info(f"Merged fixture set: {len(all_fixtures)} unique events")
 
-    # --- Phase 2: Upsert upcoming fixtures ---
-    upcoming_matches = _fixtures_to_matches(all_fixtures)
-    if upcoming_matches:
-        logger.info(f"Upserting {len(upcoming_matches)} upcoming fixtures...")
-        replace_upcoming_matches(upcoming_matches)
+    # --- Phase 2: Persist authoritative fixture states ---
+    fixture_matches = _fixtures_to_matches(all_fixtures)
+    if fixture_matches:
+        client = get_client()
+        persisted = _persist_fixture_matches(client, fixture_matches)
+        logger.info(f"Persisted {persisted} fixture states...")
 
         # Stamp espn_event_id on matches row and create espn_match_data stubs
-        client = get_client()
-        for m in upcoming_matches:
+        for m in fixture_matches:
             if not m["match_id"].startswith("espn-"):
                 continue
             espn_eid = m["match_id"].removeprefix("espn-")
@@ -506,7 +632,7 @@ def main(match_types: Optional[list[str]] = None) -> None:
         if reconciled:
             logger.info(f"Reconciled {reconciled} provisional Cricbuzz fixtures to ESPN IDs")
     else:
-        logger.warning("No upcoming fixtures found from ESPN or Cricbuzz.")
+        logger.warning("No fixture states found from ESPN or Cricbuzz.")
 
     # --- Phase 3: Score completed matches ---
     espn_completed = [f for f in all_fixtures if f.get("status") == "post" and f.get("winner")]

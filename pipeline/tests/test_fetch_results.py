@@ -129,6 +129,24 @@ class TestScorePrediction(unittest.TestCase):
 
 
 class TestMarkStaleUpcomingCompleted(unittest.TestCase):
+    def test_stale_cleanup_only_queries_upcoming_so_multiday_live_test_is_preserved(self):
+        client = MagicMock()
+        matches = MagicMock()
+        client.table.return_value = matches
+        matches.select.return_value = matches
+        matches.eq.return_value = matches
+        matches.lt.return_value = matches
+        matches.execute.return_value = MagicMock(data=[])
+
+        marked = _mark_stale_upcoming_completed(
+            client,
+            datetime(2026, 8, 6, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(marked, 0)
+        matches.eq.assert_called_once_with("status", "upcoming")
+        matches.update.assert_not_called()
+
     @patch("fetch_results._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
     def test_marks_stale_match_completed_without_scoring(self, _mock_summary):
         client = MagicMock()

@@ -2,7 +2,7 @@ name: Fetch Fixtures
 
 on:
   schedule:
-    - cron: '7 */2 * * *'  # Every 2 hours; owns fixture discovery and ESPN match context
+    - cron: '7,22,37,52 * * * *'  # Every 15 minutes; owns fixture discovery and ESPN match context
   workflow_dispatch:
 
 permissions:
