@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
-import { getTeamMeta, getFlagUrl, getFlag2xUrl, isInternationalTeam } from '@/lib/teams';
+import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
@@ -216,6 +216,54 @@ function MatchCenterTeamMark({
         meta.shortName.slice(0, 2)
       )}
     </span>
+  );
+}
+
+function FeaturedTeamCrest({
+  team,
+  logoUrl,
+  selected,
+}: {
+  team: string;
+  logoUrl?: string;
+  selected: boolean;
+}) {
+  const [failedUrls, setFailedUrls] = useState<string[]>([]);
+  const meta = getTeamMeta(team);
+  const isInternational = isInternationalTeam(team);
+  const imageCandidates = [
+    logoUrl,
+    getFranchiseLogoUrl(team),
+    isInternational && meta.countryCode ? getFlagUrl(meta.countryCode, 64) : undefined,
+  ].filter((url): url is string => Boolean(url));
+  const imageUrl = imageCandidates.find((url) => !failedUrls.includes(url));
+
+  return (
+    <motion.div
+      className={`h-14 w-14 flex-shrink-0 overflow-hidden ring-2 shadow-xl sm:h-16 sm:w-16 ${
+        isInternational ? 'rounded-xl' : 'rounded-full'
+      }`}
+      style={{ ['--tw-ring-color' as string]: selected ? meta.primaryColor : 'rgba(255,255,255,0.1)' }}
+      whileHover={{ scale: 1.1 }}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={team}
+          className={`h-full w-full bg-slate-950/30 ${
+            isInternational ? 'rounded-xl object-cover' : 'object-contain p-1'
+          }`}
+          onError={() => setFailedUrls((urls) => [...urls, imageUrl])}
+        />
+      ) : (
+        <div
+          className="flex h-full w-full items-center justify-center text-sm font-black text-white"
+          style={{ backgroundColor: meta.primaryColor }}
+        >
+          {meta.shortName.slice(0, 3)}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -619,21 +667,11 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
           <div className="flex items-center gap-4 sm:gap-8">
             {/* Team 1 */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <motion.div
-                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
-                  team1Meta.countryCode ? 'rounded-xl' : 'rounded-full'
-                }`}
-                style={{ ['--tw-ring-color' as string]: winner === match.team1 ? team1Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
-                whileHover={{ scale: 1.1 }}
-              >
-                {team1Meta.countryCode ? (
-                  <img src={getFlagUrl(team1Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team1Meta.countryCode, 64)} 2x`} alt={match.team1} className="w-full h-full rounded-xl object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team1Meta.primaryColor }}>
-                    {team1Meta.shortName.slice(0, 3)}
-                  </div>
-                )}
-              </motion.div>
+              <FeaturedTeamCrest
+                team={match.team1}
+                logoUrl={match.team1_logo_url}
+                selected={winner === match.team1}
+              />
               <div className="min-w-0">
                 <p className="text-base sm:text-lg font-black text-white leading-none">{team1Meta.shortName}</p>
                 {prediction && (
@@ -671,21 +709,11 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   </p>
                 )}
               </div>
-              <motion.div
-                className={`w-14 h-14 sm:w-16 sm:h-16 overflow-hidden flex-shrink-0 ring-2 shadow-xl ${
-                  team2Meta.countryCode ? 'rounded-xl' : 'rounded-full'
-                }`}
-                style={{ ['--tw-ring-color' as string]: winner === match.team2 ? team2Meta.primaryColor : 'rgba(255,255,255,0.1)' }}
-                whileHover={{ scale: 1.1 }}
-              >
-                {team2Meta.countryCode ? (
-                  <img src={getFlagUrl(team2Meta.countryCode, 64)} srcSet={`${getFlag2xUrl(team2Meta.countryCode, 64)} 2x`} alt={match.team2} className="w-full h-full rounded-xl object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center font-black text-white text-sm" style={{ backgroundColor: team2Meta.primaryColor }}>
-                    {team2Meta.shortName.slice(0, 3)}
-                  </div>
-                )}
-              </motion.div>
+              <FeaturedTeamCrest
+                team={match.team2}
+                logoUrl={match.team2_logo_url}
+                selected={winner === match.team2}
+              />
             </div>
           </div>
 
