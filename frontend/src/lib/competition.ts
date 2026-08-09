@@ -534,6 +534,32 @@ function compareStableMatchIdentity(a: CompetitionMatch, b: CompetitionMatch): n
   return (a.match_id ?? `${a.team1}-${a.team2}`).localeCompare(b.match_id ?? `${b.team1}-${b.team2}`);
 }
 
+export function getFeaturedHorizonMatches<T extends CompetitionMatch>(matches: T[], now = Date.now()): T[] {
+  const hour = 60 * 60 * 1000;
+  const futureMatches = matches
+    .filter((match) => {
+      const kickoff = getMatchTimestamp(match);
+      return match.status.toLowerCase() === 'upcoming'
+        && kickoff > now
+        && kickoff !== Number.MAX_SAFE_INTEGER;
+    })
+    .sort((a, b) => {
+      const kickoffDiff = getMatchTimestamp(a) - getMatchTimestamp(b);
+      return kickoffDiff !== 0 ? kickoffDiff : compareStableMatchIdentity(a, b);
+    });
+
+  const within24Hours = futureMatches.filter((match) => getMatchTimestamp(match) <= now + 24 * hour);
+  if (within24Hours.length > 0) return within24Hours;
+
+  const within48Hours = futureMatches.filter((match) => getMatchTimestamp(match) <= now + 48 * hour);
+  if (within48Hours.length > 0) return within48Hours;
+
+  const earliestKickoff = futureMatches[0] ? getMatchTimestamp(futureMatches[0]) : null;
+  return earliestKickoff === null
+    ? []
+    : futureMatches.filter((match) => getMatchTimestamp(match) <= earliestKickoff + 24 * hour);
+}
+
 export function compareMatchesByCompetition(a: CompetitionMatch, b: CompetitionMatch): number {
   const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
   if (priorityDiff !== 0) return priorityDiff;

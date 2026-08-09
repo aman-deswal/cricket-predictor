@@ -9,6 +9,7 @@ import {
   compareMatchesByCompetition,
   getCompetitionPriority,
   getCompetitionProfile,
+  getFeaturedHorizonMatches,
   getMatchTimestamp,
 } from '@/lib/competition';
 import { MatchCard } from '@/components/MatchCard';
@@ -78,13 +79,7 @@ function compareFeaturedMatches(a: MatchWithPredictions, b: MatchWithPredictions
 }
 
 function selectFeaturedMatch(matches: MatchWithPredictions[], now = Date.now()): MatchWithPredictions | null {
-  const latestKickoff = now + 7 * 24 * 60 * 60 * 1000;
-  return matches
-    .filter((match) => {
-      const kickoff = getMatchTimestamp(match);
-      return !isMatchLive(match) && kickoff > now && kickoff <= latestKickoff;
-    })
-    .sort(compareFeaturedMatches)[0] ?? null;
+  return getFeaturedHorizonMatches(matches, now).sort(compareFeaturedMatches)[0] ?? null;
 }
 
 function getMatchDayLabel(date: string): string {
