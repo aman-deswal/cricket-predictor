@@ -10,6 +10,7 @@ import type {
   Prediction,
   PredictionHistoryItem,
 } from './supabase';
+import { compareMatchCenterMatches } from './competition';
 
 const now = Date.now();
 
@@ -21,64 +22,8 @@ function pastIso(daysAgo: number): string {
   return new Date(now - daysAgo * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function getMatchSection(match: Match): 'International' | 'League' | 'Other' {
-  const topInternationalTeams = new Set([
-    'India',
-    'Australia',
-    'England',
-    'South Africa',
-    'New Zealand',
-    'Pakistan',
-    'Sri Lanka',
-    'Bangladesh',
-    'West Indies',
-    'Afghanistan',
-    'Zimbabwe',
-    'Ireland',
-  ]);
-
-  const popularLeagues = [
-    'indian premier league',
-    'ipl',
-    'womens premier league',
-    'women premier league',
-    'wpl',
-    'big bash league',
-    'bbl',
-    'the hundred',
-    'caribbean premier league',
-    'cpl',
-    'pakistan super league',
-    'psl',
-    'sa20',
-    'major league cricket',
-    'mlc',
-    'lanka premier league',
-    'lpl',
-    'bangladesh premier league',
-    'bpl',
-  ];
-
-  const team1 = match.team1.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
-  const team2 = match.team2.replace(/\s+Women$/, '').replace(/\s+Men$/, '').trim();
-  const haystack = `${match.name} ${match.venue}`.toLowerCase();
-
-  if (topInternationalTeams.has(team1) && topInternationalTeams.has(team2)) {
-    return 'International';
-  }
-  if (popularLeagues.some((league) => haystack.includes(league))) {
-    return 'League';
-  }
-  return 'Other';
-}
-
 function sortMatches(matches: MatchWithPredictions[]): MatchWithPredictions[] {
-  return [...matches].sort((a, b) => {
-    const priority = (section: ReturnType<typeof getMatchSection>) => (section === 'International' ? 0 : section === 'League' ? 1 : 2);
-    const sectionDiff = priority(getMatchSection(a)) - priority(getMatchSection(b));
-    if (sectionDiff !== 0) return sectionDiff;
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
+  return [...matches].sort(compareMatchCenterMatches);
 }
 
 function makePrediction(match: Match, winner: string, team1Prob: number, confidence: Prediction['confidence']): Prediction {

@@ -73,7 +73,26 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(m["team2"], "Australia")
         self.assertEqual(m["status"], "upcoming")
         self.assertEqual(m["match_type"], "T20")
-        self.assertEqual(m["name"], "India vs Australia")
+        self.assertEqual(m["name"], "India vs Australia, ICC T20I")
+
+    def test_fixture_name_preserves_competition_alias(self):
+        fixture = self._make_fixture(
+            team1="Welsh Fire (Women)",
+            team2="Southern Brave (Women)",
+            league_name="19th Match, The Hundred Women's Competition 2026",
+        )
+
+        matches = _fixtures_to_matches([fixture])
+
+        self.assertEqual(
+            matches[0]["name"],
+            "Welsh Fire (Women) vs Southern Brave (Women), 19th Match, The Hundred Women's Competition 2026",
+        )
+
+    def test_fixture_name_omits_empty_competition(self):
+        matches = _fixtures_to_matches([self._make_fixture(league_name="")])
+
+        self.assertEqual(matches[0]["name"], "India vs Australia")
 
     def test_completed_fixture_converted(self):
         fixtures = [self._make_fixture(status="post")]
