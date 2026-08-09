@@ -554,10 +554,7 @@ export function getFeaturedHorizonMatches<T extends CompetitionMatch>(matches: T
   const within48Hours = futureMatches.filter((match) => getMatchTimestamp(match) <= now + 48 * hour);
   if (within48Hours.length > 0) return within48Hours;
 
-  const earliestKickoff = futureMatches[0] ? getMatchTimestamp(futureMatches[0]) : null;
-  return earliestKickoff === null
-    ? []
-    : futureMatches.filter((match) => getMatchTimestamp(match) <= earliestKickoff + 24 * hour);
+  return futureMatches;
 }
 
 export function compareMatchesByCompetition(a: CompetitionMatch, b: CompetitionMatch): number {
