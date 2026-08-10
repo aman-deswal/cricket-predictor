@@ -14,6 +14,7 @@ import {
 } from '@/lib/competition';
 import { selectFeaturedMatch } from '@/lib/featured-selection';
 import { MatchCard } from '@/components/MatchCard';
+import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
@@ -455,9 +456,7 @@ function MatchBoardStrip({
                 <div>
                   <div className="mb-3 flex h-7 items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <span className="shrink-0 rounded-full border border-slate-500/25 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-500">
-                        {match.match_type}
-                      </span>
+                      <MatchFormatBadge match={match} className="text-amber-100" />
                       {isFeatured && (
                         <span
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
@@ -620,9 +619,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-slate-500/25 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-100">
-              {match.match_type}
-            </span>
+            <MatchFormatBadge match={match} />
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>

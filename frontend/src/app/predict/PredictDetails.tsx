@@ -11,6 +11,8 @@ import { PredictionChart } from '@/components/PredictionChart';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon, SparkleIcon } from '@/components/CricketIcons';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
+import { MatchFormatBadge } from '@/components/MatchFormatBadge';
+import { getMatchFormatLabel } from '@/lib/competition';
 
 function toAmericanOdds(probability: number): string {
   if (probability <= 0 || probability >= 1) return '-';
@@ -303,8 +305,7 @@ export function PredictDetails() {
         // Fetch player stats for all squad players
         if (squadData.length > 0 && matchData) {
           const allNames = squadData.flatMap(s => (s.players ?? []).map(p => p.name));
-          const format = matchData.match_type?.toLowerCase().includes('t20') ? 't20i' :
-                         matchData.match_type?.toLowerCase().includes('odi') ? 'odi' : 't20i';
+          const format = matchFormat === 'ODI' ? 'odi' : 't20i';
           const stats = await getPlayerStats(allNames, format);
           setPlayerStats(stats);
         }
@@ -409,6 +410,7 @@ export function PredictDetails() {
   const hasClearPick = predictionMargin >= 0.01;
   const matchDate = match.date.endsWith('Z') || match.date.includes('+') ? match.date : `${match.date}Z`;
   const matchStatus = getMatchStatusPresentation(match.status);
+  const matchFormat = getMatchFormatLabel({ ...match, competition_name: espnData?.series_note ?? null });
   const isLiveMatch = matchStatus.kind === 'live';
   const isUpcomingMatch = matchStatus.kind === 'upcoming'
     && new Date(matchDate).getTime() > Date.now();
@@ -616,6 +618,7 @@ export function PredictDetails() {
           <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
           All Matches
         </Link>
+        <MatchFormatBadge match={match} competitionName={espnData?.series_note ?? null} />
         {isLiveMatch ? (
           <LiveStatusBadge />
         ) : countdown && (
@@ -913,7 +916,7 @@ export function PredictDetails() {
               if (levelMatch) matchNum = parseInt(levelMatch[1]) + parseInt(levelMatch[2]) + 1;
               else if (leadsMatch) matchNum = parseInt(leadsMatch[1]) + parseInt(leadsMatch[2]) + 1;
               const suffix = matchNum === 1 ? 'st' : matchNum === 2 ? 'nd' : matchNum === 3 ? 'rd' : 'th';
-              return matchNum > 0 ? `${matchNum}${suffix} ${match.match_type}` : match.match_type;
+              return matchNum > 0 ? `${matchNum}${suffix} ${matchFormat}` : matchFormat;
             })()}
           </span>
           <span>{espnData?.venue_name || enrichment?.venue_name || match.venue || 'TBC'}{espnData?.venue_city ? `, ${espnData.venue_city}` : ''}</span>

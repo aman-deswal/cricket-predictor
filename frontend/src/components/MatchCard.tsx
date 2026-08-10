@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { MatchWithPredictions, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
+import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 
 interface MatchCardProps {
   match: MatchWithPredictions;
@@ -150,10 +151,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
             {/* ── Header row ── */}
             <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
-                {/* Match type pill */}
-                <span className="text-[9px] font-bold text-slate-200 uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-                  {match.match_type}
-                </span>
+                <MatchFormatBadge match={match} />
 
               </div>
 
