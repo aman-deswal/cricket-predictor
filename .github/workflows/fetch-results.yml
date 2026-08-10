@@ -32,4 +32,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           RESULT_CHECK_BATCH_SIZE: '25'
-        run: python pipeline/fetch_results.py
+        run: python pipeline/fetch_results.py --correct-event 1534180

@@ -90,6 +90,19 @@ def _normalize(name: str) -> str:
     return name
 
 
+def _parse_winner_flag(value: object) -> Optional[bool]:
+    """Parse ESPN winner flags without treating non-empty strings as truthy."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+    return None
+
+
 def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) -> tuple[Optional[str], Optional[str]]:
     """Fetch ESPN summary and extract winner + result text.
     Returns (team_display_name, result_text) or (None, None).
@@ -118,15 +131,34 @@ def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) ->
             or status.get("shortDetail")
         ) or None
 
-        for c in comps:
-            if c.get("winner"):
-                return c.get("team", {}).get("displayName"), result_text
-
         # Abandoned / No Result — no winner
         if status_desc in ("Abandoned", "No Result"):
             return "__no_result__", result_text or status_desc
 
-        return None, None
+        winners = []
+        for competitor in comps:
+            raw_flag = competitor.get("winner")
+            parsed_flag = _parse_winner_flag(raw_flag)
+            if raw_flag is not None and parsed_flag is None:
+                logger.warning(
+                    "ESPN summary event %s has malformed winner flag %r; skipping",
+                    event_id,
+                    raw_flag,
+                )
+                return None, None
+            if parsed_flag is True:
+                winners.append(competitor)
+
+        if len(winners) != 1:
+            logger.warning(
+                "ESPN summary event %s has %d winning competitors; skipping",
+                event_id,
+                len(winners),
+            )
+            return None, None
+
+        winner_name = winners[0].get("team", {}).get("displayName")
+        return (winner_name, result_text) if winner_name else (None, None)
     except Exception as e:
         logger.debug(f"ESPN summary failed for event {event_id}: {e}")
         return None, None
@@ -164,6 +196,53 @@ def _match_espn_winner_to_prediction(espn_winner: str, prediction: dict) -> Opti
         f"'{t1}' or '{t2}' — skipping"
     )
     return None
+
+
+def _correct_espn_event(client, event_id: str) -> bool:
+    """Re-fetch and idempotently repair a previously scored ESPN event."""
+    link_resp = (
+        client.table("espn_match_data")
+        .select("match_id")
+        .eq("espn_event_id", event_id)
+        .execute()
+    )
+    links = link_resp.data or []
+    if len(links) != 1:
+        logger.warning(
+            "Correction for ESPN event %s requires exactly one linked match; found %d",
+            event_id,
+            len(links),
+        )
+        return False
+
+    prediction_resp = (
+        client.table("predictions")
+        .select("*")
+        .eq("match_id", links[0]["match_id"])
+        .execute()
+    )
+    predictions = prediction_resp.data or []
+    if len(predictions) != 1:
+        logger.warning(
+            "Correction for ESPN event %s requires exactly one prediction; found %d",
+            event_id,
+            len(predictions),
+        )
+        return False
+
+    prediction = predictions[0]
+    espn_winner, result_text = _espn_winner_from_summary(event_id)
+    if not espn_winner or espn_winner == "__no_result__":
+        logger.warning("Correction for ESPN event %s found no valid winner", event_id)
+        return False
+
+    actual_winner = _match_espn_winner_to_prediction(espn_winner, prediction)
+    if not actual_winner:
+        return False
+
+    _persist_score(client, prediction, actual_winner, result_text)
+    logger.info("Corrected stored result for ESPN event %s", event_id)
+    return True
 
 
 def _mark_stale_upcoming_completed(client, now: datetime) -> int:
@@ -242,11 +321,14 @@ def _mark_stale_upcoming_completed(client, now: datetime) -> int:
 # Main scoring pipeline
 # ---------------------------------------------------------------------------
 
-def main(force: bool = False) -> None:
+def main(force: bool = False, correction_events: Optional[list[str]] = None) -> None:
     """Score all unscored predictions using ESPN (primary) + CricAPI (fallback)."""
     logger.info("Result scorer — checking for completed matches...")
 
     client = get_client()
+
+    for event_id in correction_events or []:
+        _correct_espn_event(client, event_id)
 
     # Get unscored predictions
     response = (
@@ -385,5 +467,11 @@ def main(force: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Score completed match predictions")
     parser.add_argument("--force", action="store_true", help="Re-score already scored predictions")
+    parser.add_argument(
+        "--correct-event",
+        action="append",
+        default=[],
+        help="Idempotently re-fetch and repair a stored result by ESPN event ID",
+    )
     args = parser.parse_args()
-    main(force=args.force)
+    main(force=args.force, correction_events=args.correct_event)

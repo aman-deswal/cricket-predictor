@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -25,8 +26,10 @@ CRICKET_SPORTS = [
     "cricket_t20_intl",
     "cricket_test_match",
     "cricket_psl",
+    "cricket_caribbean_premier_league",
 ]
 
+CARIBBEAN_PREMIER_LEAGUE_KEY = "cricket_caribbean_premier_league"
 REGIONS = "uk,au"  # Best cricket bookmaker coverage
 MARKETS = "h2h"  # Match winner odds
 
@@ -42,6 +45,11 @@ def get_available_cricket_sports() -> list[str]:
     all_sports = resp.json()
     active = [s["key"] for s in all_sports if s["key"] in CRICKET_SPORTS and s.get("active")]
     logger.info(f"Active cricket sports: {active}")
+    if CARIBBEAN_PREMIER_LEAGUE_KEY not in active:
+        logger.warning(
+            "CPL market coverage unavailable: The Odds API did not report %s as active",
+            CARIBBEAN_PREMIER_LEAGUE_KEY,
+        )
     return active
 
 
@@ -123,24 +131,50 @@ def match_odds_to_matches(odds_rows: list[dict]) -> list[dict]:
     )
 
     def normalize(name: str) -> str:
-        return name.lower().strip().replace(" women", "").replace(" men", "")
+        normalized = name.lower().replace("&", " and ")
+        normalized = re.sub(r"\bsaint\b", "st", normalized)
+        normalized = re.sub(r"\b(and|the)\b", " ", normalized)
+        normalized = re.sub(r"\s+(women|men)\s*$", "", normalized)
+        return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
+
+    def parse_time(value: str) -> Optional[datetime]:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except (AttributeError, TypeError, ValueError):
+            return None
 
     # Build lookup by normalized team pair
-    match_lookup: dict[tuple, dict] = {}
+    match_lookup: dict[tuple[str, str], list[dict]] = {}
     for m in matches:
         key = tuple(sorted([normalize(m["team1"]), normalize(m["team2"])]))
-        match_lookup[key] = m
+        match_lookup.setdefault(key, []).append(m)
 
     linked = []
     for row in odds_rows:
         key = tuple(sorted([normalize(row["team1"]), normalize(row["team2"])]))
-        match = match_lookup.get(key)
-        if match:
+        candidates = match_lookup.get(key, [])
+        event_time = parse_time(row.get("commence_time", ""))
+        dated_candidates = [
+            (abs((candidate_time - event_time).total_seconds()), candidate)
+            for candidate in candidates
+            if event_time and (candidate_time := parse_time(candidate.get("date", "")))
+        ]
+        closest = min(dated_candidates, key=lambda item: item[0]) if dated_candidates else None
+        match = closest[1] if closest else (candidates[0] if len(candidates) == 1 else None)
+        if match and (
+            not event_time
+            or closest is None
+            or closest[0] <= 36 * 60 * 60
+        ):
+            same_order = normalize(row["team1"]) == normalize(match["team1"])
+            team1_odds = row["team1_odds"] if same_order else row["team2_odds"]
+            team2_odds = row["team2_odds"] if same_order else row["team1_odds"]
             linked.append({
                 "match_id": match["match_id"],
                 "bookmaker": row["bookmaker"],
-                "team1_odds": row["team1_odds"],
-                "team2_odds": row["team2_odds"],
+                "team1_odds": team1_odds,
+                "team2_odds": team2_odds,
                 "draw_odds": row["draw_odds"],
                 "market": row["market"],
                 "fetched_at": row["fetched_at"],
@@ -174,10 +208,11 @@ def main(sport: Optional[str] = None) -> int:
         return 1
 
     # Get active cricket sports
-    if sport:
-        sports = [sport]
-    else:
-        sports = get_available_cricket_sports()
+    try:
+        sports = [sport] if sport else get_available_cricket_sports()
+    except requests.RequestException as exc:
+        logger.error("Failed to discover active cricket sports: %s", exc)
+        return 1
 
     if not sports:
         logger.info("No active cricket sports found on The Odds API")
@@ -185,15 +220,38 @@ def main(sport: Optional[str] = None) -> int:
 
     # Fetch odds for each sport
     all_odds_rows: list[dict] = []
+    successful_sports = 0
+    failed_sports: list[str] = []
     for sport_key in sports:
         try:
             events = fetch_odds_for_sport(sport_key)
+            successful_sports += 1
             rows = parse_odds_events(events)
             all_odds_rows.extend(rows)
         except requests.RequestException as e:
-            logger.error(f"Failed to fetch {sport_key}: {e}")
+            failed_sports.append(sport_key)
+            logger.error("Failed to fetch %s: %s", sport_key, e)
+            response = getattr(e, "response", None)
+            if response is not None and response.status_code in (401, 403):
+                logger.error("Fatal sportsbook API authentication failure")
+                return 1
 
-    logger.info(f"Total odds rows fetched: {len(all_odds_rows)} from {len(sports)} sports")
+    if successful_sports == 0:
+        logger.error("Sportsbook refresh failed: all %d requested sports failed", len(sports))
+        return 1
+    if failed_sports:
+        logger.warning(
+            "Sportsbook refresh partially succeeded: %d succeeded, %d failed (%s)",
+            successful_sports,
+            len(failed_sports),
+            ", ".join(failed_sports),
+        )
+
+    logger.info(
+        "Total odds rows fetched: %d from %d successful sports",
+        len(all_odds_rows),
+        successful_sports,
+    )
 
     # Link to our matches
     linked = match_odds_to_matches(all_odds_rows)
