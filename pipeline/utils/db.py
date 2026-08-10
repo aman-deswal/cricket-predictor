@@ -134,7 +134,7 @@ def get_all_predictions() -> list[dict]:
     client = get_client()
     response = (
         client.table("prediction_results")
-        .select("*, predictions(*)")
+        .select("predicted_probability, correct")
         .execute()
     )
     return response.data
