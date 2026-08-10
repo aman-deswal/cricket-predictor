@@ -539,6 +539,13 @@ function compareStableMatchIdentity(a: CompetitionMatch, b: CompetitionMatch): n
   return (a.match_id ?? `${a.team1}-${a.team2}`).localeCompare(b.match_id ?? `${b.team1}-${b.team2}`);
 }
 
+const LIVE_MATCH_PRIORITY_BONUS = 8;
+
+function getMatchCenterPriority(match: CompetitionMatch): number {
+  const liveBoost = match.status.toLowerCase() === 'live' ? LIVE_MATCH_PRIORITY_BONUS : 0;
+  return getCompetitionPriority(match) - liveBoost;
+}
+
 export function hasValidMarketOdds(match: CompetitionMatch): boolean {
   const odds = match.bookmaker_odds;
   return Boolean(
@@ -584,6 +591,9 @@ export function compareMatchesByCompetition(a: CompetitionMatch, b: CompetitionM
 }
 
 export function compareMatchCenterMatches(a: CompetitionMatch, b: CompetitionMatch): number {
+  const priorityDiff = getMatchCenterPriority(a) - getMatchCenterPriority(b);
+  if (priorityDiff !== 0) return priorityDiff;
+
   const liveDiff = (a.status.toLowerCase() === 'live' ? 0 : 1) - (b.status.toLowerCase() === 'live' ? 0 : 1);
   if (liveDiff !== 0) return liveDiff;
   return compareMatchesByCompetition(a, b);
