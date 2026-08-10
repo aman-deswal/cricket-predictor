@@ -32,6 +32,21 @@ const validMarket = {
   team2_odds: 2.0,
 };
 
+const richEvidence: Partial<FeaturedCandidate> = {
+  venue: 'Providence Stadium',
+  spotlight_signals: {
+    has_expert_preview: true,
+    has_espn_context: true,
+    h2h_match_count: 4,
+    source_link_count: 3,
+    key_player_count: 4,
+    possible_xi_player_count: 18,
+    player_update_count: 2,
+  },
+  team1_recent_form: ['W', 'L', 'W', 'W', 'L'],
+  team2_recent_form: ['L', 'W', 'L', 'W', 'W'],
+};
+
 assert.equal(
   selectFeaturedMatch([
     candidate('model-only', 4, { name: 'IPL model-only match' }),
@@ -43,33 +58,55 @@ assert.equal(
 
 assert.equal(
   selectFeaturedMatch([
+    candidate('sparse-established', 4, {
+      name: 'Sparse match, Super Smash',
+      competition_name: 'Super Smash',
+    }),
+    candidate('rich-established', 5, {
+      name: 'Rich match, T20 Blast',
+      competition_name: 'T20 Blast',
+      ...richEvidence,
+    }),
+  ], NOW)?.match_id,
+  'rich-established',
+  'rich evidence wins within the same established-league tier',
+);
+
+assert.equal(
+  selectFeaturedMatch([
+    candidate('supported-marquee', 4, {
+      name: 'Mumbai Indians vs Chennai Super Kings, IPL',
+      competition_name: 'Indian Premier League',
+      venue: 'Wankhede Stadium',
+      spotlight_signals: {
+        has_espn_context: true,
+        h2h_match_count: 3,
+        source_link_count: 2,
+      },
+      team1_recent_form: ['W', 'L', 'W'],
+      team2_recent_form: ['L', 'W', 'L'],
+    }),
+    candidate('rich-obscure', 5, richEvidence),
+  ], NOW)?.match_id,
+  'supported-marquee',
+  'canonical competition relevance keeps a supported marquee fixture above an obscure match',
+);
+
+assert.equal(
+  selectFeaturedMatch([
     candidate('sparse-marquee', 4, {
       name: 'Mumbai Indians vs Chennai Super Kings, IPL',
       competition_name: 'Indian Premier League',
     }),
-    candidate('rich-lower-tier', 5, {
-      venue: 'Providence Stadium',
-      predictions: {
-        confidence: 'medium',
-        reasoning: 'Verified recent form and matchup context support this model projection.',
-        team1_win_probability: 0.55,
-        team2_win_probability: 0.45,
-      },
-      spotlight_signals: {
-        has_expert_preview: true,
-        has_espn_context: true,
-        h2h_match_count: 4,
-        source_link_count: 3,
-        key_player_count: 4,
-        possible_xi_player_count: 18,
-        player_update_count: 2,
-      },
-      team1_recent_form: ['W', 'L', 'W', 'W', 'L'],
-      team2_recent_form: ['L', 'W', 'L', 'W', 'W'],
+    candidate('rich-adjacent-tier', 5, {
+      name: 'India vs Australia, 1st T20I',
+      team1: 'India',
+      team2: 'Australia',
+      ...richEvidence,
     }),
   ], NOW)?.match_id,
-  'rich-lower-tier',
-  'a richly evidenced lower-tier model projection beats a sparse marquee fixture',
+  'rich-adjacent-tier',
+  'strong evidence can overcome a modest canonical tier gap',
 );
 
 assert.equal(

@@ -1,10 +1,27 @@
 import {
+  COMPETITION_PRIORITY,
   CompetitionMatch,
   getCompetitionPriority,
   getFeaturedHorizonMatches,
   getMatchTimestamp,
   hasValidMarketOdds,
 } from './competition';
+
+const EVIDENCE_POINTS = {
+  venue: 8,
+  expertPreview: 15,
+  espnContext: 12,
+  h2h: 15,
+  sourceLinks: 16,
+  keyPlayers: 12,
+  possibleXi: 16,
+  playerUpdates: 12,
+  recentForm: 10,
+} as const;
+const MAX_EVIDENCE_COMPLETENESS = Object.values(EVIDENCE_POINTS)
+  .reduce((sum, points) => sum + points, 0);
+const EVIDENCE_WEIGHT = 0.52;
+const COMPETITION_WEIGHT = 1 - EVIDENCE_WEIGHT;
 
 interface FeaturedPrediction {
   confidence: string;
@@ -48,16 +65,36 @@ function hasKnownVenue(value: string | undefined): boolean {
 export function getEvidenceCompletenessScore(match: FeaturedCandidate): number {
   const signals = match.spotlight_signals;
   return [
-    hasKnownVenue(match.venue) ? 8 : 0,
-    signals?.has_expert_preview ? 15 : 0,
-    signals?.has_espn_context ? 12 : 0,
-    Math.min((signals?.h2h_match_count ?? 0) * 3, 15),
-    Math.min((signals?.source_link_count ?? 0) * 4, 16),
-    Math.min((signals?.key_player_count ?? 0) * 2, 12),
-    Math.min((signals?.possible_xi_player_count ?? 0), 16),
-    Math.min((signals?.player_update_count ?? 0) * 3, 12),
-    Math.min((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0), 10),
+    hasKnownVenue(match.venue) ? EVIDENCE_POINTS.venue : 0,
+    signals?.has_expert_preview ? EVIDENCE_POINTS.expertPreview : 0,
+    signals?.has_espn_context ? EVIDENCE_POINTS.espnContext : 0,
+    Math.min((signals?.h2h_match_count ?? 0) * 3, EVIDENCE_POINTS.h2h),
+    Math.min((signals?.source_link_count ?? 0) * 4, EVIDENCE_POINTS.sourceLinks),
+    Math.min((signals?.key_player_count ?? 0) * 2, EVIDENCE_POINTS.keyPlayers),
+    Math.min((signals?.possible_xi_player_count ?? 0), EVIDENCE_POINTS.possibleXi),
+    Math.min((signals?.player_update_count ?? 0) * 3, EVIDENCE_POINTS.playerUpdates),
+    Math.min(
+      (match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0),
+      EVIDENCE_POINTS.recentForm,
+    ),
   ].reduce((sum, score) => sum + score, 0);
+}
+
+function normalizeBounded(value: number, maximum: number): number {
+  if (maximum <= 0) return 0;
+  return Math.max(0, Math.min(1, value / maximum));
+}
+
+export function getFeaturedCompositeScore(match: FeaturedCandidate): number {
+  const evidenceScore = normalizeBounded(
+    getEvidenceCompletenessScore(match),
+    MAX_EVIDENCE_COMPLETENESS,
+  );
+  const competitionScore = normalizeBounded(
+    COMPETITION_PRIORITY.UNKNOWN - getCompetitionPriority(match),
+    COMPETITION_PRIORITY.UNKNOWN,
+  );
+  return evidenceScore * EVIDENCE_WEIGHT + competitionScore * COMPETITION_WEIGHT;
 }
 
 function getPredictionConfidenceScore(match: FeaturedCandidate): number {
@@ -82,17 +119,14 @@ export function compareFeaturedMatches(a: FeaturedCandidate, b: FeaturedCandidat
   const marketDiff = Number(hasValidMarketOdds(b)) - Number(hasValidMarketOdds(a));
   if (marketDiff !== 0) return marketDiff;
 
-  const completenessDiff = getEvidenceCompletenessScore(b) - getEvidenceCompletenessScore(a);
-  if (completenessDiff !== 0) return completenessDiff;
+  const compositeDiff = getFeaturedCompositeScore(b) - getFeaturedCompositeScore(a);
+  if (compositeDiff !== 0) return compositeDiff;
 
   const confidenceDiff = getPredictionConfidenceScore(b) - getPredictionConfidenceScore(a);
   if (confidenceDiff !== 0) return confidenceDiff;
 
   const edgeDiff = getMeaningfulEdgeScore(b) - getMeaningfulEdgeScore(a);
   if (edgeDiff !== 0) return edgeDiff;
-
-  const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
-  if (priorityDiff !== 0) return priorityDiff;
 
   const kickoffDiff = getMatchTimestamp(a) - getMatchTimestamp(b);
   if (kickoffDiff !== 0) return kickoffDiff;
