@@ -257,7 +257,7 @@ def main(sport: Optional[str] = None) -> int:
             logger.error("Failed to fetch %s (%s)", sport_key, describe_api_error(e))
             response = getattr(e, "response", None)
             if response is not None and response.status_code in (401, 403):
-                logger.error("Fatal sportsbook API authentication failure")
+                logger.error("Fatal sportsbook API access failure")
                 return 1
 
     if successful_sports == 0:
