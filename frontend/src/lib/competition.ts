@@ -7,6 +7,11 @@ export interface CompetitionMatch {
   match_type: string;
   status: string;
   competition_name?: string | null;
+  bookmaker_odds?: {
+    bookmaker: string;
+    team1_odds: number;
+    team2_odds: number;
+  };
 }
 
 export type MatchSection =
@@ -534,12 +539,24 @@ function compareStableMatchIdentity(a: CompetitionMatch, b: CompetitionMatch): n
   return (a.match_id ?? `${a.team1}-${a.team2}`).localeCompare(b.match_id ?? `${b.team1}-${b.team2}`);
 }
 
+export function hasValidMarketOdds(match: CompetitionMatch): boolean {
+  const odds = match.bookmaker_odds;
+  return Boolean(
+    odds?.bookmaker.trim()
+    && Number.isFinite(odds.team1_odds)
+    && odds.team1_odds > 1
+    && Number.isFinite(odds.team2_odds)
+    && odds.team2_odds > 1,
+  );
+}
+
 export function getFeaturedHorizonMatches<T extends CompetitionMatch>(matches: T[], now = Date.now()): T[] {
   const hour = 60 * 60 * 1000;
   const futureMatches = matches
     .filter((match) => {
       const kickoff = getMatchTimestamp(match);
       return match.status.toLowerCase() === 'upcoming'
+        && hasValidMarketOdds(match)
         && kickoff > now
         && kickoff !== Number.MAX_SAFE_INTEGER;
     })
