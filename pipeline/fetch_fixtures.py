@@ -418,11 +418,11 @@ def _infer_match_type(fixture: Union[dict, str]) -> str:
     """
     if isinstance(fixture, str):
         raw = fixture.strip().upper()
-        if "TEST" in raw:
+        if re.search(r"\bTEST\b", raw):
             return "Test"
-        if "ODI" in raw:
+        if re.search(r"\bODI\b", raw):
             return "ODI"
-        if "T20" in raw or "TWENTY" in raw:
+        if re.search(r"\b(T20I?|TWENTY20I?)\b", raw):
             return "T20"
         return ""
 
@@ -435,21 +435,23 @@ def _infer_match_type(fixture: Union[dict, str]) -> str:
     ).strip()
     event_type = raw_event.upper()
 
-    if "TEST" in event_type:
+    if re.search(r"\bTEST\b", event_type):
         return "Test"
-    if "ODI" in event_type:
+    if re.search(r"\bODI\b", event_type):
         return "ODI"
-    # Accept T20, T20I, 'TWENTY20', 'TWENTY20I', 'TWENTY'
-    if "T20" in event_type or "TWENTY" in event_type:
+    # Accept T20, T20I, 'TWENTY20', 'TWENTY20I'
+    if re.search(r"\b(T20I?|TWENTY20I?)\b", event_type):
         return "T20"
 
     # Fallback: if the fixture has a textual title/description that hints at T20/ODI/Test
     title = str(fixture.get("title", "") or fixture.get("description", "") or "").upper()
-    if "TEST" in title:
+    # Use word-boundary regexes to avoid matching substrings inside unrelated words
+    # Be conservative with title-based TEST detection to avoid false positives
+    if re.search(r"\bTEST(?: MATCH| CRICKET| SERIES|S)?\b", title):
         return "Test"
-    if "ODI" in title:
+    if re.search(r"\bODI\b", title):
         return "ODI"
-    if "T20" in title or "TWENTY" in title:
+    if re.search(r"\b(T20I?|TWENTY20I?)\b", title):
         return "T20"
 
     return ""
