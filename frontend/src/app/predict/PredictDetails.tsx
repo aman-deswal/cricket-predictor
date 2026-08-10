@@ -375,9 +375,9 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(22rem,1fr)]">
-        <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-4 sm:px-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+        <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-3 sm:px-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: marketSideMeta.primaryColor }} />
@@ -392,29 +392,29 @@ function MarketMovementPanel({
 
           {chartRows.length > 0 ? (
             <>
-              <div className="h-[18rem] sm:h-[21rem]">
+              <div className="h-40 sm:h-44 lg:h-40">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartRows} margin={{ top: 10, right: 16, bottom: 0, left: -18 }}>
-                    <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.85} />
+                  <LineChart data={chartRows} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
+                    <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.7} />
                     <XAxis
                       dataKey="timestamp"
                       type="number"
                       domain={['dataMin', 'dataMax']}
                       tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
-                      tick={{ fill: '#94a3b8', fontSize: 10 }}
+                      tick={{ fill: '#94a3b8', fontSize: 9 }}
                       tickLine={false}
                       axisLine={false}
-                      minTickGap={28}
+                      minTickGap={24}
                     />
                     <YAxis
                       domain={[minDomain, maxDomain]}
                       tickFormatter={(value) => `${value}%`}
-                      tick={{ fill: '#94a3b8', fontSize: 10 }}
+                      tick={{ fill: '#94a3b8', fontSize: 9 }}
                       tickLine={false}
                       axisLine={false}
-                      width={40}
+                      width={34}
                     />
-                    <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.35} />
+                    <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#111820',
@@ -441,44 +441,35 @@ function MarketMovementPanel({
                         type="monotone"
                         dataKey={book.id}
                         stroke={book.color}
-                        strokeWidth={3}
-                        dot={chartRows.length <= 8 ? { fill: book.color, r: 3, strokeWidth: 0 } : false}
-                        activeDot={{ fill: book.color, r: 5, strokeWidth: 0 }}
+                        strokeWidth={2.25}
+                        dot={chartRows.length <= 8 ? { fill: book.color, r: 2.5, strokeWidth: 0 } : false}
+                        activeDot={{ fill: book.color, r: 4, strokeWidth: 0 }}
                         connectNulls
                       />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {featuredBooks.map((book) => (
-                  <div key={`${book.id}-legend`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: book.color }} />
-                        <span className="truncate">{book.bookmaker}</span>
-                      </span>
-                      <span className="text-[11px] font-black text-white">
-                        {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[10px] text-slate-500">
-                      {book.delta !== null
-                        ? `${book.delta >= 0 ? 'Up' : 'Down'} ${Math.abs(book.delta).toFixed(1)} pts since first capture`
-                        : 'First capture recorded'}
-                    </p>
-                  </div>
+                  <span
+                    key={`${book.id}-legend`}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: book.color }} />
+                    {book.bookmaker}
+                  </span>
                 ))}
               </div>
             </>
           ) : (
-            <div className="flex h-[18rem] items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-6 text-center text-sm text-slate-400">
+            <div className="flex h-40 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
               Market history will plot here after the next sportsbook refresh captures opening movement.
             </div>
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -488,7 +479,7 @@ function MarketMovementPanel({
               }}
               className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.12em] text-white">{book.bookmaker}</p>
                   <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -506,14 +497,14 @@ function MarketMovementPanel({
               <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-lg font-black text-white">
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
                     {decimalToAmerican(book.current.team1_odds)}
                   </p>
                 </div>
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
                 <div className="text-right">
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-lg font-black text-white">
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
                     {decimalToAmerican(book.current.team2_odds)}
                   </p>
                 </div>
@@ -934,15 +925,6 @@ export function PredictDetails() {
           </div>
         )}
       </div>
-      <MarketMovementPanel
-        sportsbookOdds={featuredSportsbooks}
-        oddsHistory={oddsHistory}
-        displayTeam1={displayTeam1}
-        displayTeam2={displayTeam2}
-        trackedTeam={marketTrackedTeam}
-        trackedTeamKey={marketTrackedTeamKey}
-        detailTileClass={detailTileStrongClass}
-      />
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <style>{`
         @keyframes pickEntrance {
@@ -1233,6 +1215,16 @@ export function PredictDetails() {
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
+
+      <MarketMovementPanel
+        sportsbookOdds={featuredSportsbooks}
+        oddsHistory={oddsHistory}
+        displayTeam1={displayTeam1}
+        displayTeam2={displayTeam2}
+        trackedTeam={marketTrackedTeam}
+        trackedTeamKey={marketTrackedTeamKey}
+        detailTileClass={detailTileClass}
+      />
 
       {/* Our Take */}
       {prediction ? (
