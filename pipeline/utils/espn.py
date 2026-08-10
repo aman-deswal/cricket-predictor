@@ -649,6 +649,10 @@ def get_espn_fixtures() -> List[Dict[str, Any]]:
                     "date": date_str,
                     "league_name": league_name,
                     "league_id": league_id,
+                    "event_type": event.get("eventType", ""),
+                    "class_card": (event.get("class") or {}).get("generalClassCard", ""),
+                    "title": event.get("title", ""),
+                    "description": event.get("description", ""),
                     "status": status,
                     "winner": winner,
                 })

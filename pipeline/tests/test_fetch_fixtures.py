@@ -50,8 +50,8 @@ class TestInferMatchType(unittest.TestCase):
 
 class TestEspnFixturesToMatches(unittest.TestCase):
     def _make_fixture(self, status="pre", espn_id="12345", team1="India", team2="Australia",
-                      date="2026-08-01T10:00:00Z", league_name="ICC T20I", venue=""):
-        return {
+                      date="2026-08-01T10:00:00Z", league_name="ICC T20I", venue="", **extras):
+        fixture = {
             "espn_event_id": espn_id,
             "team1": team1,
             "team2": team2,
@@ -62,6 +62,8 @@ class TestEspnFixturesToMatches(unittest.TestCase):
             "winner": None,
             "venue": venue,
         }
+        fixture.update(extras)
+        return fixture
 
     def test_upcoming_fixture_converted(self):
         fixtures = [self._make_fixture()]
@@ -130,6 +132,17 @@ class TestEspnFixturesToMatches(unittest.TestCase):
 
     def test_odi_league_name(self):
         fixtures = [self._make_fixture(league_name="ICC Men's ODI Series")]
+        matches = _espn_fixtures_to_matches(fixtures)
+        self.assertEqual(matches[0]["match_type"], "ODI")
+
+    def test_event_type_takes_precedence_over_league_name(self):
+        fixtures = [self._make_fixture(
+            league_name="Afghanistan tour of Ireland 2026",
+            event_type="ODI",
+            class_card="ODI",
+            title="3rd ODI",
+            description="3rd ODI, Afghanistan tour of Ireland at Belfast, Aug 10 2026",
+        )]
         matches = _espn_fixtures_to_matches(fixtures)
         self.assertEqual(matches[0]["match_type"], "ODI")
 
