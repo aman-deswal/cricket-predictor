@@ -159,6 +159,13 @@ const demoMatchOdds: MatchOdds[] = [
   { match_id: 'demo-nep-vs-nam-odi', bookmaker: 'Bet365', team1_odds: 2.25, team2_odds: 1.68, draw_odds: null, market: 'match_winner', fetched_at: pastIso(1) },
 ];
 
+const demoMatchOddsHistory: MatchOdds[] = demoMatchOdds.flatMap((latest) => [
+  { ...latest, team1_odds: latest.team1_odds * 1.08, team2_odds: latest.team2_odds * 0.94, fetched_at: pastIso(25) },
+  { ...latest, team1_odds: latest.team1_odds * 1.04, team2_odds: latest.team2_odds * 0.97, fetched_at: pastIso(17) },
+  { ...latest, team1_odds: latest.team1_odds * 1.02, team2_odds: latest.team2_odds * 0.99, fetched_at: pastIso(9) },
+  latest,
+]);
+
 const miCskSquadPlayers = [
   { id: 'mi-1', name: 'Rohit Sharma', role: 'Bat', is_captain: true },
   { id: 'mi-2', name: 'Ishan Kishan', role: 'Keeper', is_keeper: true },
@@ -666,6 +673,10 @@ export function getMockPrediction(matchId: string): Prediction | null {
 
 export function getMockMatchOdds(matchId: string): MatchOdds[] {
   return demoMatchOdds.filter((odds) => odds.match_id === matchId);
+}
+
+export function getMockMatchOddsHistory(matchId: string): MatchOdds[] {
+  return demoMatchOddsHistory.filter((odds) => odds.match_id === matchId);
 }
 
 export function getMockEdgeScore(matchId: string): EdgeScore | null {

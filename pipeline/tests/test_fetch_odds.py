@@ -234,6 +234,27 @@ class TestQuotaBudget(unittest.TestCase):
         self.assertEqual(after.remaining, 50)
 
 
+class TestOddsHistory(unittest.TestCase):
+    @patch("fetch_odds.get_client")
+    def test_appends_existing_linked_row_shape_without_provider_call(self, mock_get_client):
+        table = MagicMock()
+        table.insert.return_value = table
+        mock_get_client.return_value.table.return_value = table
+        rows = [{
+            "match_id": "espn-1",
+            "bookmaker": "Bet365",
+            "team1_odds": 1.8,
+            "team2_odds": 2.1,
+            "draw_odds": None,
+            "market": "h2h",
+            "fetched_at": NOW.isoformat(),
+        }]
+
+        self.assertEqual(fetch_odds.store_odds_history([*rows, *rows]), 1)
+        mock_get_client.return_value.table.assert_called_once_with("match_odds_history")
+        table.insert.assert_called_once_with(rows)
+
+
 class TestApiErrorDiagnostics(unittest.TestCase):
     def test_reports_provider_code_and_quota_without_request_url(self):
         error = _http_error(
@@ -297,6 +318,7 @@ class TestRefreshOutcomes(unittest.TestCase):
             patch("fetch_odds.store_refresh_state"),
             patch("fetch_odds.match_odds_to_matches", return_value=[]),
             patch("fetch_odds.store_odds", return_value=0),
+            patch("fetch_odds.store_odds_history", return_value=0),
         ]
 
     def test_legitimate_empty_market_succeeds_and_persists_freshness(self):
@@ -437,6 +459,7 @@ class TestRefreshOutcomes(unittest.TestCase):
             patch("fetch_odds.store_refresh_state"),
             patch("fetch_odds.match_odds_to_matches", return_value=[]),
             patch("fetch_odds.store_odds", return_value=0),
+            patch("fetch_odds.store_odds_history", return_value=0),
         ):
             self.assertEqual(fetch_odds.main(), 0)
 
