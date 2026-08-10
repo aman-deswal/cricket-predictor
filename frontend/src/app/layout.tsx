@@ -15,16 +15,20 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+const productionBasePath = process.env.NODE_ENV === 'production' ? '/cricket-predictor' : '';
+const siteUrl = `https://aman-deswal.github.io${productionBasePath}`;
+
 export const metadata: Metadata = {
   title: 'SixSense™ | AI Cricket Predictions',
   description: 'AI-powered cricket match predictions — your sixth sense for the game',
-  metadataBase: new URL('https://aman-deswal.github.io'),
+  metadataBase: new URL(siteUrl),
   openGraph: {
     title: 'SixSense™ | AI Cricket Predictions',
     description: 'AI-powered cricket match predictions with Edge Score analysis, sportsbook odds, and head-to-head breakdowns.',
     siteName: 'SixSense™',
     type: 'website',
     locale: 'en_US',
+    url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',
@@ -32,8 +36,8 @@ export const metadata: Metadata = {
     description: 'AI-powered cricket match predictions — your sixth sense for the game',
   },
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: `${productionBasePath}/icon.svg`,
+    apple: `${productionBasePath}/icon.svg`,
   },
 };
 
