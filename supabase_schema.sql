@@ -57,3 +57,15 @@ CREATE TABLE IF NOT EXISTS match_odds (
 );
 
 CREATE INDEX IF NOT EXISTS idx_match_odds_match_id ON match_odds(match_id);
+
+-- Per-provider-sport paid refresh state. This remains authoritative even when
+-- a successful provider response is empty and creates no match_odds rows.
+CREATE TABLE IF NOT EXISTS odds_refresh_state (
+  sport_key text PRIMARY KEY,
+  refreshed_at timestamptz NOT NULL,
+  event_count integer NOT NULL DEFAULT 0,
+  quota_used integer,
+  quota_remaining integer,
+  quota_last integer,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
