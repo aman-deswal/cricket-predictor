@@ -1,5 +1,9 @@
 import { strict as assert } from 'node:assert';
-import { FeaturedCandidate, selectFeaturedMatch } from '../src/lib/featured-selection';
+import {
+  FeaturedCandidate,
+  getFeaturedCompositeScore,
+  selectFeaturedMatch,
+} from '../src/lib/featured-selection';
 
 const NOW = Date.parse('2026-08-10T00:00:00Z');
 
@@ -47,6 +51,31 @@ const richEvidence: Partial<FeaturedCandidate> = {
   team2_recent_form: ['L', 'W', 'L', 'W', 'W'],
 };
 
+const completeEvidence: Partial<FeaturedCandidate> = {
+  venue: 'Known Ground',
+  spotlight_signals: {
+    has_expert_preview: true,
+    has_espn_context: true,
+    h2h_match_count: 5,
+    source_link_count: 4,
+    key_player_count: 6,
+    possible_xi_player_count: 16,
+    player_update_count: 4,
+  },
+  team1_recent_form: ['W', 'L', 'W', 'W', 'L'],
+  team2_recent_form: ['L', 'W', 'L', 'W', 'W'],
+};
+
+const equalBlendEvidence: Partial<FeaturedCandidate> = {
+  venue: 'Known Ground',
+  spotlight_signals: {
+    has_expert_preview: true,
+    has_espn_context: true,
+    h2h_match_count: 5,
+    source_link_count: 2,
+  },
+};
+
 assert.equal(
   selectFeaturedMatch([
     candidate('model-only', 4, { name: 'IPL model-only match' }),
@@ -74,22 +103,19 @@ assert.equal(
 
 assert.equal(
   selectFeaturedMatch([
-    candidate('supported-marquee', 4, {
+    candidate('sparse-top-tier', 4, {
       name: 'Mumbai Indians vs Chennai Super Kings, IPL',
       competition_name: 'Indian Premier League',
-      venue: 'Wankhede Stadium',
-      spotlight_signals: {
-        has_espn_context: true,
-        h2h_match_count: 3,
-        source_link_count: 2,
-      },
-      team1_recent_form: ['W', 'L', 'W'],
-      team2_recent_form: ['L', 'W', 'L'],
     }),
-    candidate('rich-obscure', 5, richEvidence),
+    candidate('complete-associate', 5, {
+      team1: 'Nepal',
+      team2: 'Oman',
+      ...completeEvidence,
+    }),
+    candidate('complete-unknown', 6, completeEvidence),
   ], NOW)?.match_id,
-  'supported-marquee',
-  'canonical competition relevance keeps a supported marquee fixture above an obscure match',
+  'sparse-top-tier',
+  'maximum completeness alone cannot displace a top-tier fixture with associate or unknown competition relevance',
 );
 
 assert.equal(
@@ -107,6 +133,28 @@ assert.equal(
   ], NOW)?.match_id,
   'rich-adjacent-tier',
   'strong evidence can overcome a modest canonical tier gap',
+);
+
+const sparseIpl = candidate('sparse-ipl', 4, {
+  name: 'Mumbai Indians vs Chennai Super Kings, IPL',
+  competition_name: 'Indian Premier League',
+});
+const evidencedBbl = candidate('evidenced-bbl', 5, {
+  name: 'Sydney Sixers vs Perth Scorchers, BBL',
+  competition_name: 'Big Bash League',
+  ...equalBlendEvidence,
+});
+
+assert.equal(
+  getFeaturedCompositeScore(sparseIpl),
+  getFeaturedCompositeScore(evidencedBbl),
+  'the boundary fixtures deliberately have equal blended relevance and evidence scores',
+);
+
+assert.equal(
+  selectFeaturedMatch([sparseIpl, evidencedBbl], NOW)?.match_id,
+  'evidenced-bbl',
+  'equal blended scores resolve through evidence completeness before later tie-breaks',
 );
 
 assert.equal(
