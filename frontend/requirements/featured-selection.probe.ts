@@ -18,6 +18,7 @@ function candidate(
     status: 'upcoming',
     predictions: {
       confidence: 'medium',
+      reasoning: '',
       team1_win_probability: 0.55,
       team2_win_probability: 0.45,
     },
@@ -38,6 +39,37 @@ assert.equal(
   ], NOW)?.match_id,
   'market-backed',
   'valid market-backed candidates are preferred within the selected horizon',
+);
+
+assert.equal(
+  selectFeaturedMatch([
+    candidate('sparse-marquee', 4, {
+      name: 'Mumbai Indians vs Chennai Super Kings, IPL',
+      competition_name: 'Indian Premier League',
+    }),
+    candidate('rich-lower-tier', 5, {
+      venue: 'Providence Stadium',
+      predictions: {
+        confidence: 'medium',
+        reasoning: 'Verified recent form and matchup context support this model projection.',
+        team1_win_probability: 0.55,
+        team2_win_probability: 0.45,
+      },
+      spotlight_signals: {
+        has_expert_preview: true,
+        has_espn_context: true,
+        h2h_match_count: 4,
+        source_link_count: 3,
+        key_player_count: 4,
+        possible_xi_player_count: 18,
+        player_update_count: 2,
+      },
+      team1_recent_form: ['W', 'L', 'W', 'W', 'L'],
+      team2_recent_form: ['L', 'W', 'L', 'W', 'W'],
+    }),
+  ], NOW)?.match_id,
+  'rich-lower-tier',
+  'a richly evidenced lower-tier model projection beats a sparse marquee fixture',
 );
 
 assert.equal(

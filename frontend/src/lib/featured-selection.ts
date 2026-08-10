@@ -8,6 +8,7 @@ import {
 
 interface FeaturedPrediction {
   confidence: string;
+  reasoning?: string;
   team1_win_probability: number;
   team2_win_probability: number;
 }
@@ -25,6 +26,7 @@ interface SpotlightSignals {
 
 export interface FeaturedCandidate extends CompetitionMatch {
   match_id: string;
+  venue?: string;
   predictions?: FeaturedPrediction | FeaturedPrediction[] | null;
   spotlight_signals?: SpotlightSignals;
   team1_recent_form?: Array<'W' | 'L'>;
@@ -35,21 +37,26 @@ function getPrimaryPrediction(match: FeaturedCandidate): FeaturedPrediction | nu
   return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
 }
 
-function getDataRichnessScore(match: FeaturedCandidate): number {
-  const prediction = getPrimaryPrediction(match);
+function hasKnownVenue(value: string | undefined): boolean {
+  const venue = value?.trim();
+  return Boolean(
+    venue
+    && !/^(tbd|tbc|unknown|unavailable|none|n\/a|coming soon|venue tbd|venue tbc)$/i.test(venue),
+  );
+}
+
+export function getEvidenceCompletenessScore(match: FeaturedCandidate): number {
   const signals = match.spotlight_signals;
   return [
-    prediction ? 35 : 0,
-    hasValidMarketOdds(match) ? 30 : 0,
-    signals?.has_expert_preview ? 25 : 0,
-    signals?.has_espn_context ? 20 : 0,
-    signals?.enrichment_confidence === 'high' ? 18 : signals?.enrichment_confidence === 'medium' ? 10 : 0,
-    Math.min((signals?.h2h_match_count ?? 0) * 4, 20),
-    Math.min((signals?.source_link_count ?? 0) * 5, 20),
-    Math.min((signals?.key_player_count ?? 0) * 4, 20),
-    Math.min((signals?.possible_xi_player_count ?? 0) * 2, 20),
+    hasKnownVenue(match.venue) ? 8 : 0,
+    signals?.has_expert_preview ? 15 : 0,
+    signals?.has_espn_context ? 12 : 0,
+    Math.min((signals?.h2h_match_count ?? 0) * 3, 15),
+    Math.min((signals?.source_link_count ?? 0) * 4, 16),
+    Math.min((signals?.key_player_count ?? 0) * 2, 12),
+    Math.min((signals?.possible_xi_player_count ?? 0), 16),
     Math.min((signals?.player_update_count ?? 0) * 3, 12),
-    Math.min(((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0)) * 2, 20),
+    Math.min((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0), 10),
   ].reduce((sum, score) => sum + score, 0);
 }
 
@@ -75,17 +82,17 @@ export function compareFeaturedMatches(a: FeaturedCandidate, b: FeaturedCandidat
   const marketDiff = Number(hasValidMarketOdds(b)) - Number(hasValidMarketOdds(a));
   if (marketDiff !== 0) return marketDiff;
 
-  const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
-  if (priorityDiff !== 0) return priorityDiff;
-
-  const richnessDiff = getDataRichnessScore(b) - getDataRichnessScore(a);
-  if (richnessDiff !== 0) return richnessDiff;
+  const completenessDiff = getEvidenceCompletenessScore(b) - getEvidenceCompletenessScore(a);
+  if (completenessDiff !== 0) return completenessDiff;
 
   const confidenceDiff = getPredictionConfidenceScore(b) - getPredictionConfidenceScore(a);
   if (confidenceDiff !== 0) return confidenceDiff;
 
   const edgeDiff = getMeaningfulEdgeScore(b) - getMeaningfulEdgeScore(a);
   if (edgeDiff !== 0) return edgeDiff;
+
+  const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
+  if (priorityDiff !== 0) return priorityDiff;
 
   const kickoffDiff = getMatchTimestamp(a) - getMatchTimestamp(b);
   if (kickoffDiff !== 0) return kickoffDiff;
