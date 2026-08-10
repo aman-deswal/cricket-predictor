@@ -22,6 +22,7 @@ from utils.db import (
     store_match_enrichment,
 )
 from fetch_squads import fetch_and_store_squads
+from fetch_player_stats import fetch_stats_for_match_squads
 from utils.espn import get_espn_enrichment_context, format_espn_context
 from utils.edge_score import compute_edge_score, format_edge_for_prompt
 from enrich_matches import enrich_match
@@ -451,6 +452,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
         logger.info("Refreshing squads before prediction/enrichment...")
         for match in matches:
             fetch_and_store_squads(match_ids=[match["match_id"]], force=force)
+            fetch_stats_for_match_squads(match_id=match["match_id"], force=False)
 
     stored = 0
     for match in matches:
