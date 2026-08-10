@@ -14,6 +14,7 @@ import {
   getMockMatch,
   getMockMatchEnrichment,
   getMockMatchOdds,
+  getMockMatchOddsHistory,
   getMockMatchSquads,
   getMockPlayerStats,
   getMockPrediction,
@@ -619,6 +620,24 @@ export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
 
   if (error) return [];
   return data ?? [];
+}
+
+export async function getMatchOddsHistory(matchId: string): Promise<MatchOdds[]> {
+  if (isMockDataEnabled()) {
+    return getMockMatchOddsHistory(matchId);
+  }
+
+  const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('match_odds_history')
+    .select('match_id, bookmaker, team1_odds, team2_odds, draw_odds, market, fetched_at')
+    .eq('match_id', matchId)
+    .gte('fetched_at', cutoff)
+    .order('fetched_at', { ascending: false })
+    .limit(200);
+
+  if (error) return [];
+  return (data ?? []).reverse();
 }
 
 export async function getEdgeScore(matchId: string): Promise<EdgeScore | null> {

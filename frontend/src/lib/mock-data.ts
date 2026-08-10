@@ -22,6 +22,10 @@ function pastIso(daysAgo: number): string {
   return new Date(now - daysAgo * 24 * 60 * 60 * 1000).toISOString();
 }
 
+function pastHoursIso(hoursAgo: number): string {
+  return new Date(now - hoursAgo * 60 * 60 * 1000).toISOString();
+}
+
 function sortMatches(matches: MatchWithPredictions[]): MatchWithPredictions[] {
   return [...matches].sort(compareMatchCenterMatches);
 }
@@ -153,11 +157,18 @@ const demoMatches: MatchWithPredictions[] = sortMatches([
 ]);
 
 const demoMatchOdds: MatchOdds[] = [
-  { match_id: 'demo-ind-vs-aus-odi', bookmaker: 'Tab', team1_odds: 1.72, team2_odds: 2.15, draw_odds: null, market: 'match_winner', fetched_at: pastIso(1) },
+  { match_id: 'demo-ind-vs-aus-odi', bookmaker: 'Tab', team1_odds: 1.72, team2_odds: 2.15, draw_odds: 8.5, market: 'match_winner', fetched_at: pastIso(1) },
   { match_id: 'demo-mi-vs-csk-ipl', bookmaker: 'SkyBet', team1_odds: 1.94, team2_odds: 1.87, draw_odds: null, market: 'match_winner', fetched_at: pastIso(1) },
   { match_id: 'demo-engw-vs-saw-t20', bookmaker: 'Unibet', team1_odds: 1.89, team2_odds: 1.92, draw_odds: null, market: 'match_winner', fetched_at: pastIso(1) },
   { match_id: 'demo-nep-vs-nam-odi', bookmaker: 'Bet365', team1_odds: 2.25, team2_odds: 1.68, draw_odds: null, market: 'match_winner', fetched_at: pastIso(1) },
 ];
+
+const demoMatchOddsHistory: MatchOdds[] = demoMatchOdds.flatMap((latest) => [
+  { ...latest, team1_odds: latest.team1_odds * 1.08, team2_odds: latest.team2_odds * 0.94, draw_odds: latest.draw_odds ? latest.draw_odds * 1.04 : null, fetched_at: pastHoursIso(60) },
+  { ...latest, team1_odds: latest.team1_odds * 1.04, team2_odds: latest.team2_odds * 0.97, draw_odds: latest.draw_odds ? latest.draw_odds * 1.02 : null, fetched_at: pastHoursIso(48) },
+  { ...latest, team1_odds: latest.team1_odds * 1.02, team2_odds: latest.team2_odds * 0.99, draw_odds: latest.draw_odds ? latest.draw_odds * 1.01 : null, fetched_at: pastHoursIso(36) },
+  latest,
+]);
 
 const miCskSquadPlayers = [
   { id: 'mi-1', name: 'Rohit Sharma', role: 'Bat', is_captain: true },
@@ -666,6 +677,10 @@ export function getMockPrediction(matchId: string): Prediction | null {
 
 export function getMockMatchOdds(matchId: string): MatchOdds[] {
   return demoMatchOdds.filter((odds) => odds.match_id === matchId);
+}
+
+export function getMockMatchOddsHistory(matchId: string): MatchOdds[] {
+  return demoMatchOddsHistory.filter((odds) => odds.match_id === matchId);
 }
 
 export function getMockEdgeScore(matchId: string): EdgeScore | null {

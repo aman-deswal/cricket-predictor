@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -165,6 +165,93 @@ function ComingSoonTile({ title, body, eyebrow = 'Coming soon' }: { title: strin
   );
 }
 
+function OddsTrendSparkline({
+  history,
+  team1Name,
+  team2Name,
+  team1Color,
+  team2Color,
+}: {
+  history: MatchOdds[];
+  team1Name: string;
+  team2Name: string;
+  team1Color: string;
+  team2Color: string;
+}) {
+  const points = history
+    .map((snapshot) => {
+      const timestamp = new Date(snapshot.fetched_at).getTime();
+      const raw1 = snapshot.team1_odds > 1 ? 1 / snapshot.team1_odds : 0;
+      const raw2 = snapshot.team2_odds > 1 ? 1 / snapshot.team2_odds : 0;
+      const rawDraw = snapshot.draw_odds && snapshot.draw_odds > 1 ? 1 / snapshot.draw_odds : 0;
+      const total = raw1 + raw2 + rawDraw;
+      if (!Number.isFinite(timestamp) || total <= 0) return null;
+      return {
+        timestamp,
+        team1: (raw1 / total) * 100,
+        team2: (raw2 / total) * 100,
+      };
+    })
+    .filter((point): point is { timestamp: number; team1: number; team2: number } => point !== null)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  if (points.length < 2) return null;
+
+  const width = 240;
+  const height = 46;
+  const padding = 4;
+  const firstTime = points[0].timestamp;
+  const lastTime = points[points.length - 1].timestamp;
+  const timeRange = Math.max(lastTime - firstTime, 1);
+  const probabilities = points.flatMap((point) => [point.team1, point.team2]);
+  const rawMin = Math.min(...probabilities);
+  const rawMax = Math.max(...probabilities);
+  const center = (rawMin + rawMax) / 2;
+  const probabilityRange = Math.max(rawMax - rawMin, 4);
+  const minProbability = center - probabilityRange / 2;
+  const x = (timestamp: number) => padding + ((timestamp - firstTime) / timeRange) * (width - padding * 2);
+  const y = (probability: number) => height - padding - ((probability - minProbability) / probabilityRange) * (height - padding * 2);
+  const pathFor = (team: 'team1' | 'team2') => points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.timestamp).toFixed(1)} ${y(point[team]).toFixed(1)}`)
+    .join(' ');
+  const latest = points[points.length - 1];
+  const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString(undefined, {
+    weekday: 'short',
+    hour: 'numeric',
+  });
+  const accessibleLabel = `${team1Name} and ${team2Name} normalized market-implied win probability from ${formatTime(firstTime)} to ${formatTime(lastTime)}. Current: ${team1Name} ${latest.team1.toFixed(0)} percent, ${team2Name} ${latest.team2.toFixed(0)} percent.`;
+
+  return (
+    <div className="mt-2 border-t border-white/[0.07] pt-2">
+      <div className="mb-1 flex items-center justify-between gap-3 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+        <span>72h implied win trend</span>
+        <span>{points.length} updates</span>
+      </div>
+      <svg
+        className="h-11 w-full overflow-visible"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={accessibleLabel}
+      >
+        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="rgba(148,163,184,0.12)" strokeDasharray="3 4" />
+        <path d={pathFor('team1')} fill="none" stroke={team1Color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <path d={pathFor('team2')} fill="none" stroke={team2Color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <circle cx={x(latest.timestamp)} cy={y(latest.team1)} r="2.5" fill={team1Color} />
+        <circle cx={x(latest.timestamp)} cy={y(latest.team2)} r="2.5" fill={team2Color} />
+      </svg>
+      <div className="-mt-0.5 flex justify-between text-[8px] font-medium text-slate-600">
+        <time dateTime={new Date(firstTime).toISOString()}>{formatTime(firstTime)}</time>
+        <time dateTime={new Date(lastTime).toISOString()}>{formatTime(lastTime)}</time>
+      </div>
+      <div className="mt-1 flex items-center gap-3 text-[9px] font-semibold text-slate-400">
+        <span className="flex min-w-0 items-center gap-1 truncate"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: team1Color }} />{team1Name} {latest.team1.toFixed(0)}%</span>
+        <span className="flex min-w-0 items-center gap-1 truncate"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: team2Color }} />{team2Name} {latest.team2.toFixed(0)}%</span>
+      </div>
+    </div>
+  );
+}
+
 export function PredictDetails() {
   const searchParams = useSearchParams();
   const matchId = searchParams.get('id');
@@ -172,6 +259,7 @@ export function PredictDetails() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [odds, setOdds] = useState<MatchOdds[]>([]);
+  const [oddsHistory, setOddsHistory] = useState<MatchOdds[]>([]);
   const [squads, setSquads] = useState<MatchSquad[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [espnData, setEspnData] = useState<ESPNMatchData | null>(null);
@@ -193,11 +281,12 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData, oddsData, squadData, espn, edgeData] = await Promise.all([
+        const [matchData, predictionData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
           getMatchEnrichment(matchId),
           getMatchOdds(matchId),
+          getMatchOddsHistory(matchId),
           getMatchSquads(matchId),
           getESPNMatchData(matchId),
           getEdgeScore(matchId),
@@ -206,6 +295,7 @@ export function PredictDetails() {
         setPrediction(predictionData);
         setEnrichment(enrichmentData);
         setOdds(oddsData);
+        setOddsHistory(oddsHistoryData);
         setSquads(squadData);
         setEspnData(espn);
         setEdgeScore(edgeData);
@@ -861,6 +951,10 @@ export function PredictDetails() {
                 const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
                 const isValue1 = diff1 && Number(diff1) > 10;
                 const isValue2 = diff1 && Number(diff1) < -10;
+                const bookmakerHistory = oddsHistory.filter(
+                  (snapshot) => normalizeBookmaker(snapshot.bookmaker) === normalizeBookmaker(o.bookmaker)
+                    && hasValidTwoSidedOdds(snapshot)
+                );
 
                 return (
                   <button
@@ -870,21 +964,30 @@ export function PredictDetails() {
                       const url = getBookmakerMarketUrl(o.bookmaker);
                       if (url) openExternalMarket(url);
                     }}
-                    className="w-full appearance-none flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white/[0.04] border border-white/10 hover:border-amber-500/25 hover:bg-white/[0.06] transition-colors text-left"
+                    className="w-full appearance-none px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white/[0.04] border border-white/10 hover:border-amber-500/25 hover:bg-white/[0.06] transition-colors text-left"
                   >
-                    <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-slate-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
-                    <div className="flex items-center gap-2.5">
-                      <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                        {decimalToAmerican(o.team1_odds)}
-                        {isValue1 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
-                      </span>
-                      <span className="text-slate-500 text-[clamp(0.7rem,0.85vw,0.85rem)]">|</span>
-                      <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                        {decimalToAmerican(o.team2_odds)}
-                        {isValue2 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
-                      </span>
-                      <svg className="w-3 h-3 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-slate-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
+                      <div className="flex items-center gap-2.5">
+                        <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
+                          {decimalToAmerican(o.team1_odds)}
+                          {isValue1 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
+                        </span>
+                        <span className="text-slate-500 text-[clamp(0.7rem,0.85vw,0.85rem)]">|</span>
+                        <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
+                          {decimalToAmerican(o.team2_odds)}
+                          {isValue2 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
+                        </span>
+                        <svg className="w-3 h-3 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
+                      </div>
                     </div>
+                    <OddsTrendSparkline
+                      history={bookmakerHistory}
+                      team1Name={team1Meta.shortName}
+                      team2Name={team2Meta.shortName}
+                      team1Color={teamColor1}
+                      team2Color={teamColor2}
+                    />
                   </button>
                 );
               })}
