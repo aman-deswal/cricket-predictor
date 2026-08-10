@@ -124,6 +124,24 @@ class TestCompetitionMappingAndRelevance(unittest.TestCase):
 
         self.assertEqual([row["match_id"] for row in relevant], ["ipl"])
 
+    def test_normalizes_parenthesized_women_suffix(self):
+        trent = _fixture(
+            "trent",
+            "The Hundred Women's Competition",
+            "Trent Rockets (Women)",
+            "Southern Brave (Women)",
+        )
+        event = _event(trent)
+
+        relevant = fetch_odds.relevant_fixtures_for_sport(
+            "cricket_the_hundred",
+            [event],
+            [trent],
+            NOW,
+        )
+
+        self.assertEqual([row["match_id"] for row in relevant], ["trent"])
+
     def test_rejects_explicit_competition_mismatch_even_when_teams_match(self):
         psl = _fixture("psl", "Pakistan Super League", "Lahore Qalandars", "Karachi Kings")
 

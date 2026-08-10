@@ -221,6 +221,7 @@ def normalize_team(name: str) -> str:
     normalized = name.lower().replace("&", " and ")
     normalized = re.sub(r"\bsaint\b", "st", normalized)
     normalized = re.sub(r"\b(and|the)\b", " ", normalized)
+    normalized = re.sub(r"\s*\((women|men)\)\s*$", "", normalized)
     normalized = re.sub(r"\s+(women|men)\s*$", "", normalized)
     return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
 
