@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -164,6 +164,37 @@ function ComingSoonTile({ title, body, eyebrow = 'Coming soon' }: { title: strin
       <p className="relative text-[clamp(0.95rem,1.15vw,1.15rem)] font-black text-white">{title}</p>
       <p className={`${detailTileMetaClass} relative mx-auto mt-1 max-w-md text-slate-400`}>{body}</p>
     </div>
+  );
+}
+
+function PlayerHeadshot({
+  imageUrl,
+  alt,
+  className,
+  style,
+  fallback,
+}: {
+  imageUrl?: string | null;
+  alt: string;
+  className: string;
+  style?: CSSProperties;
+  fallback: ReactNode;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const normalizedUrl = imageUrl?.trim() ?? '';
+
+  if (!normalizedUrl || imageFailed) {
+    return <>{fallback}</>;
+  }
+
+  return (
+    <img
+      src={normalizedUrl}
+      alt={alt}
+      className={className}
+      style={style}
+      onError={() => setImageFailed(true)}
+    />
   );
 }
 
@@ -1270,9 +1301,20 @@ export function PredictDetails() {
                           </div>
                           {/* Photo + Name row */}
                           <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                            {batterImg && (
-                              <img src={batterImg} alt={batterLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${bMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            )}
+                            <PlayerHeadshot
+                              imageUrl={batterImg}
+                              alt={batterLast}
+                              className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg"
+                              style={{ outline: `2px solid ${bMeta.primaryColor}55` }}
+                              fallback={(
+                                <span
+                                  className="flex w-10 h-10 sm:w-16 sm:h-16 items-center justify-center rounded-lg sm:rounded-xl shrink-0"
+                                  style={{ background: `${bMeta.primaryColor}18`, outline: `2px solid ${bMeta.primaryColor}55`, color: bMeta.primaryColor }}
+                                >
+                                  <BatIcon className="w-4 h-4 sm:w-6 sm:h-6" />
+                                </span>
+                              )}
+                            />
                             <div className="min-w-0 flex-1">
                               <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{batterLast}</p>
                               {batterStats ? (
@@ -1332,9 +1374,20 @@ export function PredictDetails() {
                                 <p className="text-[clamp(0.7rem,0.85vw,0.9rem)] font-mono text-amber-300 mt-1.5 leading-none">{h2h.dot_pct}% dot balls</p>
                               )}
                             </div>
-                            {bowlerImg && (
-                              <img src={bowlerImg} alt={bowlerLast} className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg" style={{ outline: `2px solid ${wMeta.primaryColor}55` }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            )}
+                            <PlayerHeadshot
+                              imageUrl={bowlerImg}
+                              alt={bowlerLast}
+                              className="w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl object-cover object-top shrink-0 shadow-lg"
+                              style={{ outline: `2px solid ${wMeta.primaryColor}55` }}
+                              fallback={(
+                                <span
+                                  className="flex w-10 h-10 sm:w-16 sm:h-16 items-center justify-center rounded-lg sm:rounded-xl shrink-0"
+                                  style={{ background: `${wMeta.primaryColor}18`, outline: `2px solid ${wMeta.primaryColor}55`, color: wMeta.primaryColor }}
+                                >
+                                  <BowlIcon className="w-4 h-4 sm:w-6 sm:h-6" />
+                                </span>
+                              )}
+                            />
                           </div>
                           {/* Form strip — last 5 wicket hauls */}
                           {battle.bowler_figures && (
@@ -1823,18 +1876,17 @@ export function PredictDetails() {
                         return (
                           <div key={player.id || player.name} className="flex flex-col items-center gap-1">
                             <div className="relative">
-                              {player.image_url ? (
-                                <img
-                                  src={player.image_url}
-                                  alt={player.name}
-                                  className="w-11 h-11 rounded-full object-cover"
-                                  style={{ boxShadow: `0 0 0 2px ${roleColor}66` }}
-                                />
-                              ) : (
-                                <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${roleColor}15`, boxShadow: `0 0 0 2px ${roleColor}44`, color: roleColor }}>
-                                  <RoleIcon className="w-4 h-4" />
-                                </span>
-                              )}
+                              <PlayerHeadshot
+                                imageUrl={player.image_url}
+                                alt={player.name}
+                                className="w-11 h-11 rounded-full object-cover"
+                                style={{ boxShadow: `0 0 0 2px ${roleColor}66` }}
+                                fallback={(
+                                  <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${roleColor}15`, boxShadow: `0 0 0 2px ${roleColor}44`, color: roleColor }}>
+                                    <RoleIcon className="w-4 h-4" />
+                                  </span>
+                                )}
+                              />
                               {player.is_captain && (
                                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-yellow-400 flex items-center justify-center text-[7px] font-black text-gray-900 leading-none">C</span>
                               )}
