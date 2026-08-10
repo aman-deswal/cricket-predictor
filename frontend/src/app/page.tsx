@@ -55,6 +55,21 @@ function isMatchLive(match: MatchWithPredictions): boolean {
   return String(match.status).toLowerCase() === 'live';
 }
 
+function getCountdown(date: string): { days: number; hours: number; mins: number; secs: number } | null {
+  const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
+  const kickoff = new Date(raw).getTime();
+  if (Number.isNaN(kickoff)) return null;
+
+  const diff = kickoff - Date.now();
+  if (diff <= 0) return null;
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  return { days, hours, mins, secs };
+}
+
 function decimalToAmerican(d: number): string {
   if (d <= 1) return '-';
   if (d >= 2) return '+' + Math.round((d - 1) * 100);
@@ -567,6 +582,14 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
   const hasMarket = hasValidMarketOdds(match);
+  const getHeroCountdown = useCallback(() => getCountdown(match.date), [match.date]);
+  const [countdown, setCountdown] = useState(getHeroCountdown);
+
+  useEffect(() => {
+    setCountdown(getHeroCountdown());
+    const interval = window.setInterval(() => setCountdown(getHeroCountdown()), 1000);
+    return () => window.clearInterval(interval);
+  }, [getHeroCountdown]);
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
@@ -596,19 +619,31 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
         <div className="relative px-5 py-5 sm:px-8 sm:py-6">
           {/* Row 1: match context */}
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-slate-500/25 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-100">
               {match.match_type}
             </span>
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-              hasMarket
-                ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
-                : 'border-slate-400/20 bg-slate-400/[0.06] text-slate-300'
-            }`}>
-              {hasMarket ? 'Market backed' : 'SixSense Projection'}
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-300">
+              <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 4v4l3 2" />
+              </svg>
+              {countdown ? (
+                <span className="whitespace-nowrap">
+                  Begins in{' '}
+                  {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+                  <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
+                  <span className="text-slate-400"> </span>
+                  <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+                  <span className="text-slate-400"> </span>
+                  <span className="text-white">{String(countdown.secs).padStart(2, '0')}s</span>
+                </span>
+              ) : (
+                <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
+              )}
             </span>
           </div>
 
