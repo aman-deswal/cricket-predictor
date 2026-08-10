@@ -61,6 +61,23 @@ export const COMPETITION_PRIORITY = {
   UNKNOWN: 90,
 } as const;
 
+export function getMatchFormatLabel(match: { match_type?: string; name: string; competition_name?: string | null }): string {
+  const source = normalizeText([
+    match.competition_name,
+    match.match_type,
+    match.name,
+  ].filter(Boolean).join(' '));
+
+  if (/(^|\b)(test|tests?|red ball|first class)(\b|$)/.test(source)) return 'TEST';
+  if (/(^|\b)(odi|one day|one-day|50 over|50-over)(\b|$)/.test(source)) return 'ODI';
+  if (/(^|\b)(t20|twenty20|twenty 20)(\b|$)/.test(source)) return 'T20';
+  if (/(^|\b)t10(\b|$)/.test(source)) return 'T10';
+  if (source.includes('hundred')) return 'THE HUNDRED';
+
+  const fallback = match.match_type?.trim();
+  return fallback ? fallback.toUpperCase() : 'CRICKET';
+}
+
 interface LeagueDefinition {
   key: string;
   label: string;
