@@ -57,3 +57,53 @@ CREATE TABLE IF NOT EXISTS match_odds (
 );
 
 CREATE INDEX IF NOT EXISTS idx_match_odds_match_id ON match_odds(match_id);
+
+-- Per-provider-sport paid refresh state. This remains authoritative even when
+-- a successful provider response is empty and creates no match_odds rows.
+CREATE TABLE IF NOT EXISTS odds_refresh_state (
+  sport_key text PRIMARY KEY,
+  refreshed_at timestamptz NOT NULL,
+  event_count integer NOT NULL DEFAULT 0,
+  quota_used integer,
+  quota_remaining integer,
+  quota_last integer,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Append-only snapshots power bookmaker movement charts without new API calls.
+CREATE TABLE IF NOT EXISTS match_odds_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id text NOT NULL,
+  bookmaker text NOT NULL,
+  team1_odds decimal,
+  team2_odds decimal,
+  draw_odds decimal,
+  market text NOT NULL DEFAULT 'h2h',
+  fetched_at timestamptz NOT NULL,
+  UNIQUE(match_id, bookmaker, fetched_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_odds_history_lookup
+  ON match_odds_history(match_id, bookmaker, fetched_at DESC);
+
+ALTER TABLE match_odds_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on match_odds_history"
+  ON match_odds_history FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow matching snapshot inserts on match_odds_history"
+  ON match_odds_history FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM match_odds latest
+      WHERE latest.match_id = match_odds_history.match_id
+        AND latest.bookmaker = match_odds_history.bookmaker
+        AND latest.team1_odds IS NOT DISTINCT FROM match_odds_history.team1_odds
+        AND latest.team2_odds IS NOT DISTINCT FROM match_odds_history.team2_odds
+        AND latest.draw_odds IS NOT DISTINCT FROM match_odds_history.draw_odds
+        AND latest.market = match_odds_history.market
+        AND latest.fetched_at = match_odds_history.fetched_at
+    )
+  );
