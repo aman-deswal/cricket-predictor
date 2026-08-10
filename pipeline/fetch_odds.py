@@ -391,6 +391,7 @@ def can_make_paid_call(quota: ApiQuota) -> bool:
 def parse_odds_events(events: list[dict]) -> list[dict]:
     """Parse odds API events into rows for the existing match_odds shape."""
     rows = []
+    fetched_at = datetime.now(timezone.utc).isoformat()
     for event in events:
         event_id = event.get("id")
         home_team = event.get("home_team", "")
@@ -423,7 +424,7 @@ def parse_odds_events(events: list[dict]) -> list[dict]:
                     "draw_odds": outcomes.get("Draw"),
                     "market": "h2h",
                     "commence_time": commence_time,
-                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "fetched_at": fetched_at,
                 })
     return rows
 
@@ -480,6 +481,22 @@ def store_odds(odds_rows: list[dict]) -> int:
         on_conflict="match_id,bookmaker",
     ).execute()
     return len(deduped)
+
+
+def store_odds_history(odds_rows: list[dict]) -> int:
+    """Append the same paid snapshots used by the latest-odds table."""
+    if not odds_rows:
+        return 0
+    seen = {}
+    for row in odds_rows:
+        seen[(row["match_id"], row["bookmaker"], row["fetched_at"])] = row
+    snapshots = list(seen.values())
+    get_client().table("match_odds_history").upsert(
+        snapshots,
+        on_conflict="match_id,bookmaker,fetched_at",
+        ignore_duplicates=True,
+    ).execute()
+    return len(snapshots)
 
 
 def _is_fatal_access_error(exc: requests.RequestException) -> bool:
@@ -587,17 +604,19 @@ def main(sport: Optional[str] = None) -> int:
             parsed_rows = parse_odds_events(result.data)
             linked_rows = match_odds_to_matches(parsed_rows, local_fixtures)
             stored_rows = store_odds(linked_rows)
+            history_rows = store_odds_history(linked_rows)
             store_refresh_state(sport_key, len(result.data), quota)
             provider_event_count += len(result.data)
             parsed_row_count += len(parsed_rows)
             linked_row_count += len(linked_rows)
             stored_row_count += stored_rows
             logger.info(
-                "Completed paid refresh %s: events=%d linked_rows=%d stored=%d actual_cost=%s quota %s",
+                "Completed paid refresh %s: events=%d linked_rows=%d stored=%d history=%d actual_cost=%s quota %s",
                 sport_key,
                 len(result.data),
                 len(linked_rows),
                 stored_rows,
+                history_rows,
                 quota.last if quota.last is not None else "unknown",
                 quota_log(quota),
             )

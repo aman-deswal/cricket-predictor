@@ -234,6 +234,37 @@ class TestQuotaBudget(unittest.TestCase):
         self.assertEqual(after.remaining, 50)
 
 
+class TestOddsHistory(unittest.TestCase):
+    @patch("fetch_odds.fetch_odds_for_sport")
+    @patch("fetch_odds.get_client")
+    def test_appends_existing_linked_row_shape_without_provider_call(
+        self,
+        mock_get_client,
+        mock_fetch_odds,
+    ):
+        table = MagicMock()
+        table.upsert.return_value = table
+        mock_get_client.return_value.table.return_value = table
+        rows = [{
+            "match_id": "espn-1",
+            "bookmaker": "Bet365",
+            "team1_odds": 1.8,
+            "team2_odds": 2.1,
+            "draw_odds": None,
+            "market": "h2h",
+            "fetched_at": NOW.isoformat(),
+        }]
+
+        self.assertEqual(fetch_odds.store_odds_history([*rows, *rows]), 1)
+        mock_fetch_odds.assert_not_called()
+        mock_get_client.return_value.table.assert_called_once_with("match_odds_history")
+        table.upsert.assert_called_once_with(
+            rows,
+            on_conflict="match_id,bookmaker,fetched_at",
+            ignore_duplicates=True,
+        )
+
+
 class TestApiErrorDiagnostics(unittest.TestCase):
     def test_reports_provider_code_and_quota_without_request_url(self):
         error = _http_error(
@@ -297,6 +328,7 @@ class TestRefreshOutcomes(unittest.TestCase):
             patch("fetch_odds.store_refresh_state"),
             patch("fetch_odds.match_odds_to_matches", return_value=[]),
             patch("fetch_odds.store_odds", return_value=0),
+            patch("fetch_odds.store_odds_history", return_value=0),
         ]
 
     def test_legitimate_empty_market_succeeds_and_persists_freshness(self):
@@ -409,6 +441,43 @@ class TestRefreshOutcomes(unittest.TestCase):
                 fetch_odds.main()
         fetch_odds.store_refresh_state.assert_not_called()
 
+    def test_refresh_state_waits_for_history_storage(self):
+        patches = self._base_patches()
+        for active_patch in patches:
+            active_patch.start()
+            self.addCleanup(active_patch.stop)
+        fetch_odds.store_odds_history.side_effect = RuntimeError("history unavailable")
+        linked_rows = [{
+            "match_id": self.ipl["match_id"],
+            "bookmaker": "Bet365",
+            "team1_odds": 1.8,
+            "team2_odds": 2.1,
+            "draw_odds": None,
+            "market": "h2h",
+            "fetched_at": NOW.isoformat(),
+        }]
+        with (
+            patch(
+                "fetch_odds.fetch_odds_for_sport",
+                return_value=fetch_odds.ProviderResult(
+                    [{
+                        **_event(self.ipl),
+                        "sport_key": "cricket_ipl",
+                        "bookmakers": [],
+                    }],
+                    fetch_odds.ApiQuota(used=11, remaining=489, last=1),
+                ),
+            ) as paid,
+            patch("fetch_odds.parse_odds_events", return_value=[{"row": True}]),
+            patch("fetch_odds.match_odds_to_matches", return_value=linked_rows),
+        ):
+            with self.assertRaises(RuntimeError):
+                fetch_odds.main()
+        paid.assert_called_once_with("cricket_ipl")
+        fetch_odds.store_odds.assert_called_once_with(linked_rows)
+        fetch_odds.store_odds_history.assert_called_once_with(linked_rows)
+        fetch_odds.store_refresh_state.assert_not_called()
+
     def test_partial_paid_success_is_preserved(self):
         psl = _fixture(
             "psl",
@@ -437,6 +506,7 @@ class TestRefreshOutcomes(unittest.TestCase):
             patch("fetch_odds.store_refresh_state"),
             patch("fetch_odds.match_odds_to_matches", return_value=[]),
             patch("fetch_odds.store_odds", return_value=0),
+            patch("fetch_odds.store_odds_history", return_value=0),
         ):
             self.assertEqual(fetch_odds.main(), 0)
 
