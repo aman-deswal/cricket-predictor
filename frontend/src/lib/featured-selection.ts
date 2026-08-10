@@ -20,8 +20,11 @@ const EVIDENCE_POINTS = {
 } as const;
 const MAX_EVIDENCE_COMPLETENESS = Object.values(EVIDENCE_POINTS)
   .reduce((sum, points) => sum + points, 0);
-const EVIDENCE_WEIGHT = 0.52;
-const COMPETITION_WEIGHT = 1 - EVIDENCE_WEIGHT;
+export const FEATURED_SCORE_WEIGHTS = {
+  competitionRelevance: 0.6,
+  evidenceCompleteness: 0.4,
+} as const;
+const COMPOSITE_SCORE_PRECISION = 1_000_000;
 
 interface FeaturedPrediction {
   confidence: string;
@@ -94,7 +97,11 @@ export function getFeaturedCompositeScore(match: FeaturedCandidate): number {
     COMPETITION_PRIORITY.UNKNOWN - getCompetitionPriority(match),
     COMPETITION_PRIORITY.UNKNOWN,
   );
-  return evidenceScore * EVIDENCE_WEIGHT + competitionScore * COMPETITION_WEIGHT;
+  const weightedScore = (
+    competitionScore * FEATURED_SCORE_WEIGHTS.competitionRelevance
+    + evidenceScore * FEATURED_SCORE_WEIGHTS.evidenceCompleteness
+  );
+  return Math.round(weightedScore * COMPOSITE_SCORE_PRECISION) / COMPOSITE_SCORE_PRECISION;
 }
 
 function getPredictionConfidenceScore(match: FeaturedCandidate): number {
@@ -121,6 +128,9 @@ export function compareFeaturedMatches(a: FeaturedCandidate, b: FeaturedCandidat
 
   const compositeDiff = getFeaturedCompositeScore(b) - getFeaturedCompositeScore(a);
   if (compositeDiff !== 0) return compositeDiff;
+
+  const completenessDiff = getEvidenceCompletenessScore(b) - getEvidenceCompletenessScore(a);
+  if (completenessDiff !== 0) return completenessDiff;
 
   const confidenceDiff = getPredictionConfidenceScore(b) - getPredictionConfidenceScore(a);
   if (confidenceDiff !== 0) return confidenceDiff;

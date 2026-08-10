@@ -19,4 +19,10 @@ assert.deepEqual(
   'canonical completed status remains final without an upcoming countdown',
 );
 
+assert.notEqual(
+  getMatchStatusPresentation('live').label,
+  getMatchStatusPresentation('completed').label,
+  'canonical live status cannot render as final',
+);
+
 console.log('Match detail status requirements passed');
