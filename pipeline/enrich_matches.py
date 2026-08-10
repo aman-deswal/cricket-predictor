@@ -29,6 +29,7 @@ from utils.db import (
     get_h2h_from_cache,
     get_recent_results,
 )
+from fetch_squads import fetch_and_store_squads
 from utils.espn import get_espn_enrichment_context, format_espn_context
 from utils.llm import LLMUnavailableError, create_chat_completion, llm_garnish_enabled
 
@@ -778,6 +779,10 @@ def enrich_key_battles(battles: list[dict], match_type: str) -> list[dict]:
 def enrich_match(match: dict, source_limit: int) -> dict:
     match_id = match.get("match_id", "")
 
+    team1_squad, team2_squad = get_match_squad_names(match_id) if match_id else ([], [])
+    if match_id and not team1_squad and not team2_squad:
+        fetch_and_store_squads(match_ids=[match_id], force=False)
+
     # --- Fetch ESPN enrichment context ---
     espn_ctx_text = ""
     espn_event_id = _get_espn_event_id(match_id, match=match)
@@ -954,6 +959,11 @@ def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
     matches = sorted(matches, key=match_priority)
     matches = matches[:limit]
     logger.info(f"Enriching {len(matches)} upcoming matches")
+
+    if matches:
+        logger.info("Refreshing squads before enrichment...")
+        for match in matches:
+            fetch_and_store_squads(match_ids=[match["match_id"]], force=False)
 
     for match in matches:
         logger.info(f"Enriching {match['team1']} vs {match['team2']}")
