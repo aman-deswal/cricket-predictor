@@ -10,6 +10,7 @@ import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
 import { BatIcon, BowlIcon, KeeperIcon, AllRounderIcon, CaptainIcon, SparkleIcon } from '@/components/CricketIcons';
 import { CricketLoader } from '@/components/CricketLoader';
+import { getMatchStatusPresentation } from '@/lib/match-status';
 
 function toAmericanOdds(probability: number): string {
   if (probability <= 0 || probability >= 1) return '-';
@@ -120,6 +121,20 @@ function teamIdentityMatches(candidate: string | undefined, expected: string): b
   const candidateKey = normalizeTeamIdentity(candidate);
   const expectedKey = normalizeTeamIdentity(expected);
   return candidateKey === expectedKey || candidateKey.includes(expectedKey) || expectedKey.includes(candidateKey);
+}
+
+function LiveStatusBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      aria-label="Match status: live"
+      className={`inline-flex shrink-0 items-center rounded-full border border-red-400/30 bg-red-400/10 font-black uppercase tracking-widest text-red-200 ${
+        compact ? 'px-2 py-0.5 text-[8px] sm:text-[9px]' : 'gap-1.5 px-3 py-1 text-[10px] sm:text-xs'
+      }`}
+    >
+      {!compact && <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" aria-hidden="true" />}
+      LIVE
+    </span>
+  );
 }
 
 const fadeUp = {
@@ -264,6 +279,7 @@ export function PredictDetails() {
   // Live countdown timer
   const getCountdown = useCallback(() => {
     if (!match) return null;
+    if (!getMatchStatusPresentation(match.status).showCountdown) return null;
     const matchDate = match.date.endsWith('Z') || match.date.includes('+') ? match.date : match.date + 'Z';
     const diff = new Date(matchDate).getTime() - Date.now();
     if (diff <= 0) return null;
@@ -302,7 +318,9 @@ export function PredictDetails() {
   const predictionMargin = prediction ? Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) : 0;
   const hasClearPick = predictionMargin >= 0.01;
   const matchDate = match.date.endsWith('Z') || match.date.includes('+') ? match.date : `${match.date}Z`;
-  const isUpcomingMatch = match.status.toLowerCase() === 'upcoming'
+  const matchStatus = getMatchStatusPresentation(match.status);
+  const isLiveMatch = matchStatus.kind === 'live';
+  const isUpcomingMatch = matchStatus.kind === 'upcoming'
     && new Date(matchDate).getTime() > Date.now();
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
   const isModelEstimated = enrichment !== null && (enrichment.source_links?.length ?? 0) === 0;
@@ -461,14 +479,21 @@ export function PredictDetails() {
             </span>
           </div>
 
-          <div className="text-center">
-            <p className={`text-[8px] sm:text-[9px] font-black uppercase tracking-[0.18em] ${
-              isMarketBackedPick ? 'text-amber-500' : 'text-slate-400'
-            }`}>
-              {isMarketBackedPick ? 'SixSense™ Pick' : 'Model projection'}
-            </p>
-            <p className="text-[10px] sm:text-[11px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
-          </div>
+          {isLiveMatch ? (
+            <div className="text-center">
+              <LiveStatusBadge compact />
+              <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-white">Match in progress</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className={`text-[8px] sm:text-[9px] font-black uppercase tracking-[0.18em] ${
+                isMarketBackedPick ? 'text-amber-500' : 'text-slate-400'
+              }`}>
+                {isMarketBackedPick ? 'SixSense™ Pick' : 'Model projection'}
+              </p>
+              <p className="text-[10px] sm:text-[11px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
+            </div>
+          )}
 
           <div className="flex min-w-0 items-center justify-end gap-2">
             <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] font-bold text-gray-300">
@@ -501,7 +526,9 @@ export function PredictDetails() {
           <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
           All Matches
         </Link>
-        {countdown && (
+        {isLiveMatch ? (
+          <LiveStatusBadge />
+        ) : countdown && (
           <div className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300">
             <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
             <span className="font-semibold whitespace-nowrap">Begins in</span>
@@ -543,6 +570,12 @@ export function PredictDetails() {
       >
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
+
+        {isLiveMatch && (
+          <div className="relative mb-4 flex justify-center">
+            <LiveStatusBadge />
+          </div>
+        )}
 
         <div className="relative flex items-center justify-between gap-4 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
@@ -800,10 +833,32 @@ export function PredictDetails() {
             })()}
           </span>
           <span>{espnData?.venue_name || enrichment?.venue_name || match.venue || 'TBC'}{espnData?.venue_city ? `, ${espnData.venue_city}` : ''}</span>
-          <span>{new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <span className={isLiveMatch ? 'font-bold text-red-200' : undefined}>
+            {isLiveMatch && <span className="mr-1.5 font-black uppercase tracking-widest">LIVE ·</span>}
+            <time dateTime={match.date}>
+              {new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </time>
+          </span>
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
+
+      {isLiveMatch && (
+        <motion.div
+          {...fadeUp}
+          role="status"
+          aria-label="Live match status"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-red-400/20 bg-red-400/[0.06] px-4 py-3 sm:px-5"
+        >
+          <LiveStatusBadge />
+          <div>
+            <p className="text-sm font-black text-white">Match in progress</p>
+            <p className={`${detailTileMetaClass} text-slate-400`}>
+              Probabilities and analysis shown below are model projections, not a final result.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* 1. Sportsbook Odds | Reasoning — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
