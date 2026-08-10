@@ -340,6 +340,69 @@ function MarketMovementPanel({
     maxDomain = Math.min(100, Math.ceil(center + spread / 2 + 3));
   }
 
+  const overlappingDotOffsets = new Map<string, number>();
+  chartRows.forEach((row) => {
+    const timestamp = Number(row.timestamp);
+    const groups = new Map<string, string[]>();
+
+    featuredBooks.forEach((book) => {
+      const value = row[book.id];
+      if (typeof value !== 'number' || !Number.isFinite(value)) return;
+      const bucketKey = `${timestamp}:${value.toFixed(1)}`;
+      const entries = groups.get(bucketKey) ?? [];
+      entries.push(book.id);
+      groups.set(bucketKey, entries);
+    });
+
+    groups.forEach((bookIds, bucketKey) => {
+      const offsets = bookIds.length === 1
+        ? [0]
+        : bookIds.length === 2
+          ? [-5, 5]
+          : [-8, 0, 8];
+
+      bookIds.forEach((bookId, index) => {
+        overlappingDotOffsets.set(`${bucketKey}:${bookId}`, offsets[index] ?? 0);
+      });
+    });
+  });
+
+  const renderMarketDot = (dotProps: {
+    cx?: number;
+    cy?: number;
+    payload?: Record<string, number | string | null>;
+    value?: number | string | Array<number | string>;
+    dataKey?: string | number;
+    stroke?: string;
+  }) => {
+    if (typeof dotProps.cx !== 'number' || typeof dotProps.cy !== 'number' || typeof dotProps.dataKey !== 'string') {
+      return <g />;
+    }
+
+    const timestamp = Number(dotProps.payload?.timestamp);
+    const numericValue = typeof dotProps.value === 'number'
+      ? dotProps.value
+      : Array.isArray(dotProps.value) && typeof dotProps.value[0] === 'number'
+        ? dotProps.value[0]
+        : null;
+
+    if (!Number.isFinite(timestamp) || numericValue === null) return <g />;
+
+    const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
+    const offsetX = overlappingDotOffsets.get(offsetKey) ?? 0;
+
+    return (
+      <circle
+        cx={dotProps.cx + offsetX}
+        cy={dotProps.cy}
+        r={3.25}
+        fill={dotProps.stroke}
+        stroke="#0b1016"
+        strokeWidth={1.5}
+      />
+    );
+  };
+
   return (
     <motion.div
       className={`${detailTileClass} mb-4 border-white/10`}
@@ -442,7 +505,7 @@ function MarketMovementPanel({
                         dataKey={book.id}
                         stroke={book.color}
                         strokeWidth={2.25}
-                        dot={chartRows.length <= 8 ? { fill: book.color, r: 2.5, strokeWidth: 0 } : false}
+                        dot={chartRows.length <= 8 ? renderMarketDot : false}
                         activeDot={{ fill: book.color, r: 4, strokeWidth: 0 }}
                         connectNulls
                       />
