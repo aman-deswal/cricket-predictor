@@ -7,7 +7,9 @@
     "dev:mock": "NEXT_PUBLIC_USE_MOCK_DATA=true next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "verify:featured-selection": "rm -rf /tmp/cricket-predictor-featured-probe && tsc --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --skipLibCheck --outDir /tmp/cricket-predictor-featured-probe requirements/featured-selection.probe.ts src/lib/featured-selection.ts src/lib/competition.ts && node /tmp/cricket-predictor-featured-probe/requirements/featured-selection.probe.js && rm -rf /tmp/cricket-predictor-featured-probe",
+    "verify:match-status": "rm -rf /tmp/cricket-predictor-status-probe && tsc --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --skipLibCheck --outDir /tmp/cricket-predictor-status-probe requirements/match-status.probe.ts src/lib/match-status.ts && node /tmp/cricket-predictor-status-probe/requirements/match-status.probe.js && rm -rf /tmp/cricket-predictor-status-probe"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

@@ -11,9 +11,12 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
 from fetch_results import (
+    _correct_espn_event,
+    _espn_winner_from_summary,
     _mark_stale_upcoming_completed,
     _match_espn_winner_to_prediction,
     _normalize,
+    _parse_winner_flag,
     _score_prediction,
 )
 
@@ -36,6 +39,102 @@ class TestNormalize(unittest.TestCase):
 
     def test_no_suffix(self):
         self.assertEqual(_normalize("South Africa"), "south africa")
+
+
+class TestEspnWinnerParsing(unittest.TestCase):
+    def _summary(self, flags):
+        return {
+            "header": {
+                "competitions": [{
+                    "status": {"type": {"description": "Result", "shortDetail": "TKR won"}},
+                    "competitors": [
+                        {"winner": flag, "team": {"displayName": team}}
+                        for flag, team in zip(flags, ["St Kitts and Nevis Patriots", "Trinbago Knight Riders"])
+                    ],
+                }],
+            },
+        }
+
+    def test_parse_winner_flag_accepts_only_booleans_and_boolean_strings(self):
+        self.assertIs(_parse_winner_flag(True), True)
+        self.assertIs(_parse_winner_flag(False), False)
+        self.assertIs(_parse_winner_flag("true"), True)
+        self.assertIs(_parse_winner_flag("false"), False)
+        self.assertIsNone(_parse_winner_flag("yes"))
+        self.assertIsNone(_parse_winner_flag(1))
+
+    @patch("fetch_results.requests.get")
+    def test_string_false_does_not_beat_string_true(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = self._summary(["false", "true"])
+
+        winner, result_text = _espn_winner_from_summary("1534180")
+
+        self.assertEqual(winner, "Trinbago Knight Riders")
+        self.assertEqual(result_text, "TKR won")
+
+    @patch("fetch_results.requests.get")
+    def test_boolean_flags_select_exactly_one_winner(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = self._summary([False, True])
+
+        winner, _ = _espn_winner_from_summary("1534180")
+
+        self.assertEqual(winner, "Trinbago Knight Riders")
+
+    @patch("fetch_results.requests.get")
+    def test_ambiguous_two_winner_payload_is_skipped(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = self._summary([True, "true"])
+
+        self.assertEqual(_espn_winner_from_summary("1534180"), (None, None))
+
+    @patch("fetch_results.requests.get")
+    def test_no_winner_payload_is_skipped(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = self._summary([False, "false"])
+
+        self.assertEqual(_espn_winner_from_summary("1534180"), (None, None))
+
+    @patch("fetch_results.requests.get")
+    def test_malformed_winner_payload_is_skipped(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = self._summary(["yes", True])
+
+        self.assertEqual(_espn_winner_from_summary("1534180"), (None, None))
+
+
+class TestTargetedCorrection(unittest.TestCase):
+    @patch("fetch_results._espn_winner_from_summary", return_value=("Trinbago Knight Riders", "TKR won"))
+    @patch("fetch_results._persist_score")
+    def test_rewrites_previously_scored_event(self, mock_persist, _mock_summary):
+        client = MagicMock()
+        tables = {}
+
+        def table_side_effect(name):
+            table = MagicMock()
+            table.select.return_value = table
+            table.eq.return_value = table
+            if name == "espn_match_data":
+                table.execute.return_value = MagicMock(data=[{"match_id": "espn-1534180"}])
+            elif name == "predictions":
+                table.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-1534180",
+                    "team1": "St Kitts and Nevis Patriots",
+                    "team2": "Trinbago Knight Riders",
+                    "predicted_winner": "Trinbago Knight Riders",
+                    "team1_win_probability": 0.45,
+                    "team2_win_probability": 0.55,
+                    "scored_at": "2026-08-09T00:00:00",
+                }])
+            tables[name] = table
+            return table
+
+        client.table.side_effect = table_side_effect
+
+        self.assertTrue(_correct_espn_event(client, "1534180"))
+        mock_persist.assert_called_once()
+        self.assertEqual(mock_persist.call_args.args[2], "Trinbago Knight Riders")
 
 
 class TestMatchEspnWinnerToPrediction(unittest.TestCase):

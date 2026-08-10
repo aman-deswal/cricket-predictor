@@ -290,6 +290,15 @@ function isLiveMatch(match: Match): boolean {
   return match.status === 'live';
 }
 
+function isPlaceholderEvidenceText(value: unknown): boolean {
+  if (typeof value !== 'string') return true;
+  const text = value.trim();
+  return !text
+    || /^(tbd|tbc|unknown|unavailable|none|n\/a|coming soon|venue tbd|venue tbc)$/i.test(text)
+    || /^No recent reputable (article|source)-backed updates (were found|were generated)/i.test(text)
+    || /unavailable until a reliable source is found/i.test(text);
+}
+
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   if (isMockDataEnabled()) {
     return getMockUpcomingMatches();
@@ -335,7 +344,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     series_note: string | null;
     rosters: ESPNRoster[] | string | null;
   }) => {
-    if (e.venue_name) espnVenue.set(e.match_id, e.venue_name);
+    if (!isPlaceholderEvidenceText(e.venue_name)) espnVenue.set(e.match_id, e.venue_name!.trim());
     if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
     if (e.series_note) espnCompetition.set(e.match_id, e.series_note);
     if (e.rosters) {
@@ -368,6 +377,11 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   });
   const enrichmentVenue = new Map<string, string>();
   const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
+  const hasNamedEvidence = (value: unknown): boolean => (
+    typeof value === 'string'
+    && value.trim().length > 1
+    && !isPlaceholderEvidenceText(value)
+  );
   (enrichmentData ?? []).forEach((e: {
     match_id: string;
     venue_name: string | null;
@@ -378,15 +392,42 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     possible_xi: { team1?: unknown[]; team2?: unknown[] } | null;
     source_links: unknown[] | null;
   }) => {
-    if (e.venue_name) enrichmentVenue.set(e.match_id, e.venue_name);
+    if (!isPlaceholderEvidenceText(e.venue_name)) enrichmentVenue.set(e.match_id, e.venue_name!.trim());
+    const keyPlayerCount = Array.isArray(e.key_players)
+      ? e.key_players.filter((entry) => {
+          if (!entry || typeof entry !== 'object') return false;
+          const player = entry as { name?: unknown; batter?: unknown; bowler?: unknown };
+          return hasNamedEvidence(player.name)
+            || (hasNamedEvidence(player.batter) && hasNamedEvidence(player.bowler));
+        }).length
+      : 0;
+    const playerUpdateCount = Array.isArray(e.player_updates)
+      ? e.player_updates.filter((entry) => {
+          if (!entry || typeof entry !== 'object') return false;
+          const update = entry as { player?: unknown; status?: unknown };
+          return hasNamedEvidence(update.player) && !isPlaceholderEvidenceText(update.status);
+        }).length
+      : 0;
+    const possibleXiPlayerCount = [
+      ...(Array.isArray(e.possible_xi?.team1) ? e.possible_xi.team1 : []),
+      ...(Array.isArray(e.possible_xi?.team2) ? e.possible_xi.team2 : []),
+    ].filter(hasNamedEvidence).length;
+    const sourceLinkCount = Array.isArray(e.source_links)
+      ? e.source_links.filter((entry) => {
+          if (!entry || typeof entry !== 'object') return false;
+          const source = entry as { url?: unknown; source?: unknown };
+          return typeof source.url === 'string'
+            && /^https?:\/\//i.test(source.url.trim())
+            && source.source !== 'demo';
+        }).length
+      : 0;
     enrichmentSignals.set(e.match_id, {
       enrichment_confidence: e.confidence ?? undefined,
-      has_expert_preview: Boolean(e.expert_preview?.trim()),
-      key_player_count: Array.isArray(e.key_players) ? e.key_players.length : 0,
-      player_update_count: Array.isArray(e.player_updates) ? e.player_updates.length : 0,
-      possible_xi_player_count: (Array.isArray(e.possible_xi?.team1) ? e.possible_xi.team1.length : 0)
-        + (Array.isArray(e.possible_xi?.team2) ? e.possible_xi.team2.length : 0),
-      source_link_count: Array.isArray(e.source_links) ? e.source_links.length : 0,
+      has_expert_preview: !isPlaceholderEvidenceText(e.expert_preview),
+      key_player_count: keyPlayerCount,
+      player_update_count: playerUpdateCount,
+      possible_xi_player_count: possibleXiPlayerCount,
+      source_link_count: sourceLinkCount,
     });
   });
 
@@ -463,7 +504,10 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 
     return {
       ...match,
-      venue: match.venue || espnVenue.get(match.match_id) || enrichmentVenue.get(match.match_id) || '',
+      venue: (!isPlaceholderEvidenceText(match.venue) ? match.venue.trim() : '')
+        || espnVenue.get(match.match_id)
+        || enrichmentVenue.get(match.match_id)
+        || '',
       competition_name: espnCompetition.get(match.match_id),
       team1_logo_url: findTeamLogo(match.team1),
       team2_logo_url: findTeamLogo(match.team2),
@@ -472,7 +516,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       bookmaker_odds: oddsMap.get(match.match_id),
       spotlight_signals: {
         ...enrichmentSignals.get(match.match_id),
-        has_espn_context: espnVenue.has(match.match_id) || espnH2H.has(match.match_id),
+        has_espn_context: espnVenue.has(match.match_id) || h2hMatchCount > 0,
         h2h_match_count: h2hMatchCount,
       },
     };

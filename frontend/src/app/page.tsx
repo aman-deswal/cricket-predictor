@@ -9,9 +9,10 @@ import {
   compareMatchesByCompetition,
   getCompetitionPriority,
   getCompetitionProfile,
-  getFeaturedHorizonMatches,
   getMatchTimestamp,
+  hasValidMarketOdds,
 } from '@/lib/competition';
+import { selectFeaturedMatch } from '@/lib/featured-selection';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
@@ -22,64 +23,6 @@ import Link from 'next/link';
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
   return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
-}
-
-function getDataRichnessScore(match: MatchWithPredictions): number {
-  const prediction = getPrimaryPrediction(match);
-  const signals = match.spotlight_signals;
-  return [
-    prediction ? 35 : 0,
-    match.bookmaker_odds ? 30 : 0,
-    signals?.has_expert_preview ? 25 : 0,
-    signals?.has_espn_context ? 20 : 0,
-    signals?.enrichment_confidence === 'high' ? 18 : signals?.enrichment_confidence === 'medium' ? 10 : 0,
-    Math.min((signals?.h2h_match_count ?? 0) * 4, 20),
-    Math.min((signals?.source_link_count ?? 0) * 5, 20),
-    Math.min((signals?.key_player_count ?? 0) * 4, 20),
-    Math.min((signals?.possible_xi_player_count ?? 0) * 2, 20),
-    Math.min((signals?.player_update_count ?? 0) * 3, 12),
-    Math.min(((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0)) * 2, 20),
-  ].reduce((sum, score) => sum + score, 0);
-}
-
-function getPredictionConfidenceScore(match: MatchWithPredictions): number {
-  const prediction = getPrimaryPrediction(match);
-  return prediction?.confidence === 'high' ? 3 : prediction?.confidence === 'medium' ? 2 : prediction ? 1 : 0;
-}
-
-function getMeaningfulEdgeScore(match: MatchWithPredictions): number {
-  const prediction = getPrimaryPrediction(match);
-  const edgeScore = prediction && match.bookmaker_odds
-    ? Math.max(
-        0,
-        Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100),
-        Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
-      )
-    : 0;
-  return edgeScore >= 7 ? edgeScore : 0;
-}
-
-function compareFeaturedMatches(a: MatchWithPredictions, b: MatchWithPredictions): number {
-  const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
-  if (priorityDiff !== 0) return priorityDiff;
-
-  const richnessDiff = getDataRichnessScore(b) - getDataRichnessScore(a);
-  if (richnessDiff !== 0) return richnessDiff;
-
-  const confidenceDiff = getPredictionConfidenceScore(b) - getPredictionConfidenceScore(a);
-  if (confidenceDiff !== 0) return confidenceDiff;
-
-  const edgeDiff = getMeaningfulEdgeScore(b) - getMeaningfulEdgeScore(a);
-  if (edgeDiff !== 0) return edgeDiff;
-
-  const kickoffDiff = getMatchTimestamp(a) - getMatchTimestamp(b);
-  if (kickoffDiff !== 0) return kickoffDiff;
-
-  return a.match_id.localeCompare(b.match_id);
-}
-
-function selectFeaturedMatch(matches: MatchWithPredictions[], now = Date.now()): MatchWithPredictions | null {
-  return getFeaturedHorizonMatches(matches, now).sort(compareFeaturedMatches)[0] ?? null;
 }
 
 function getMatchDayLabel(date: string): string {
@@ -169,12 +112,15 @@ function SectionHeading({
   );
 }
 
-function SixSensePickHeading() {
+function SixSensePickHeading({ marketBacked }: { marketBacked: boolean }) {
   return (
     <SectionHeading icon={<Logo size={40} />} bareIcon>
       <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
         <span className="text-amber-600">SixSense</span>
         <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
+        <span className="ml-2 text-[9px] tracking-[0.12em] text-slate-400">
+          {marketBacked ? 'Market backed' : 'Model projection · No market available'}
+        </span>
       </h2>
     </SectionHeading>
   );
@@ -474,14 +420,15 @@ function MatchBoardStrip({
             const team2Leads = prediction
               ? prediction.team2_win_probability > prediction.team1_win_probability
               : false;
-            const ev1 = prediction && match.bookmaker_odds
+            const hasMarket = hasValidMarketOdds(match);
+            const ev1 = prediction && hasMarket && match.bookmaker_odds
               ? Math.round((prediction.team1_win_probability - 1 / match.bookmaker_odds.team1_odds) * 100)
               : 0;
-            const ev2 = prediction && match.bookmaker_odds
+            const ev2 = prediction && hasMarket && match.bookmaker_odds
               ? Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
               : 0;
             const edgePct = Math.max(ev1, ev2);
-            const hasEdge = edgePct >= 7;
+            const hasEdge = hasMarket && edgePct >= 7;
             const isFeatured = match.match_id === featuredMatchId;
 
             return (
@@ -502,15 +449,17 @@ function MatchBoardStrip({
                       {isFeatured && (
                         <span
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
-                          title="SixSense Pick"
-                          aria-label="SixSense Pick"
+                          title={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Pick · Model projection · No market available'}
+                          aria-label={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Pick · Model projection · No market available'}
                         >
                           <Logo size={18} />
                           <span className="leading-none">
                             <span className="block text-[6px] font-black uppercase tracking-[0.2em] text-amber-500">
                               SixSense<sup className="ml-px text-[0.55em] tracking-normal">™</sup>
                             </span>
-                            <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.2em] text-white">Pick</span>
+                            <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.12em] text-white">
+                              {hasMarket ? 'Pick' : 'Model projection'}
+                            </span>
                           </span>
                         </span>
                       )}
@@ -538,9 +487,9 @@ function MatchBoardStrip({
                         </span>
                         <span
                           className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                          title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                          title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
                         >
-                          {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
+                          {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
                         </span>
                       </span>
                       <span
@@ -558,9 +507,9 @@ function MatchBoardStrip({
                         </span>
                         <span
                           className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                          title={match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                          title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
                         >
-                          {match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
+                          {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
                         </span>
                       </span>
                       <span
@@ -620,6 +569,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
+  const hasMarket = hasValidMarketOdds(match);
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
@@ -656,6 +606,13 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+              hasMarket
+                ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
+                : 'border-slate-400/20 bg-slate-400/[0.06] text-slate-300'
+            }`}>
+              {hasMarket ? 'Market backed' : 'Model projection · No market available'}
+            </span>
           </div>
 
           {/* Row 2: Teams + chart */}
@@ -675,7 +632,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                     {(prediction.team1_win_probability * 100).toFixed(0)}%
                   </p>
                 )}
-                {match.bookmaker_odds && (
+                {hasMarket && match.bookmaker_odds && (
                   <p className="text-[10px] font-mono text-slate-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team1_odds)}
                   </p>
@@ -698,7 +655,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                     {(prediction.team2_win_probability * 100).toFixed(0)}%
                   </p>
                 )}
-                {match.bookmaker_odds && (
+                {hasMarket && match.bookmaker_odds && (
                   <p className="text-[10px] font-mono text-slate-300 mt-1">
                     {decimalToAmerican(match.bookmaker_odds.team2_odds)}
                   </p>
@@ -838,7 +795,7 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading />
+                <SixSensePickHeading marketBacked={hasValidMarketOdds(featuredMatch)} />
               </div>
               <div className="p-3">
                 <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />

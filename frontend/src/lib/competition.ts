@@ -556,7 +556,6 @@ export function getFeaturedHorizonMatches<T extends CompetitionMatch>(matches: T
     .filter((match) => {
       const kickoff = getMatchTimestamp(match);
       return match.status.toLowerCase() === 'upcoming'
-        && hasValidMarketOdds(match)
         && kickoff > now
         && kickoff !== Number.MAX_SAFE_INTEGER;
     })
