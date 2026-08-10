@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from utils.db import get_client
 from fetch_squads import fetch_and_store_squads
+from fetch_player_stats import fetch_stats_for_match_squads
 
 
 def _parse_match_time(value: str) -> datetime | None:
@@ -57,6 +58,7 @@ def main(window_minutes: int = 5, live_grace_minutes: int = 10) -> None:
     print(f"Refreshing squads for {len(match_ids)} imminent matches...")
     for match_id in match_ids:
         fetch_and_store_squads(match_ids=[match_id], force=True)
+        fetch_stats_for_match_squads(match_id=match_id, force=False)
 
 
 if __name__ == "__main__":

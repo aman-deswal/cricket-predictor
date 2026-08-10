@@ -1,8 +1,8 @@
-name: Fetch Squads & Player Stats
+name: Fetch Squads & Headshots
 
 on:
   schedule:
-    - cron: '37 */6 * * *'  # Every 6 hours; owns squads, player stats, and new-squad headshots
+    - cron: '37 */6 * * *'  # Every 6 hours; owns squads and new-squad headshots
   workflow_dispatch:
 
 permissions:
@@ -33,13 +33,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python pipeline/fetch_squads.py
-
-      - name: Fetch player stats
-        env:
-          CRICAPI_KEY: ${{ secrets.CRICAPI_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/fetch_player_stats.py
 
       - name: Fetch headshots for new squads
         env:
