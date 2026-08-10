@@ -12,9 +12,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import fetch_odds
 
 
-def _http_error(status_code: int) -> requests.HTTPError:
+def _http_error(status_code: int, payload=None, headers=None) -> requests.HTTPError:
     response = requests.Response()
     response.status_code = status_code
+    response.headers.update(headers or {})
+    if payload is not None:
+        response._content = __import__("json").dumps(payload).encode()
+        response.headers["content-type"] = "application/json"
     return requests.HTTPError(f"{status_code} error", response=response)
 
 
@@ -32,6 +36,34 @@ class TestSportDiscovery(unittest.TestCase):
             fetch_odds.get_available_cricket_sports(),
             ["cricket_caribbean_premier_league"],
         )
+
+
+class TestApiErrorDiagnostics(unittest.TestCase):
+    def test_reports_provider_code_and_quota_without_request_url(self):
+        error = _http_error(
+            401,
+            {
+                "message": "Usage quota has been exhausted",
+                "error_code": "OUT_OF_USAGE_CREDITS",
+            },
+            {
+                "x-requests-remaining": "0",
+                "x-requests-used": "500",
+            },
+        )
+        error.request = requests.Request(
+            "GET",
+            "https://api.the-odds-api.com/v4/sports/cricket_odi/odds",
+            params={"apiKey": "never-log-this-key"},
+        ).prepare()
+
+        details = fetch_odds.describe_api_error(error)
+
+        self.assertIn("status=401", details)
+        self.assertIn("error_code=OUT_OF_USAGE_CREDITS", details)
+        self.assertIn("x-requests-remaining=0", details)
+        self.assertNotIn("never-log-this-key", details)
+        self.assertNotIn("apiKey", details)
 
 
 class TestRefreshOutcomes(unittest.TestCase):

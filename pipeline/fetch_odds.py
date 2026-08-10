@@ -34,6 +34,30 @@ REGIONS = "uk,au"  # Best cricket bookmaker coverage
 MARKETS = "h2h"  # Match winner odds
 
 
+def describe_api_error(exc: requests.RequestException) -> str:
+    """Return provider diagnostics without logging request URLs or API keys."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return exc.__class__.__name__
+
+    details = [f"status={response.status_code}"]
+    try:
+        payload = response.json()
+    except requests.exceptions.JSONDecodeError:
+        payload = {}
+
+    if isinstance(payload, dict):
+        if payload.get("error_code"):
+            details.append(f"error_code={payload['error_code']}")
+        if payload.get("message"):
+            details.append(f"message={str(payload['message'])[:240]}")
+
+    for header in ("x-requests-remaining", "x-requests-used", "x-requests-last", "retry-after"):
+        if response.headers.get(header) is not None:
+            details.append(f"{header}={response.headers[header]}")
+    return ", ".join(details)
+
+
 def get_available_cricket_sports() -> list[str]:
     """Return cricket sport keys that are currently in-season."""
     resp = requests.get(
@@ -211,7 +235,7 @@ def main(sport: Optional[str] = None) -> int:
     try:
         sports = [sport] if sport else get_available_cricket_sports()
     except requests.RequestException as exc:
-        logger.error("Failed to discover active cricket sports: %s", exc)
+        logger.error("Failed to discover active cricket sports (%s)", describe_api_error(exc))
         return 1
 
     if not sports:
@@ -230,7 +254,7 @@ def main(sport: Optional[str] = None) -> int:
             all_odds_rows.extend(rows)
         except requests.RequestException as e:
             failed_sports.append(sport_key)
-            logger.error("Failed to fetch %s: %s", sport_key, e)
+            logger.error("Failed to fetch %s (%s)", sport_key, describe_api_error(e))
             response = getattr(e, "response", None)
             if response is not None and response.status_code in (401, 403):
                 logger.error("Fatal sportsbook API authentication failure")
