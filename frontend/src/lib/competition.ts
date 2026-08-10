@@ -70,7 +70,7 @@ export function getMatchFormatLabel(match: { match_type?: string; name: string; 
 
   if (/(^|\b)(test|tests?|red ball|first class)(\b|$)/.test(source)) return 'TEST';
   if (source.includes('hundred')) return '100-BALL';
-  if (/(^|\b)(ipl|wpl|bbl|wbbl|cpl|psl|sa20|mlc|lpl|bpl|ilt20|t20 blast|vitality blast|super smash|csa t20 challenge|global super league|t20 world cup|t20i)(\b|$)/.test(source)) return 'T20';
+  if (/(^|\b)(ipl|indian premier league|wpl|women'?s premier league|bbl|big bash league|wbbl|women'?s big bash league|cpl|caribbean premier league|psl|pakistan super league|sa20|mlc|major league cricket|lpl|lanka premier league|bpl|bangladesh premier league|ilt20|t20 blast|vitality blast|super smash|csa t20 challenge|global super league|t20 world cup|t20i)(\b|$)/.test(source)) return 'T20';
   if (/(^|\b)(cricket world cup|world cup league 2|champions trophy|odi series|odi tri series|odi super league|one day cup)(\b|$)/.test(source)) return 'ODI';
   if (/(^|\b)(odi|one day|one-day|50 over|50-over)(\b|$)/.test(source)) return 'ODI';
   if (/(^|\b)(t20|twenty20|twenty 20)(\b|$)/.test(source)) return 'T20';

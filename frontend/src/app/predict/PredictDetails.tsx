@@ -4,6 +4,16 @@ import { useEffect, useState, useCallback, useRef, type CSSProperties, type Reac
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
@@ -198,90 +208,334 @@ function PlayerHeadshot({
   );
 }
 
-function OddsTrendSparkline({
-  history,
-  team1Name,
-  team2Name,
-  team1Color,
-  team2Color,
-}: {
-  history: MatchOdds[];
-  team1Name: string;
-  team2Name: string;
-  team1Color: string;
-  team2Color: string;
-}) {
-  const points = history
-    .map((snapshot) => {
-      const timestamp = new Date(snapshot.fetched_at).getTime();
-      const raw1 = snapshot.team1_odds > 1 ? 1 / snapshot.team1_odds : 0;
-      const raw2 = snapshot.team2_odds > 1 ? 1 / snapshot.team2_odds : 0;
-      const rawDraw = snapshot.draw_odds && snapshot.draw_odds > 1 ? 1 / snapshot.draw_odds : 0;
-      const total = raw1 + raw2 + rawDraw;
-      if (!Number.isFinite(timestamp) || total <= 0) return null;
-      return {
-        timestamp,
-        team1: (raw1 / total) * 100,
-        team2: (raw2 / total) * 100,
-      };
-    })
-    .filter((point): point is { timestamp: number; team1: number; team2: number } => point !== null)
-    .sort((a, b) => a.timestamp - b.timestamp);
+const MARKET_BOOK_COLORS = ['#22d3ee', '#f59e0b', '#a78bfa'] as const;
 
-  if (points.length < 2) return null;
+function toNormalizedImpliedProbability(snapshot: MatchOdds, trackedTeam: 'team1' | 'team2'): number | null {
+  if (!hasValidTwoSidedOdds(snapshot)) return null;
+  const raw1 = 1 / snapshot.team1_odds;
+  const raw2 = 1 / snapshot.team2_odds;
+  const rawDraw = snapshot.draw_odds && snapshot.draw_odds > 1 ? 1 / snapshot.draw_odds : 0;
+  const total = raw1 + raw2 + rawDraw;
+  if (total <= 0) return null;
+  return ((trackedTeam === 'team1' ? raw1 : raw2) / total) * 100;
+}
 
-  const width = 240;
-  const height = 46;
-  const padding = 4;
-  const firstTime = points[0].timestamp;
-  const lastTime = points[points.length - 1].timestamp;
-  const timeRange = Math.max(lastTime - firstTime, 1);
-  const probabilities = points.flatMap((point) => [point.team1, point.team2]);
-  const rawMin = Math.min(...probabilities);
-  const rawMax = Math.max(...probabilities);
-  const center = (rawMin + rawMax) / 2;
-  const probabilityRange = Math.max(rawMax - rawMin, 4);
-  const minProbability = center - probabilityRange / 2;
-  const x = (timestamp: number) => padding + ((timestamp - firstTime) / timeRange) * (width - padding * 2);
-  const y = (probability: number) => height - padding - ((probability - minProbability) / probabilityRange) * (height - padding * 2);
-  const pathFor = (team: 'team1' | 'team2') => points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.timestamp).toFixed(1)} ${y(point[team]).toFixed(1)}`)
-    .join(' ');
-  const latest = points[points.length - 1];
-  const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString(undefined, {
-    weekday: 'short',
-    hour: 'numeric',
+function formatMarketTimestamp(timestamp: number, compact = false): string {
+  return new Date(timestamp).toLocaleString(undefined, compact
+    ? { month: 'short', day: 'numeric', hour: 'numeric' }
+    : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric' });
+}
+
+function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
+  const bookmakerKey = normalizeBookmaker(current.bookmaker);
+  const deduped = new Map<string, MatchOdds>();
+  [...history, current].forEach((snapshot) => {
+    if (normalizeBookmaker(snapshot.bookmaker) !== bookmakerKey || !hasValidTwoSidedOdds(snapshot)) return;
+    deduped.set(snapshot.fetched_at, snapshot);
   });
-  const accessibleLabel = `${team1Name} and ${team2Name} normalized market-implied win probability from ${formatTime(firstTime)} to ${formatTime(lastTime)}. Current: ${team1Name} ${latest.team1.toFixed(0)} percent, ${team2Name} ${latest.team2.toFixed(0)} percent.`;
+  return [...deduped.values()].sort(
+    (left, right) => new Date(left.fetched_at).getTime() - new Date(right.fetched_at).getTime()
+  );
+}
+
+function MarketMovementPanel({
+  sportsbookOdds,
+  oddsHistory,
+  displayTeam1,
+  displayTeam2,
+  trackedTeam,
+  trackedTeamKey,
+  detailTileClass,
+}: {
+  sportsbookOdds: MatchOdds[];
+  oddsHistory: MatchOdds[];
+  displayTeam1: string;
+  displayTeam2: string;
+  trackedTeam: string;
+  trackedTeamKey: 'team1' | 'team2';
+  detailTileClass: string;
+}) {
+  const featuredBooks = sportsbookOdds.slice(0, 3).map((current, index) => {
+    const history = getBookHistory(current, oddsHistory);
+    const latestProbability = toNormalizedImpliedProbability(current, trackedTeamKey);
+    const openingProbability = history.length > 0
+      ? toNormalizedImpliedProbability(history[0], trackedTeamKey)
+      : latestProbability;
+
+    return {
+      id: `${normalizeBookmaker(current.bookmaker)}-${index}`,
+      bookmaker: current.bookmaker,
+      color: MARKET_BOOK_COLORS[index % MARKET_BOOK_COLORS.length],
+      current,
+      history,
+      latestProbability,
+      openingProbability,
+      delta: latestProbability !== null && openingProbability !== null
+        ? latestProbability - openingProbability
+        : null,
+      marketUrl: getBookmakerMarketUrl(current.bookmaker),
+    };
+  });
+
+  if (featuredBooks.length === 0) {
+    return (
+      <motion.div
+        className={`${detailTileClass} mb-4`}
+        {...fadeUp}
+        transition={{ delay: 0.16 }}
+      >
+        <ComingSoonTile
+          title="Market board opening soon"
+          body="This panel will light up once trusted sportsbooks publish opening prices."
+        />
+      </motion.div>
+    );
+  }
+
+  const chartRowsByTimestamp = new Map<number, Record<string, number | null>>();
+  featuredBooks.forEach((book) => {
+    book.history.forEach((snapshot) => {
+      const timestamp = new Date(snapshot.fetched_at).getTime();
+      if (Number.isNaN(timestamp)) return;
+      const row = chartRowsByTimestamp.get(timestamp) ?? {};
+      row.timestamp = timestamp;
+      row[book.id] = toNormalizedImpliedProbability(snapshot, trackedTeamKey);
+      chartRowsByTimestamp.set(timestamp, row);
+    });
+  });
+
+  const chartRows = [...chartRowsByTimestamp.values()]
+    .sort((left, right) => Number(left.timestamp) - Number(right.timestamp));
+  const chartValues = chartRows.flatMap((row) => featuredBooks.map((book) => row[book.id]))
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+  const fallbackLatest = featuredBooks
+    .map((book) => book.latestProbability)
+    .filter((value): value is number => value !== null);
+  const fallbackOpening = featuredBooks
+    .map((book) => book.openingProbability)
+    .filter((value): value is number => value !== null);
+  const consensusLatest = fallbackLatest.length > 0
+    ? fallbackLatest.reduce((sum, value) => sum + value, 0) / fallbackLatest.length
+    : null;
+  const consensusOpening = fallbackOpening.length > 0
+    ? fallbackOpening.reduce((sum, value) => sum + value, 0) / fallbackOpening.length
+    : null;
+  const consensusDelta = consensusLatest !== null && consensusOpening !== null
+    ? consensusLatest - consensusOpening
+    : null;
+
+  const marketSideMeta = getTeamMeta(trackedTeam);
+  const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
+  const opposingMeta = getTeamMeta(opposingTeam);
+
+  let minDomain = 40;
+  let maxDomain = 60;
+  if (chartValues.length > 0) {
+    const rawMin = Math.min(...chartValues);
+    const rawMax = Math.max(...chartValues);
+    const spread = Math.max(rawMax - rawMin, 6);
+    const center = (rawMin + rawMax) / 2;
+    minDomain = Math.max(0, Math.floor(center - spread / 2 - 3));
+    maxDomain = Math.min(100, Math.ceil(center + spread / 2 + 3));
+  }
 
   return (
-    <div className="mt-2 border-t border-white/[0.07] pt-2">
-      <div className="mb-1 flex items-center justify-between gap-3 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-        <span>72h implied win trend</span>
-        <span>{points.length} updates</span>
+    <motion.div
+      className={`${detailTileClass} mb-4 border-white/10`}
+      {...fadeUp}
+      transition={{ delay: 0.16 }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className={detailTileTitleClass}>
+            <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 13h12M3 10l2.4-5 2.2 3.1L10.4 3l2.6 7" />
+            </svg>
+            Market Movement
+          </h2>
+          <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
+            Tracking {marketSideMeta.shortName} implied win probability across the top 3 trusted books
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
+            {featuredBooks.length} books shown
+          </span>
+          {consensusLatest !== null && (
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+              {marketSideMeta.shortName} {consensusLatest.toFixed(0)}%
+              {consensusDelta !== null && (
+                <span className={`ml-2 ${consensusDelta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                  {consensusDelta >= 0 ? '↑' : '↓'} {Math.abs(consensusDelta).toFixed(1)} pts
+                </span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
-      <svg
-        className="h-11 w-full overflow-visible"
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={accessibleLabel}
-      >
-        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="rgba(148,163,184,0.12)" strokeDasharray="3 4" />
-        <path d={pathFor('team1')} fill="none" stroke={team1Color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <path d={pathFor('team2')} fill="none" stroke={team2Color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <circle cx={x(latest.timestamp)} cy={y(latest.team1)} r="2.5" fill={team1Color} />
-        <circle cx={x(latest.timestamp)} cy={y(latest.team2)} r="2.5" fill={team2Color} />
-      </svg>
-      <div className="-mt-0.5 flex justify-between text-[8px] font-medium text-slate-600">
-        <time dateTime={new Date(firstTime).toISOString()}>{formatTime(firstTime)}</time>
-        <time dateTime={new Date(lastTime).toISOString()}>{formatTime(lastTime)}</time>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(22rem,1fr)]">
+        <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-4 sm:px-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: marketSideMeta.primaryColor }} />
+                {marketSideMeta.shortName}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">vs {opposingMeta.shortName}</span>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {chartRows.length > 0 ? `${chartRows.length} snapshots` : 'awaiting history'}
+            </span>
+          </div>
+
+          {chartRows.length > 0 ? (
+            <>
+              <div className="h-[18rem] sm:h-[21rem]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows} margin={{ top: 10, right: 16, bottom: 0, left: -18 }}>
+                    <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.85} />
+                    <XAxis
+                      dataKey="timestamp"
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
+                      tick={{ fill: '#94a3b8', fontSize: 10 }}
+                      tickLine={false}
+                      axisLine={false}
+                      minTickGap={28}
+                    />
+                    <YAxis
+                      domain={[minDomain, maxDomain]}
+                      tickFormatter={(value) => `${value}%`}
+                      tick={{ fill: '#94a3b8', fontSize: 10 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={40}
+                    />
+                    <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.35} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#111820',
+                        border: '1px solid rgba(245,158,11,0.16)',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-jetbrains-mono, monospace)',
+                      }}
+                      labelFormatter={(value) => formatMarketTimestamp(Number(value))}
+                      formatter={(value, name) => {
+                        const book = featuredBooks.find((entry) => entry.id === name);
+                        const numericValue = typeof value === 'number'
+                          ? value
+                          : Array.isArray(value) && typeof value[0] === 'number'
+                            ? value[0]
+                            : null;
+                        if (numericValue === null) return ['—', book?.bookmaker ?? String(name)];
+                        return [`${numericValue.toFixed(1)}%`, book?.bookmaker ?? String(name)];
+                      }}
+                    />
+                    {featuredBooks.map((book) => (
+                      <Line
+                        key={book.id}
+                        type="monotone"
+                        dataKey={book.id}
+                        stroke={book.color}
+                        strokeWidth={3}
+                        dot={chartRows.length <= 8 ? { fill: book.color, r: 3, strokeWidth: 0 } : false}
+                        activeDot={{ fill: book.color, r: 5, strokeWidth: 0 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {featuredBooks.map((book) => (
+                  <div key={`${book.id}-legend`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: book.color }} />
+                        <span className="truncate">{book.bookmaker}</span>
+                      </span>
+                      <span className="text-[11px] font-black text-white">
+                        {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {book.delta !== null
+                        ? `${book.delta >= 0 ? 'Up' : 'Down'} ${Math.abs(book.delta).toFixed(1)} pts since first capture`
+                        : 'First capture recorded'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-[18rem] items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-6 text-center text-sm text-slate-400">
+              Market history will plot here after the next sportsbook refresh captures opening movement.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {featuredBooks.map((book) => (
+            <button
+              key={book.id}
+              type="button"
+              onClick={() => {
+                if (book.marketUrl) openExternalMarket(book.marketUrl);
+              }}
+              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-[0.12em] text-white">{book.bookmaker}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {book.history.length} update{book.history.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {book.marketUrl && (
+                  <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M6 4h6v6" />
+                    <path d="M10 4L4 10" />
+                    <path d="M4 6v6h6" />
+                  </svg>
+                )}
+              </div>
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-lg font-black text-white">
+                    {decimalToAmerican(book.current.team1_odds)}
+                  </p>
+                </div>
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-lg font-black text-white">
+                    {decimalToAmerican(book.current.team2_odds)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[11px]">
+                <span className="font-semibold text-slate-400">
+                  {trackedTeam} implied
+                </span>
+                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
+                  {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
+                  {book.delta !== null && (
+                    <span className="ml-2 text-[10px] uppercase tracking-[0.14em]">
+                      {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)} pts
+                    </span>
+                  )}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-1 flex items-center gap-3 text-[9px] font-semibold text-slate-400">
-        <span className="flex min-w-0 items-center gap-1 truncate"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: team1Color }} />{team1Name} {latest.team1.toFixed(0)}%</span>
-        <span className="flex min-w-0 items-center gap-1 truncate"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: team2Color }} />{team2Name} {latest.team2.toFixed(0)}%</span>
-      </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -486,6 +740,7 @@ export function PredictDetails() {
     ))
     .sort((a, b) => a.sportsbook.priority - b.sportsbook.priority)
     .map((entry) => entry.odd);
+  const featuredSportsbooks = sportsbookOdds.slice(0, 3);
   const featuredBookmakerUrl = sportsbookOdds.length > 0
     ? getBookmakerMarketUrl(sportsbookOdds[0].bookmaker)
     : null;
@@ -545,6 +800,16 @@ export function PredictDetails() {
   const h2hReconciliationNote = h2hContradictsPick && h2hContextSentences
     ? `Despite ${h2hLeader} leading the recent H2H, ${modelPick} is the model pick. ${h2hContextSentences}`
     : '';
+  const marketTrackedTeam = prediction?.predicted_winner ?? (
+    featuredSportsbooks.length > 0
+      ? (
+        featuredSportsbooks.reduce((sum, book) => sum + (toNormalizedImpliedProbability(book, 'team1') ?? 0), 0) / featuredSportsbooks.length
+      ) >= 50
+        ? displayTeam1
+        : displayTeam2
+      : displayTeam1
+  );
+  const marketTrackedTeamKey = marketTrackedTeam === displayTeam1 ? 'team1' : 'team2';
 
   // Build a player name → image_url lookup from squad data
   const playerImageMap = new Map<string, string>();
@@ -669,6 +934,15 @@ export function PredictDetails() {
           </div>
         )}
       </div>
+      <MarketMovementPanel
+        sportsbookOdds={featuredSportsbooks}
+        oddsHistory={oddsHistory}
+        displayTeam1={displayTeam1}
+        displayTeam2={displayTeam2}
+        trackedTeam={marketTrackedTeam}
+        trackedTeamKey={marketTrackedTeamKey}
+        detailTileClass={detailTileStrongClass}
+      />
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <style>{`
         @keyframes pickEntrance {
@@ -960,135 +1234,60 @@ export function PredictDetails() {
         </motion.div>
       </motion.div>
 
-      {/* 1. Sportsbook Odds | Reasoning — side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Sportsbook Odds */}
+      {/* Our Take */}
+      {prediction ? (
         <motion.div
-          className={`${detailTileClass} transition-all ${
-            sportsbookOdds.length > 0 ? 'border-white/10' : 'border-white/[0.06]'
-          }`}
+          className={`${detailTileClass} mb-4`}
           {...fadeUp}
-          transition={{ delay: 0.22 }}
+          transition={{ delay: 0.25 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className={detailTileTitleClass}>
-              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14V6l4-4 4 4v8" /><path d="M10 14V8l4-4v10" /><line x1="2" y1="14" x2="14" y2="14" /></svg>
-              Sportsbook Odds
+              <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
+              Our Take
             </h2>
-            {sportsbookOdds.length > 0 && <span className={`${detailTileMetaClass} text-slate-300`}>{sportsbookOdds.length} trusted {sportsbookOdds.length === 1 ? 'sportsbook' : 'sportsbooks'}</span>}
+            <span
+              className={`text-[clamp(0.7rem,0.85vw,0.85rem)] px-2.5 py-0.5 rounded-full font-semibold ${
+                prediction.confidence === 'high'
+                  ? 'bg-emerald-500/20 text-emerald-300'
+                  : prediction.confidence === 'medium'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-red-500/20 text-red-300'
+              }`}
+            >
+              {prediction.confidence} confidence
+            </span>
           </div>
-          {sportsbookOdds.length > 0 ? (
-            <div className="space-y-2">
-              {sportsbookOdds.slice(0, 4).map((o) => {
-                const aiProb1 = prediction?.team1_win_probability;
-                const impliedProb1 = o.team1_odds > 0 ? (1 / o.team1_odds) : null;
-                const diff1 = aiProb1 && impliedProb1 ? ((aiProb1 - impliedProb1) * 100).toFixed(0) : null;
-                const isValue1 = diff1 && Number(diff1) > 10;
-                const isValue2 = diff1 && Number(diff1) < -10;
-                const bookmakerHistory = oddsHistory.filter(
-                  (snapshot) => normalizeBookmaker(snapshot.bookmaker) === normalizeBookmaker(o.bookmaker)
-                    && hasValidTwoSidedOdds(snapshot)
-                );
-
-                return (
-                  <button
-                    key={`${o.bookmaker}-${o.fetched_at}`}
-                    type="button"
-                    onClick={() => {
-                      const url = getBookmakerMarketUrl(o.bookmaker);
-                      if (url) openExternalMarket(url);
-                    }}
-                    className="w-full appearance-none px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white/[0.04] border border-white/10 hover:border-amber-500/25 hover:bg-white/[0.06] transition-colors text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[clamp(0.72rem,0.9vw,0.9rem)] text-slate-300 font-medium w-24 sm:w-32 truncate">{o.bookmaker}</span>
-                      <div className="flex items-center gap-2.5">
-                        <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue1 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                          {decimalToAmerican(o.team1_odds)}
-                          {isValue1 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
-                        </span>
-                        <span className="text-slate-500 text-[clamp(0.7rem,0.85vw,0.85rem)]">|</span>
-                        <span className={`inline-flex items-center rounded-md border px-2 sm:px-2.5 py-0.5 sm:py-1 text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-bold ${isValue2 ? 'text-yellow-300 border-yellow-400/30 bg-yellow-400/5' : 'text-white border-white/10 bg-white/[0.03]'}`}>
-                          {decimalToAmerican(o.team2_odds)}
-                          {isValue2 && <span className="ml-1 text-[clamp(0.7rem,0.85vw,0.85rem)] text-yellow-400">↑</span>}
-                        </span>
-                        <svg className="w-3 h-3 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 4h6v6" /><path d="M10 4L4 10" /><path d="M4 6v6h6" /></svg>
-                      </div>
-                    </div>
-                    <OddsTrendSparkline
-                      history={bookmakerHistory}
-                      team1Name={team1Meta.shortName}
-                      team2Name={team2Meta.shortName}
-                      team1Color={teamColor1}
-                      team2Color={teamColor2}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <ComingSoonTile
-              title="Market board opening soon"
-              body="Odds will appear here as soon as the bookmaker feed prices this fixture."
-            />
+          <div className="space-y-2.5">
+            {visibleReasoning.map((sentence: string, i: number) => (
+                <div key={i} className={`pl-3 border-l-2 border-amber-500/30 ${detailTileBodyClass}`}>
+                  {sentence.trim()}
+                </div>
+              ))}
+          </div>
+          {reasoningSentences.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
+              className="mt-3 text-[clamp(0.75rem,0.9vw,0.9rem)] font-medium text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              {expandedSections.ourTake ? 'Show less' : 'Show more'}
+            </button>
           )}
         </motion.div>
-
-        {/* Our Take */}
-        {prediction ? (
-          <motion.div
-            className={detailTileClass}
-            {...fadeUp}
-            transition={{ delay: 0.25 }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className={detailTileTitleClass}>
-                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
-                Our Take
-              </h2>
-              <span
-                className={`text-[clamp(0.7rem,0.85vw,0.85rem)] px-2.5 py-0.5 rounded-full font-semibold ${
-                  prediction.confidence === 'high'
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : prediction.confidence === 'medium'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'bg-red-500/20 text-red-300'
-                }`}
-              >
-                {prediction.confidence} confidence
-              </span>
-            </div>
-            <div className="space-y-2.5">
-              {visibleReasoning.map((sentence: string, i: number) => (
-                  <div key={i} className={`pl-3 border-l-2 border-amber-500/30 ${detailTileBodyClass}`}>
-                    {sentence.trim()}
-                  </div>
-                ))}
-            </div>
-            {reasoningSentences.length > 3 && (
-              <button
-                type="button"
-                onClick={() => setExpandedSections((prev) => ({ ...prev, ourTake: !prev.ourTake }))}
-                className="mt-3 text-[clamp(0.75rem,0.9vw,0.9rem)] font-medium text-amber-400 hover:text-amber-300 transition-colors"
-              >
-                {expandedSections.ourTake ? 'Show less' : 'Show more'}
-              </button>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            {...fadeUp}
-            transition={{ delay: 0.25 }}
-            className={detailTileClass}
-          >
-            <ComingSoonTile
-              title="Prediction premiere queued"
-              body="The deterministic model will publish this tile after fixture context, odds, and matchup signals finish ingesting."
-              eyebrow="Analysis warming up"
-            />
-          </motion.div>
-        )}
-      </div>
+      ) : (
+        <motion.div
+          {...fadeUp}
+          transition={{ delay: 0.25 }}
+          className={`${detailTileClass} mb-4`}
+        >
+          <ComingSoonTile
+            title="Prediction premiere queued"
+            body="The deterministic model will publish this tile after fixture context, odds, and matchup signals finish ingesting."
+            eyebrow="Analysis warming up"
+          />
+        </motion.div>
+      )}
 
       {/* AI vs Market Edge — the betting value signal */}
       {sportsbookOdds.length > 0 && prediction && (() => {
