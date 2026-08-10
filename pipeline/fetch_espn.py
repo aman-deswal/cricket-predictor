@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from utils.espn import find_espn_event_id, get_match_summary
+from utils.espn import derive_match_type_from_series_note, find_espn_event_id, get_match_summary
 from utils.db import get_client, get_upcoming_matches
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -192,6 +192,22 @@ def backfill_enrichment_venue(client, match_id: str, venue: dict) -> None:
         logger.debug("  No enrichment row to update: %s", exc)
 
 
+def backfill_match_type(client, match_id: str, espn_data: dict) -> None:
+    """Update matches with the ESPN-derived canonical match type when available."""
+    series_note = espn_data.get("series_note") or espn_data.get("schedule", {}).get("series_note") or ""
+    match_type = derive_match_type_from_series_note(series_note)
+    if not match_type:
+        return
+
+    try:
+        client.table("matches").update({
+            "match_type": match_type,
+        }).eq("match_id", match_id).execute()
+        logger.info("  Backfilled match type: %s", match_type)
+    except Exception as exc:
+        logger.warning("  Failed to backfill match type: %s", exc)
+
+
 def process_match(client, match: dict) -> bool:
     """Fetch ESPN data for a single match. Returns True if successful."""
     team1 = match.get("team1", "")
@@ -216,6 +232,7 @@ def process_match(client, match: dict) -> bool:
                 store_espn_data(client, match_id, espn_data)
                 backfill_venue(client, match_id, espn_data.get("venue", {}))
                 backfill_enrichment_venue(client, match_id, espn_data.get("venue", {}))
+                backfill_match_type(client, match_id, espn_data)
                 return True
             return False
     except Exception:
@@ -239,6 +256,7 @@ def process_match(client, match: dict) -> bool:
     store_espn_data(client, match_id, espn_data)
     backfill_venue(client, match_id, espn_data.get("venue", {}))
     backfill_enrichment_venue(client, match_id, espn_data.get("venue", {}))
+    backfill_match_type(client, match_id, espn_data)
 
     return True
 

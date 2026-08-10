@@ -2,7 +2,7 @@ name: Fetch Squads & Player Stats
 
 on:
   schedule:
-    - cron: '37 */6 * * *'  # Every 6 hours; owns squads, player stats, and new-squad headshots
+    - cron: '17 * * * *'  # Every hour; owns squads, player stats, and new-squad headshots
   workflow_dispatch:
 
 permissions:

@@ -10,7 +10,7 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-from utils.db import get_client, get_upcoming_matches
+from utils.db import get_client
 from utils.espn import get_match_summary
 
 load_dotenv()
@@ -213,7 +213,14 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
             if resp.data:
                 matches.extend(resp.data)
     else:
-        matches = get_upcoming_matches(future_only=True)
+        response = (
+            client.table("matches")
+            .select("*")
+            .in_("status", ["upcoming", "live"])
+            .order("date", desc=False)
+            .execute()
+        )
+        matches = response.data or []
 
     if not matches:
         print("No upcoming matches found.")

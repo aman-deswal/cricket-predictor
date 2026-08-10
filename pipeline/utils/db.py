@@ -8,6 +8,8 @@ from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+from utils.espn import derive_match_type_from_series_note
+
 load_dotenv()
 
 UUID_RE = re.compile(
@@ -49,7 +51,35 @@ def get_upcoming_matches(date: Optional[str] = None, future_only: bool = False) 
     if future_only:
         query = query.gte("date", datetime.now(timezone.utc).isoformat())
     response = query.order("date", desc=False).execute()
-    return response.data
+    matches = response.data or []
+    if not matches:
+        return []
+
+    match_ids = [match.get("match_id") for match in matches if match.get("match_id")]
+    espn_by_match_id: dict[str, str] = {}
+    if match_ids:
+        espn_response = (
+            client.table("espn_match_data")
+            .select("match_id, series_note")
+            .in_("match_id", match_ids)
+            .execute()
+        )
+        for row in espn_response.data or []:
+            match_id = row.get("match_id")
+            if not match_id:
+                continue
+            espn_by_match_id[match_id] = row.get("series_note") or ""
+
+    for match in matches:
+        series_note = espn_by_match_id.get(match.get("match_id", ""), "")
+        if not series_note:
+            continue
+        match["competition_name"] = series_note
+        derived_match_type = derive_match_type_from_series_note(series_note)
+        if derived_match_type:
+            match["match_type"] = derived_match_type
+
+    return matches
 
 
 def store_prediction(prediction: dict) -> None:

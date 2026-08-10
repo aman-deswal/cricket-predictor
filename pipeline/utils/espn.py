@@ -79,6 +79,27 @@ def _parse_date(date_str: str) -> Optional[datetime]:
         return None
 
 
+def derive_match_type_from_series_note(series_note: str) -> Optional[str]:
+    """Derive a canonical match type from ESPN's series note text."""
+    if not series_note:
+        return None
+
+    normalized = re.sub(r"\s+", " ", series_note).strip().lower()
+    if not normalized:
+        return None
+    if "world test championship" in normalized or re.search(r"\btest\b", normalized):
+        return "Test"
+    if "t10" in normalized:
+        return "T10"
+    if "odi" in normalized or "one day" in normalized or "one-day" in normalized or "50 over" in normalized or "50-over" in normalized:
+        return "ODI"
+    if "t20" in normalized or "twenty20" in normalized or "twenty 20" in normalized:
+        return "T20"
+    if "hundred" in normalized:
+        return "The Hundred"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Series search
 # ---------------------------------------------------------------------------
