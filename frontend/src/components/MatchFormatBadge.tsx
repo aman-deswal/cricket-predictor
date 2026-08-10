@@ -13,7 +13,8 @@ const FORMAT_STYLES: Record<string, string> = {
   ODI: 'border-sky-400/30 bg-sky-400/10 text-sky-100',
   T20: 'border-violet-400/30 bg-violet-400/10 text-violet-100',
   T10: 'border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-100',
-  'THE HUNDRED': 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100',
+  '100-BALL': 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100',
+  'FORMAT TBD': 'border-white/10 bg-white/[0.05] text-slate-200',
   CRICKET: 'border-white/10 bg-white/[0.05] text-slate-200',
 };
 

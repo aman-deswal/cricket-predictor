@@ -87,16 +87,59 @@ def derive_match_type_from_series_note(series_note: str) -> Optional[str]:
     normalized = re.sub(r"\s+", " ", series_note).strip().lower()
     if not normalized:
         return None
+    if normalized == "cricket":
+        return None
     if "world test championship" in normalized or re.search(r"\btest\b", normalized):
         return "Test"
     if "t10" in normalized:
         return "T10"
+    if "hundred" in normalized:
+        return "The Hundred"
+    if any(marker in normalized for marker in (
+        "ipl",
+        "indian premier league",
+        "wpl",
+        "women's premier league",
+        "womens premier league",
+        "big bash league",
+        "bbl",
+        "wbbl",
+        "caribbean premier league",
+        "cpl",
+        "pakistan super league",
+        "psl",
+        "sa20",
+        "major league cricket",
+        "mlc",
+        "lanka premier league",
+        "lpl",
+        "bangladesh premier league",
+        "bpl",
+        "international league t20",
+        "ilt20",
+        "t20 blast",
+        "vitality blast",
+        "super smash",
+        "csa t20 challenge",
+        "global super league",
+        "t20 world cup",
+        "t20i",
+    )):
+        return "T20"
+    if any(marker in normalized for marker in (
+        "cricket world cup",
+        "world cup league 2",
+        "champions trophy",
+        "odi series",
+        "odi tri series",
+        "odi super league",
+        "one day cup",
+    )):
+        return "ODI"
     if "odi" in normalized or "one day" in normalized or "one-day" in normalized or "50 over" in normalized or "50-over" in normalized:
         return "ODI"
     if "t20" in normalized or "twenty20" in normalized or "twenty 20" in normalized:
         return "T20"
-    if "hundred" in normalized:
-        return "The Hundred"
     return None
 
 

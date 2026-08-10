@@ -16,6 +16,7 @@ from utils.db import get_client
 from utils.cricbuzz import get_cricbuzz_upcoming_fixtures
 from utils.espn import (
     _normalize_team,
+    derive_match_type_from_series_note,
     get_espn_fixtures,
     get_series_fixtures,
 )
@@ -411,22 +412,24 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
 
 def _infer_match_type(fixture: Union[dict, str]) -> str:
     """Extract a canonical match type from ESPN fixture metadata."""
-    if isinstance(fixture, str):
-        raw = fixture.strip().upper()
-        return raw if raw in {"TEST", "ODI", "T20"} else ""
+    def _from_text(value: str) -> str:
+        normalized = derive_match_type_from_series_note(value)
+        return normalized or ""
 
-    event_type = str(
-        fixture.get("event_type")
-        or fixture.get("class_card")
-        or fixture.get("match_type")
-        or ""
-    ).strip().upper()
-    if event_type == "TEST":
-        return "Test"
-    if event_type in {"ODI", "T20"}:
-        return event_type
-    if event_type == "T20I":
-        return "T20"
+    if isinstance(fixture, str):
+        return _from_text(fixture)
+
+    for candidate in (
+        fixture.get("event_type"),
+        fixture.get("class_card"),
+        fixture.get("title"),
+        fixture.get("description"),
+        fixture.get("league_name"),
+        fixture.get("match_type"),
+    ):
+        inferred = _from_text(str(candidate or "").strip())
+        if inferred:
+            return inferred
     return ""
 
 

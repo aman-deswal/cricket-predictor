@@ -32,11 +32,29 @@ class TestInferMatchType(unittest.TestCase):
     def test_t20i_normalizes_to_t20(self):
         self.assertEqual(_infer_match_type({"event_type": "T20I"}), "T20")
 
-    def test_unknown_metadata_returns_blank(self):
-        self.assertEqual(_infer_match_type({"league_name": "Caribbean Premier League"}), "")
+    def test_league_name_can_infer_t20_format(self):
+        self.assertEqual(_infer_match_type({"league_name": "Caribbean Premier League"}), "T20")
 
     def test_empty_string_returns_blank(self):
         self.assertEqual(_infer_match_type(""), "")
+
+    def test_generic_cricket_uses_title_hint(self):
+        self.assertEqual(_infer_match_type({
+            "match_type": "cricket",
+            "title": "3rd ODI",
+        }), "ODI")
+
+    def test_world_cup_infers_odi(self):
+        self.assertEqual(_infer_match_type({
+            "match_type": "cricket",
+            "league_name": "ICC Cricket World Cup",
+        }), "ODI")
+
+    def test_hundred_infers_hundred_format(self):
+        self.assertEqual(_infer_match_type({
+            "match_type": "cricket",
+            "league_name": "The Hundred Men's Competition",
+        }), "The Hundred")
 
 
 class TestEspnFixturesToMatches(unittest.TestCase):

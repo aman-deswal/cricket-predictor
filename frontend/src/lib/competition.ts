@@ -69,13 +69,16 @@ export function getMatchFormatLabel(match: { match_type?: string; name: string; 
   ].filter(Boolean).join(' '));
 
   if (/(^|\b)(test|tests?|red ball|first class)(\b|$)/.test(source)) return 'TEST';
+  if (source.includes('hundred')) return '100-BALL';
+  if (/(^|\b)(ipl|wpl|bbl|wbbl|cpl|psl|sa20|mlc|lpl|bpl|ilt20|t20 blast|vitality blast|super smash|csa t20 challenge|global super league|t20 world cup|t20i)(\b|$)/.test(source)) return 'T20';
+  if (/(^|\b)(cricket world cup|world cup league 2|champions trophy|odi series|odi tri series|odi super league|one day cup)(\b|$)/.test(source)) return 'ODI';
   if (/(^|\b)(odi|one day|one-day|50 over|50-over)(\b|$)/.test(source)) return 'ODI';
   if (/(^|\b)(t20|twenty20|twenty 20)(\b|$)/.test(source)) return 'T20';
   if (/(^|\b)t10(\b|$)/.test(source)) return 'T10';
-  if (source.includes('hundred')) return 'THE HUNDRED';
 
   const fallback = match.match_type?.trim();
-  return fallback ? fallback.toUpperCase() : 'CRICKET';
+  if (fallback && normalizeText(fallback) !== 'cricket') return fallback.toUpperCase();
+  return 'FORMAT TBD';
 }
 
 interface LeagueDefinition {
