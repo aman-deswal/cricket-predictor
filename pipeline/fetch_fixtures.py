@@ -445,9 +445,13 @@ def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
         team2 = f.get("team2", "")
         if not team1 or not team2:
             continue
+        competition_name = f.get("league_name", "").strip()
+        display_name = f"{team1} vs {team2}"
+        if competition_name:
+            display_name = f"{display_name}, {competition_name}"
         match = {
             "match_id": f"{source}-{source_id}",
-            "name": f"{team1} vs {team2}",
+            "name": display_name,
             "team1": team1,
             "team2": team2,
             "date": f.get("date", ""),

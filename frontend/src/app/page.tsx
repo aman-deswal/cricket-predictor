@@ -3,7 +3,15 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getMatchSection, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
+import { getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
+import {
+  compareMatchCenterMatches,
+  compareMatchesByCompetition,
+  getCompetitionPriority,
+  getCompetitionProfile,
+  getFeaturedHorizonMatches,
+  getMatchTimestamp,
+} from '@/lib/competition';
 import { MatchCard } from '@/components/MatchCard';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
@@ -14,12 +22,6 @@ import Link from 'next/link';
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
   return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
-}
-
-function getMatchTimestamp(match: MatchWithPredictions): number {
-  const raw = match.date.endsWith('Z') || match.date.includes('+') ? match.date : `${match.date}Z`;
-  const timestamp = new Date(raw).getTime();
-  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
 }
 
 function getDataRichnessScore(match: MatchWithPredictions): number {
@@ -40,15 +42,13 @@ function getDataRichnessScore(match: MatchWithPredictions): number {
   ].reduce((sum, score) => sum + score, 0);
 }
 
-function getSpotlightScore(match: MatchWithPredictions): number {
+function getPredictionConfidenceScore(match: MatchWithPredictions): number {
   const prediction = getPrimaryPrediction(match);
-  const kickoff = getMatchTimestamp(match);
-  const hoursAway = Math.max(0, (kickoff - Date.now()) / (1000 * 60 * 60));
-  const soonScore = Math.max(0, 12 - Math.min(hoursAway, 12));
-  const section = getMatchSection(match);
-  const popularityScore = section === 'International' ? 240 : section !== 'Other' ? 170 : 0;
-  const dataRichnessScore = getDataRichnessScore(match);
-  const confidenceScore = prediction?.confidence === 'high' ? 45 : prediction?.confidence === 'medium' ? 25 : prediction ? 8 : 0;
+  return prediction?.confidence === 'high' ? 3 : prediction?.confidence === 'medium' ? 2 : prediction ? 1 : 0;
+}
+
+function getMeaningfulEdgeScore(match: MatchWithPredictions): number {
+  const prediction = getPrimaryPrediction(match);
   const edgeScore = prediction && match.bookmaker_odds
     ? Math.max(
         0,
@@ -56,8 +56,30 @@ function getSpotlightScore(match: MatchWithPredictions): number {
         Math.round((prediction.team2_win_probability - 1 / match.bookmaker_odds.team2_odds) * 100)
       )
     : 0;
+  return edgeScore >= 7 ? edgeScore : 0;
+}
 
-  return popularityScore + dataRichnessScore + confidenceScore + Math.min(edgeScore, 30) + soonScore;
+function compareFeaturedMatches(a: MatchWithPredictions, b: MatchWithPredictions): number {
+  const priorityDiff = getCompetitionPriority(a) - getCompetitionPriority(b);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  const richnessDiff = getDataRichnessScore(b) - getDataRichnessScore(a);
+  if (richnessDiff !== 0) return richnessDiff;
+
+  const confidenceDiff = getPredictionConfidenceScore(b) - getPredictionConfidenceScore(a);
+  if (confidenceDiff !== 0) return confidenceDiff;
+
+  const edgeDiff = getMeaningfulEdgeScore(b) - getMeaningfulEdgeScore(a);
+  if (edgeDiff !== 0) return edgeDiff;
+
+  const kickoffDiff = getMatchTimestamp(a) - getMatchTimestamp(b);
+  if (kickoffDiff !== 0) return kickoffDiff;
+
+  return a.match_id.localeCompare(b.match_id);
+}
+
+function selectFeaturedMatch(matches: MatchWithPredictions[], now = Date.now()): MatchWithPredictions | null {
+  return getFeaturedHorizonMatches(matches, now).sort(compareFeaturedMatches)[0] ?? null;
 }
 
 function getMatchDayLabel(date: string): string {
@@ -97,34 +119,7 @@ function decimalToAmerican(d: number): string {
 }
 
 function getCompetitionLabel(match: MatchWithPredictions): string {
-  if (match.competition_name?.trim()) return match.competition_name.trim();
-
-  const namedCompetition = match.name.split(',').slice(1).join(',').trim();
-  if (namedCompetition) return namedCompetition;
-
-  const section = getMatchSection(match);
-  return section === 'Other' ? `${match.match_type} cricket` : section;
-}
-
-function getCompetitionKind(competition: string, match: MatchWithPredictions): string {
-  if (getMatchSection(match) === 'International') return 'International series';
-  if (/(cup|trophy|championship|qualifier|world|finals?)/i.test(competition)) return 'Tournament';
-  return 'League';
-}
-
-function getCompetitionFilterLabel(competition: string): string {
-  const knownLabels: Array<[RegExp, string]> = [
-    [/Indian Premier League/i, 'IPL'],
-    [/Women'?s Premier League/i, 'WPL'],
-    [/Women'?s Big Bash/i, 'WBBL'],
-    [/Big Bash/i, 'BBL'],
-    [/Major League Cricket/i, 'MLC'],
-    [/Caribbean Premier League/i, 'CPL'],
-    [/Pakistan Super League/i, 'PSL'],
-    [/Lanka Premier League/i, 'LPL'],
-    [/(Men'?s |Women'?s )?Hundred/i, 'The Hundred'],
-  ];
-  return knownLabels.find(([pattern]) => pattern.test(competition))?.[1] ?? competition;
+  return getCompetitionProfile(match).label;
 }
 
 function SparseSlateNotice({ matchCount }: { matchCount: number }) {
@@ -277,7 +272,7 @@ function MatchDiscoveryPanel({
   sectionIdx: number;
 }) {
   const leadMatch = sectionMatches[0];
-  const competitionKind = getCompetitionKind(competition, leadMatch);
+  const competitionKind = getCompetitionProfile(leadMatch).kind;
 
   return (
     <motion.section
@@ -323,7 +318,7 @@ function MatchBoardStrip({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const tickerRef = useRef<HTMLDivElement>(null);
-  const sortedMatches = [...matches].sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
+  const sortedMatches = [...matches].sort(compareMatchCenterMatches);
   const filteredMatches = sortedMatches.filter((match) => {
     if (activeFilter === 'live') return isMatchLive(match);
     if (activeFilter === 'today') return isMatchToday(match);
@@ -749,30 +744,48 @@ export default function HomePage() {
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
 
-  const featuredMatch = [...matches].sort((a, b) => {
-    const scoreDiff = getSpotlightScore(b) - getSpotlightScore(a);
-    if (scoreDiff !== 0) return scoreDiff;
-    return getMatchTimestamp(a) - getMatchTimestamp(b);
-  })[0] ?? null;
+  const featuredMatch = selectFeaturedMatch(matches);
 
-  const sectionPool = featuredMatch
-    ? matches.filter((match) => match.match_id !== featuredMatch.match_id)
-    : matches;
+  const sectionPool = matches;
 
-  const competitionGroups = new Map<string, MatchWithPredictions[]>();
+  const competitionGroups = new Map<string, {
+    competition: string;
+    filterLabel: string;
+    priority: number;
+    matches: MatchWithPredictions[];
+  }>();
   sectionPool.forEach((match) => {
-    const competition = getCompetitionLabel(match);
-    competitionGroups.set(competition, [...(competitionGroups.get(competition) ?? []), match]);
+    const profile = getCompetitionProfile(match);
+    const group = competitionGroups.get(profile.key);
+    if (group) {
+      group.matches.push(match);
+      return;
+    }
+    competitionGroups.set(profile.key, {
+      competition: profile.label,
+      filterLabel: profile.filterLabel,
+      priority: profile.priority,
+      matches: [match],
+    });
   });
-  const matchesByCompetition = Array.from(competitionGroups, ([competition, competitionMatches]) => ({
-    competition,
-    matches: competitionMatches.sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b)),
-  })).sort((a, b) => getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]));
+  const matchesByCompetition = Array.from(competitionGroups, ([key, group]) => ({
+    key,
+    ...group,
+    matches: group.matches.sort(compareMatchesByCompetition),
+  })).sort((a, b) => {
+    const priorityDiff = a.priority - b.priority;
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const kickoffDiff = getMatchTimestamp(a.matches[0]) - getMatchTimestamp(b.matches[0]);
+    if (kickoffDiff !== 0) return kickoffDiff;
+
+    return a.key.localeCompare(b.key);
+  });
 
   const discoveryMatchCount = matchesByCompetition.reduce((count, group) => count + group.matches.length, 0);
   const visibleCompetitionGroups = activeCompetition === 'all'
     ? matchesByCompetition
-    : matchesByCompetition.filter((group) => group.competition === activeCompetition);
+    : matchesByCompetition.filter((group) => group.key === activeCompetition);
   useEffect(() => {
     async function load() {
       try {
@@ -876,21 +889,21 @@ export default function HomePage() {
                   >
                     All <span className="ml-1 font-mono opacity-70">{discoveryMatchCount}</span>
                   </button>
-                  {matchesByCompetition.map(({ competition, matches: competitionMatches }) => (
+                  {matchesByCompetition.map(({ key, filterLabel, matches: competitionMatches }) => (
                     <button
-                      key={competition}
+                      key={key}
                       type="button"
                       onClick={() => {
-                        setActiveCompetition(competition);
+                        setActiveCompetition(key);
                         setCompetitionFiltersOpen(false);
                       }}
                       className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
-                        activeCompetition === competition
+                        activeCompetition === key
                           ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                           : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
                       }`}
                     >
-                      {getCompetitionFilterLabel(competition)} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
+                      {filterLabel} <span className="ml-1 font-mono opacity-70">{competitionMatches.length}</span>
                     </button>
                   ))}
                 </div>
@@ -899,9 +912,9 @@ export default function HomePage() {
             <div className="p-3">
             {visibleCompetitionGroups.length > 0 ? (
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {visibleCompetitionGroups.map(({ competition, matches: sectionMatches }, sectionIdx) => (
+                {visibleCompetitionGroups.map(({ key, competition, matches: sectionMatches }, sectionIdx) => (
                   <MatchDiscoveryPanel
-                    key={competition}
+                    key={key}
                     competition={competition}
                     sectionMatches={sectionMatches}
                     sectionIdx={sectionIdx}
