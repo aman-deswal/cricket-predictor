@@ -112,15 +112,12 @@ function SectionHeading({
   );
 }
 
-function SixSensePickHeading({ marketBacked }: { marketBacked: boolean }) {
+function SixSensePickHeading() {
   return (
     <SectionHeading icon={<Logo size={40} />} bareIcon>
       <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
         <span className="text-amber-600">SixSense</span>
         <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
-        <span className="ml-2 text-[9px] tracking-[0.12em] text-slate-400">
-          {marketBacked ? 'Market backed' : 'Model projection · No market available'}
-        </span>
       </h2>
     </SectionHeading>
   );
@@ -449,8 +446,8 @@ function MatchBoardStrip({
                       {isFeatured && (
                         <span
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
-                          title={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Pick · Model projection · No market available'}
-                          aria-label={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Pick · Model projection · No market available'}
+                          title={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Projection'}
+                          aria-label={hasMarket ? 'SixSense Pick · Market backed' : 'SixSense Projection'}
                         >
                           <Logo size={18} />
                           <span className="leading-none">
@@ -458,7 +455,7 @@ function MatchBoardStrip({
                               SixSense<sup className="ml-px text-[0.55em] tracking-normal">™</sup>
                             </span>
                             <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[0.12em] text-white">
-                              {hasMarket ? 'Pick' : 'Model projection'}
+                              {hasMarket ? 'Pick' : 'Projection'}
                             </span>
                           </span>
                         </span>
@@ -611,7 +608,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
                 : 'border-slate-400/20 bg-slate-400/[0.06] text-slate-300'
             }`}>
-              {hasMarket ? 'Market backed' : 'Model projection · No market available'}
+              {hasMarket ? 'Market backed' : 'SixSense Projection'}
             </span>
           </div>
 
@@ -795,7 +792,7 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading marketBacked={hasValidMarketOdds(featuredMatch)} />
+                <SixSensePickHeading />
               </div>
               <div className="p-3">
                 <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
