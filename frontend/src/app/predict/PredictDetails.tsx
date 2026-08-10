@@ -571,12 +571,6 @@ export function PredictDetails() {
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
 
-        {isLiveMatch && (
-          <div className="relative mb-4 flex justify-center">
-            <LiveStatusBadge />
-          </div>
-        )}
-
         <div className="relative flex items-center justify-between gap-4 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
           <motion.div
@@ -833,8 +827,7 @@ export function PredictDetails() {
             })()}
           </span>
           <span>{espnData?.venue_name || enrichment?.venue_name || match.venue || 'TBC'}{espnData?.venue_city ? `, ${espnData.venue_city}` : ''}</span>
-          <span className={isLiveMatch ? 'font-bold text-red-200' : undefined}>
-            {isLiveMatch && <span className="mr-1.5 font-black uppercase tracking-widest">LIVE ·</span>}
+          <span>
             <time dateTime={match.date}>
               {new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
             </time>
@@ -842,23 +835,6 @@ export function PredictDetails() {
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
-
-      {isLiveMatch && (
-        <motion.div
-          {...fadeUp}
-          role="status"
-          aria-label="Live match status"
-          className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-red-400/20 bg-red-400/[0.06] px-4 py-3 sm:px-5"
-        >
-          <LiveStatusBadge />
-          <div>
-            <p className="text-sm font-black text-white">Match in progress</p>
-            <p className={`${detailTileMetaClass} text-slate-400`}>
-              Probabilities and analysis shown below are model projections, not a final result.
-            </p>
-          </div>
-        </motion.div>
-      )}
 
       {/* 1. Sportsbook Odds | Reasoning — side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
