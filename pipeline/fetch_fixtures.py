@@ -410,23 +410,48 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
 
 
 def _infer_match_type(fixture: Union[dict, str]) -> str:
-    """Extract a canonical match type from ESPN fixture metadata."""
+    """Extract a canonical match type from ESPN fixture metadata.
+
+    Be tolerant of variant strings returned by feeds (e.g. 'T20I', 't20',
+    'Twenty20', 'T20 International', or other descriptive phrases). Returns
+    one of: 'T20', 'ODI', 'Test', or empty string when unknown.
+    """
     if isinstance(fixture, str):
         raw = fixture.strip().upper()
-        return raw if raw in {"TEST", "ODI", "T20"} else ""
+        if "TEST" in raw:
+            return "Test"
+        if "ODI" in raw:
+            return "ODI"
+        if "T20" in raw or "TWENTY" in raw:
+            return "T20"
+        return ""
 
-    event_type = str(
+    # Prefer explicit event_type/class_card/match_type metadata
+    raw_event = str(
         fixture.get("event_type")
         or fixture.get("class_card")
         or fixture.get("match_type")
         or ""
-    ).strip().upper()
-    if event_type == "TEST":
+    ).strip()
+    event_type = raw_event.upper()
+
+    if "TEST" in event_type:
         return "Test"
-    if event_type in {"ODI", "T20"}:
-        return event_type
-    if event_type == "T20I":
+    if "ODI" in event_type:
+        return "ODI"
+    # Accept T20, T20I, 'TWENTY20', 'TWENTY20I', 'TWENTY'
+    if "T20" in event_type or "TWENTY" in event_type:
         return "T20"
+
+    # Fallback: if the fixture has a textual title/description that hints at T20/ODI/Test
+    title = str(fixture.get("title", "") or fixture.get("description", "") or "").upper()
+    if "TEST" in title:
+        return "Test"
+    if "ODI" in title:
+        return "ODI"
+    if "T20" in title or "TWENTY" in title:
+        return "T20"
+
     return ""
 
 
