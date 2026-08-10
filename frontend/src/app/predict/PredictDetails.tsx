@@ -925,15 +925,6 @@ export function PredictDetails() {
           </div>
         )}
       </div>
-      <MarketMovementPanel
-        sportsbookOdds={featuredSportsbooks}
-        oddsHistory={oddsHistory}
-        displayTeam1={displayTeam1}
-        displayTeam2={displayTeam2}
-        trackedTeam={marketTrackedTeam}
-        trackedTeamKey={marketTrackedTeamKey}
-        detailTileClass={detailTileClass}
-      />
       {/* Hero: Teams + Prediction (replaces VS with chart) */}
       <style>{`
         @keyframes pickEntrance {
@@ -1224,6 +1215,16 @@ export function PredictDetails() {
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
+
+      <MarketMovementPanel
+        sportsbookOdds={featuredSportsbooks}
+        oddsHistory={oddsHistory}
+        displayTeam1={displayTeam1}
+        displayTeam2={displayTeam2}
+        trackedTeam={marketTrackedTeam}
+        trackedTeamKey={marketTrackedTeamKey}
+        detailTileClass={detailTileClass}
+      />
 
       {/* Our Take */}
       {prediction ? (
