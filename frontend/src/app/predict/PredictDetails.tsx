@@ -375,7 +375,7 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)]">
         <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-3 sm:px-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
@@ -392,7 +392,7 @@ function MarketMovementPanel({
 
           {chartRows.length > 0 ? (
             <>
-              <div className="h-40 sm:h-44 lg:h-40">
+              <div className="h-32 sm:h-36 lg:h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartRows} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
                     <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.7} />
@@ -463,13 +463,59 @@ function MarketMovementPanel({
               </div>
             </>
           ) : (
-            <div className="flex h-40 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
+            <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
               Market history will plot here after the next sportsbook refresh captures opening movement.
             </div>
           )}
         </div>
 
-        <div className="space-y-2.5">
+        <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {featuredBooks.map((book) => (
+            <button
+              key={`${book.id}-mobile`}
+              type="button"
+              onClick={() => {
+                if (book.marketUrl) openExternalMarket(book.marketUrl);
+              }}
+              className="min-w-[220px] flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-black uppercase tracking-[0.14em] text-white">{book.bookmaker}</p>
+                  <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {book.history.length} update{book.history.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {book.marketUrl && (
+                  <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M6 4h6v6" />
+                    <path d="M10 4L4 10" />
+                    <path d="M4 6v6h6" />
+                  </svg>
+                )}
+              </div>
+              <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
+                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team1_odds)}</p>
+                </div>
+                <span className="pb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
+                <div className="text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
+                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team2_odds)}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[10px]">
+                <span className="text-slate-400">{trackedTeam} implied</span>
+                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
+                  {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="hidden space-y-2.5 lg:block">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
