@@ -23,29 +23,20 @@ from fetch_fixtures import (
 
 
 class TestInferMatchType(unittest.TestCase):
-    def test_t20_default(self):
-        self.assertEqual(_infer_match_type("IPL 2025"), "T20")
+    def test_event_type_is_used_verbatim(self):
+        self.assertEqual(_infer_match_type({"event_type": "ODI"}), "ODI")
 
-    def test_t20_explicit(self):
-        self.assertEqual(_infer_match_type("ICC Men's T20 World Cup"), "T20")
+    def test_class_card_is_used_when_event_type_missing(self):
+        self.assertEqual(_infer_match_type({"class_card": "T20"}), "T20")
 
-    def test_odi_lowercase(self):
-        self.assertEqual(_infer_match_type("ICC Men's ODI World Cup"), "ODI")
+    def test_t20i_normalizes_to_t20(self):
+        self.assertEqual(_infer_match_type({"event_type": "T20I"}), "T20")
 
-    def test_one_day_spaced(self):
-        self.assertEqual(_infer_match_type("Men's One Day International"), "ODI")
+    def test_unknown_metadata_returns_blank(self):
+        self.assertEqual(_infer_match_type({"league_name": "Caribbean Premier League"}), "")
 
-    def test_one_day_hyphenated(self):
-        self.assertEqual(_infer_match_type("Women's One-Day Series"), "ODI")
-
-    def test_test_match(self):
-        self.assertEqual(_infer_match_type("ICC World Test Championship"), "Test")
-
-    def test_unknown_league_defaults_to_t20(self):
-        self.assertEqual(_infer_match_type("Caribbean Premier League"), "T20")
-
-    def test_empty_string(self):
-        self.assertEqual(_infer_match_type(""), "T20")
+    def test_empty_string_returns_blank(self):
+        self.assertEqual(_infer_match_type(""), "")
 
 
 class TestEspnFixturesToMatches(unittest.TestCase):
@@ -58,6 +49,7 @@ class TestEspnFixturesToMatches(unittest.TestCase):
             "date": date,
             "league_name": league_name,
             "league_id": "100",
+            "event_type": "T20",
             "status": status,
             "winner": None,
             "venue": venue,
@@ -112,6 +104,7 @@ class TestEspnFixturesToMatches(unittest.TestCase):
             status="in",
             date="2026-08-01T10:00:00Z",
             league_name="ICC World Test Championship",
+            event_type="Test",
         )]
 
         matches = _espn_fixtures_to_matches(fixtures)
@@ -131,7 +124,7 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(matches, [])
 
     def test_odi_league_name(self):
-        fixtures = [self._make_fixture(league_name="ICC Men's ODI Series")]
+        fixtures = [self._make_fixture(league_name="ICC Men's ODI Series", event_type="ODI")]
         matches = _espn_fixtures_to_matches(fixtures)
         self.assertEqual(matches[0]["match_type"], "ODI")
 
@@ -147,7 +140,7 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(matches[0]["match_type"], "ODI")
 
     def test_test_league_name(self):
-        fixtures = [self._make_fixture(league_name="ICC World Test Championship")]
+        fixtures = [self._make_fixture(league_name="ICC World Test Championship", event_type="Test")]
         matches = _espn_fixtures_to_matches(fixtures)
         self.assertEqual(matches[0]["match_type"], "Test")
 

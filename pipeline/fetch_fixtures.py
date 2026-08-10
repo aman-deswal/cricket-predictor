@@ -410,30 +410,24 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
 
 
 def _infer_match_type(fixture: Union[dict, str]) -> str:
-    """Infer a match type string from ESPN fixture metadata."""
+    """Extract a canonical match type from ESPN fixture metadata."""
     if isinstance(fixture, str):
-        fixture = {"league_name": fixture}
+        raw = fixture.strip().upper()
+        return raw if raw in {"TEST", "ODI", "T20"} else ""
 
-    event_type = str(fixture.get("event_type") or fixture.get("class_card") or "").upper()
-    if event_type in {"TEST", "ODI", "T20"}:
+    event_type = str(
+        fixture.get("event_type")
+        or fixture.get("class_card")
+        or fixture.get("match_type")
+        or ""
+    ).strip().upper()
+    if event_type == "TEST":
+        return "Test"
+    if event_type in {"ODI", "T20"}:
         return event_type
-
-    title = str(fixture.get("title") or "").lower()
-    description = str(fixture.get("description") or "").lower()
-    if "test" in title or "test" in description:
-        return "Test"
-    if "odi" in title or "odi" in description or "one day" in title or "one day" in description or "50-over" in description:
-        return "ODI"
-    if "t20" in title or "t20" in description:
+    if event_type == "T20I":
         return "T20"
-
-    league_name = str(fixture.get("league_name") or "")
-    lower = league_name.lower()
-    if "test" in lower:
-        return "Test"
-    if "odi" in lower or "one day" in lower or "one-day" in lower:
-        return "ODI"
-    return "T20"
+    return ""
 
 
 def _fixture_source_id(fixture: dict) -> Optional[str]:
