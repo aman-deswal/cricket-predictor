@@ -10,7 +10,7 @@ import argparse
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 
 from utils.db import get_client
 from utils.cricbuzz import get_cricbuzz_upcoming_fixtures
@@ -409,8 +409,25 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
     return scored
 
 
-def _infer_match_type(league_name: str) -> str:
-    """Infer a match type string from an ESPN league name."""
+def _infer_match_type(fixture: Union[dict, str]) -> str:
+    """Infer a match type string from ESPN fixture metadata."""
+    if isinstance(fixture, str):
+        fixture = {"league_name": fixture}
+
+    event_type = str(fixture.get("event_type") or fixture.get("class_card") or "").upper()
+    if event_type in {"TEST", "ODI", "T20"}:
+        return event_type
+
+    title = str(fixture.get("title") or "").lower()
+    description = str(fixture.get("description") or "").lower()
+    if "test" in title or "test" in description:
+        return "Test"
+    if "odi" in title or "odi" in description or "one day" in title or "one day" in description or "50-over" in description:
+        return "ODI"
+    if "t20" in title or "t20" in description:
+        return "T20"
+
+    league_name = str(fixture.get("league_name") or "")
     lower = league_name.lower()
     if "test" in lower:
         return "Test"
@@ -456,7 +473,7 @@ def _fixtures_to_matches(fixtures: list[dict]) -> list[dict]:
             "team2": team2,
             "date": f.get("date", ""),
             "venue": f.get("venue", ""),
-            "match_type": _infer_match_type(f.get("league_name", "")),
+            "match_type": _infer_match_type(f),
             "status": match_status,
         }
         if source == "espn":
