@@ -441,6 +441,7 @@ function MatchBoardStrip({
               : 0;
             const edgePct = Math.max(ev1, ev2);
             const hasEdge = hasMarket && edgePct >= 7;
+            const edgeTeam = hasEdge ? (ev1 >= ev2 ? 1 : 2) : null;
             const isFeatured = match.match_id === featuredMatchId;
 
             return (
@@ -473,11 +474,6 @@ function MatchBoardStrip({
                           </span>
                         </span>
                       )}
-                      {hasEdge && (
-                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-200">
-                          +{edgePct} edge
-                        </span>
-                      )}
                     </div>
                     {isMatchLive(match) ? (
                       <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
@@ -501,6 +497,15 @@ function MatchBoardStrip({
                         >
                           {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
                         </span>
+                        {edgeTeam === 1 && (
+                          <span
+                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                            title={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                            aria-label={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                          >
+                            +{edgePct}pt edge
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-amber-100' : 'text-gray-400'}`}
@@ -521,6 +526,15 @@ function MatchBoardStrip({
                         >
                           {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
                         </span>
+                        {edgeTeam === 2 && (
+                          <span
+                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                            title={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                            aria-label={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                          >
+                            +{edgePct}pt edge
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-amber-100' : 'text-gray-400'}`}
