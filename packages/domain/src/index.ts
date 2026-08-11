@@ -124,6 +124,106 @@ export interface MatchDetails {
   squads: MatchSquad[];
 }
 
+export interface PredictionHistoryItem {
+  prediction_id: string;
+  match_id: string;
+  predicted_winner: string;
+  actual_winner: string;
+  correct: boolean;
+  brier_score: number | null;
+  predicted_probability: number;
+  result_text?: string | null;
+  scored_at: string;
+  team1: string;
+  team2: string;
+  reasoning?: string;
+  toss_insight?: string;
+  confidence?: PredictionConfidence;
+  team1_win_probability?: number;
+  team2_win_probability?: number;
+}
+
+export interface AccuracySummary {
+  total: number;
+  correct: number;
+  accuracy: number;
+}
+
+export interface DashboardStats extends AccuracySummary {
+  avgBrier: number | null;
+}
+
+export interface AccuracySplit {
+  international: AccuracySummary;
+  league: AccuracySummary;
+}
+
+export interface CalibrationBin {
+  bin_center: number;
+  predicted_avg: number;
+  actual_avg: number;
+  count: number;
+}
+
+export interface AccuracyTrendPoint {
+  date: string;
+  accuracy: number;
+}
+
+export interface DashboardData {
+  stats: DashboardStats;
+  split: AccuracySplit;
+  calibration: CalibrationBin[];
+  trend: AccuracyTrendPoint[];
+}
+
+const INTERNATIONAL_TEAMS = new Set([
+  'afghanistan',
+  'australia',
+  'bangladesh',
+  'bermuda',
+  'canada',
+  'england',
+  'hong kong',
+  'india',
+  'ireland',
+  'kenya',
+  'namibia',
+  'nepal',
+  'netherlands',
+  'new zealand',
+  'oman',
+  'pakistan',
+  'papua new guinea',
+  'scotland',
+  'south africa',
+  'sri lanka',
+  'united arab emirates',
+  'united states of america',
+  'usa',
+  'west indies',
+  'zimbabwe',
+]);
+
+function normalizeTeamName(team: string): string {
+  return team
+    .toLowerCase()
+    .replace(/\s+\((men|women)\)$/, '')
+    .replace(/\s+(men|women)$/, '')
+    .trim();
+}
+
+export function isInternationalMatch(item: Pick<PredictionHistoryItem, 'team1' | 'team2'>): boolean {
+  return INTERNATIONAL_TEAMS.has(normalizeTeamName(item.team1))
+    && INTERNATIONAL_TEAMS.has(normalizeTeamName(item.team2));
+}
+
+export function summarizeAccuracy(items: Pick<PredictionHistoryItem, 'correct'>[]): AccuracySummary {
+  const total = items.length;
+  const correct = items.filter((item) => item.correct).length;
+  return { total, correct, accuracy: total > 0 ? correct / total : 0 };
+}
+
 export function getPrimaryPrediction(match: MatchWithPredictions): Prediction | null {
   return match.predictions[0] ?? null;
 }
