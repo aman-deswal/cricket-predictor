@@ -28,8 +28,6 @@ interface MatchRow {
   status: string;
   winner: string | null;
   competition_name: string | null;
-  team1_logo_url: string | null;
-  team2_logo_url: string | null;
   predictions: PredictionRow[] | null;
 }
 
@@ -44,8 +42,6 @@ const MATCH_FIELDS = `
   status,
   winner,
   competition_name,
-  team1_logo_url,
-  team2_logo_url,
   predictions (
     match_id,
     team1,
@@ -99,8 +95,6 @@ function mapMatch(row: MatchRow): MatchWithPredictions {
     status: row.status,
     winner: row.winner ?? undefined,
     competition_name: row.competition_name ?? undefined,
-    team1_logo_url: row.team1_logo_url ?? undefined,
-    team2_logo_url: row.team2_logo_url ?? undefined,
     predictions: (row.predictions ?? []).map(mapPrediction),
   };
 }

@@ -54,6 +54,76 @@ export interface EdgeScore {
   };
 }
 
+export interface MatchOdds {
+  match_id: string;
+  bookmaker: string;
+  team1_odds: number;
+  team2_odds: number;
+  draw_odds: number | null;
+  market: string;
+  fetched_at: string;
+}
+
+export interface SquadPlayer {
+  id: string;
+  name: string;
+  role: string;
+  batting_style?: string;
+  bowling_style?: string;
+  is_captain?: boolean;
+  is_keeper?: boolean;
+  image_url?: string;
+}
+
+export interface MatchSquad {
+  match_id: string;
+  team: string;
+  players: SquadPlayer[];
+  is_confirmed: boolean;
+  source: string;
+  fetched_at: string;
+}
+
+export interface PlayerUpdate {
+  player?: string;
+  team?: string;
+  status: string;
+  confidence?: 'confirmed' | 'reported' | 'speculative';
+  source_index?: number;
+}
+
+export interface SourceLink {
+  title?: string;
+  url?: string;
+  source?: string;
+  published_at?: string | null;
+}
+
+export interface MatchEnrichment {
+  match_id: string;
+  venue_name: string | null;
+  venue_confidence: 'confirmed' | 'reported' | 'unknown';
+  possible_xi: {
+    team1?: string[];
+    team2?: string[];
+  };
+  player_updates: PlayerUpdate[];
+  expert_preview: string | null;
+  toss_insight?: string | null;
+  source_links: SourceLink[];
+  confidence: PredictionConfidence;
+  generated_at: string;
+}
+
+export interface MatchDetails {
+  match: Match;
+  prediction: Prediction | null;
+  edgeScore: EdgeScore | null;
+  odds: MatchOdds[];
+  enrichment: MatchEnrichment | null;
+  squads: MatchSquad[];
+}
+
 export function getPrimaryPrediction(match: MatchWithPredictions): Prediction | null {
   return match.predictions[0] ?? null;
 }
