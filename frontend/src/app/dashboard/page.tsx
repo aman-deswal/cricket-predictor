@@ -1,11 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getDashboardStats, getAccuracyBySplit } from '@/lib/supabase';
-import { AccuracyDashboard } from '@/components/AccuracyDashboard';
 import { TargetIcon, BarChartIcon, BowlIcon, GlobeIcon, ShieldIcon } from '@/components/CricketIcons';
+
+const AccuracyDashboard = dynamic(
+  () => import('@/components/AccuracyDashboard').then((module) => module.AccuracyDashboard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-6" aria-label="Loading performance charts">
+        {['Accuracy trend', 'Calibration plot'].map((label) => (
+          <div key={label} className="rounded-2xl border border-slate-700/40 bg-[#10161d] p-4 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
+            <div className="mt-5 h-56 animate-pulse rounded-xl bg-white/[0.03] sm:h-[260px]" />
+          </div>
+        ))}
+      </div>
+    ),
+  }
+);
 
 interface Stats {
   total: number;
@@ -33,7 +50,7 @@ function StatCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="relative bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/40 overflow-hidden group hover:border-amber-600/30 transition-colors"
+      className="group relative overflow-hidden rounded-2xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 p-4 transition-colors hover:border-amber-600/30 sm:p-6 sm:backdrop-blur-xl"
     >
       <div className="absolute top-4 right-4 text-slate-600 group-hover:text-slate-400 transition-colors">
         {icon}
@@ -69,16 +86,16 @@ export default function DashboardPage() {
   return (
     <div>
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
+        <h1 className="mb-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
           <span className="text-amber-600">Dashboard</span>
         </h1>
-        <p className="text-slate-500 mb-8 text-sm">Prediction accuracy and model performance</p>
+        <p className="mb-6 text-sm text-slate-500 sm:mb-8">Prediction accuracy and model performance</p>
       </motion.div>
 
       {stats && (
         <>
           {/* Top 3 stat cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+          <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
             <StatCard
               label="Overall Accuracy"
               value={`${(stats.accuracy * 100).toFixed(1)}%`}
@@ -104,7 +121,7 @@ export default function DashboardPage() {
 
           {/* Split accuracy row */}
           {split && (
-            <div className="grid grid-cols-2 gap-5 mb-10">
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:mb-10">
               <StatCard
                 label="International Accuracy"
                 value={split.international.total > 0 ? `${Math.round(split.international.accuracy * 100)}%` : '—'}

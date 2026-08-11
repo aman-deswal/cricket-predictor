@@ -41,7 +41,7 @@ export function AccuracyDashboard() {
   }, []);
 
   const cardClass =
-    'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/40';
+    'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 sm:backdrop-blur-xl rounded-2xl p-4 sm:p-6 border border-slate-700/40';
 
   return (
     <div className="space-y-6">
@@ -52,7 +52,8 @@ export function AccuracyDashboard() {
         </h3>
         <p className="text-[10px] text-slate-500 mb-5">Rolling 10-match window</p>
         {trendData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="h-56 sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: -12 }}>
               <CartesianGrid strokeDasharray="2 4" stroke={GRID} strokeOpacity={0.8} />
               <XAxis dataKey="date" stroke={AXIS} tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} />
@@ -77,9 +78,11 @@ export function AccuracyDashboard() {
                 strokeWidth={2.5}
                 dot={{ fill: DOTS, strokeWidth: 0, r: 3 }}
                 activeDot={{ fill: LABEL, r: 5, strokeWidth: 0 }}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <p className="text-slate-500 text-center py-10 text-sm">Not enough data for trend yet</p>
         )}
@@ -94,7 +97,8 @@ export function AccuracyDashboard() {
           Dots on the diagonal = perfect model confidence. Dots above = model underestimates.
         </p>
         {calibrationData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="h-56 sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 4, right: 8, bottom: 20, left: -12 }}>
               <CartesianGrid strokeDasharray="2 4" stroke={GRID} strokeOpacity={0.8} />
               <XAxis
@@ -128,9 +132,10 @@ export function AccuracyDashboard() {
                 itemStyle={{ color: DOTS }}
                 formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
               />
-              <Scatter data={calibrationData} fill={DOTS} opacity={0.85} />
+              <Scatter data={calibrationData} fill={DOTS} opacity={0.85} isAnimationActive={false} />
             </ScatterChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <p className="text-slate-500 text-center py-10 text-sm">
             Need 50+ predictions for calibration chart
