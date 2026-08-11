@@ -559,7 +559,7 @@ function MatchBoardStrip({
             <button
               type="button"
               onClick={() => scrollTicker(1)}
-              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/30 bg-slate-200/[0.10] text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(148,163,184,0.08)] backdrop-blur-xl transition-colors active:bg-slate-200/20"
+              className="pointer-events-auto relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/30 bg-slate-200/[0.10] text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(148,163,184,0.08)] backdrop-blur-xl transition-colors active:bg-slate-200/20"
               aria-label="Scroll Match Center right"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

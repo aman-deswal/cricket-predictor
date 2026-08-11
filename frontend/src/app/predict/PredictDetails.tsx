@@ -1106,9 +1106,9 @@ export function PredictDetails() {
             )}
             {prediction && (
               <span
-                className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
+                className={`mt-1 inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 font-mono text-[clamp(0.75rem,0.95vw,0.95rem)] font-semibold ${
                   featuredBookmakerUrl
-                    ? 'border-amber-600/35 bg-amber-600/10 text-gray-100 cursor-pointer hover:bg-amber-600/20'
+                    ? 'min-h-11 cursor-pointer border-amber-600/35 bg-amber-600/10 text-gray-100 hover:bg-amber-600/20 sm:min-h-0'
                     : 'border-white/15 bg-white/5 text-gray-200'
                 }`}
                 onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
@@ -1246,9 +1246,9 @@ export function PredictDetails() {
             )}
             {prediction && (
               <span
-                className={`inline-flex items-center justify-center mt-1 px-2.5 py-0.5 rounded-full border text-[clamp(0.75rem,0.95vw,0.95rem)] font-mono font-semibold ${
+                className={`mt-1 inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 font-mono text-[clamp(0.75rem,0.95vw,0.95rem)] font-semibold ${
                   featuredBookmakerUrl
-                    ? 'border-amber-500/30 bg-amber-500/10 text-gray-100 cursor-pointer hover:bg-amber-500/15'
+                    ? 'min-h-11 cursor-pointer border-amber-500/30 bg-amber-500/10 text-gray-100 hover:bg-amber-500/15 sm:min-h-0'
                     : 'border-white/15 bg-white/5 text-gray-200'
                 }`}
                 onClick={featuredBookmakerUrl ? () => openExternalMarket(featuredBookmakerUrl) : undefined}
@@ -1550,6 +1550,7 @@ export function PredictDetails() {
                 >
                   {/* Flip container — grid so both faces share height naturally */}
                   <div
+                    className="min-w-0"
                     style={{
                       display: 'grid',
                       transformStyle: 'preserve-3d',
@@ -1558,10 +1559,10 @@ export function PredictDetails() {
                     }}
                   >
                     {/* ── FRONT FACE ─────────────────────────────── */}
-                    <div className="w-full flex flex-col" style={{ backfaceVisibility: 'hidden', gridArea: '1 / 1' }}>
-                      <div className="flex items-stretch">
+                    <div className="flex min-w-0 w-full flex-col" style={{ backfaceVisibility: 'hidden', gridArea: '1 / 1' }}>
+                      <div className="flex min-w-0 items-stretch">
                         {/* Batter */}
-                        <div className="flex-1 p-3 flex flex-col" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}1a 0%, transparent 60%)` }}>
+                        <div className="flex min-w-0 flex-1 flex-col p-3" style={{ background: `linear-gradient(135deg, ${bMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2">
                             <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[7px] sm:text-[clamp(0.65rem,0.75vw,0.8rem)] font-bold uppercase tracking-wider text-white" style={{
@@ -1573,7 +1574,7 @@ export function PredictDetails() {
                             </span>
                           </div>
                           {/* Photo + Name row */}
-                          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                          <div className="mb-2 flex min-w-0 items-center gap-2 sm:gap-3">
                             <PlayerHeadshot
                               imageUrl={batterImg}
                               alt={batterLast}
@@ -1603,7 +1604,7 @@ export function PredictDetails() {
                             <div className="flex items-center gap-1 mt-auto pt-2">
                               <span className="hidden sm:inline text-[clamp(0.62rem,0.72vw,0.75rem)] font-bold uppercase tracking-widest text-slate-400 mr-0.5 shrink-0">Last 5</span>
                               {battle.batter_scores.slice(0, 5).map((score, fi) => (
-                                <span key={fi} className="min-w-[20px] sm:min-w-[28px] px-1 h-5 sm:h-7 rounded text-[clamp(0.65rem,0.8vw,0.8rem)] font-black flex items-center justify-center shrink-0" style={{
+                                <span key={fi} className={`${fi >= 3 ? 'hidden min-[360px]:flex' : 'flex'} h-5 min-w-[20px] shrink-0 items-center justify-center rounded px-1 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black sm:h-7 sm:min-w-[28px]`} style={{
                                   background: score >= 50 ? '#16a34a55' : score >= 25 ? '#d9770655' : '#dc262655',
                                   color: score >= 50 ? '#4ade80' : score >= 25 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${score >= 50 ? '#16a34a88' : score >= 25 ? '#d9770688' : '#dc262688'}`,
@@ -1625,7 +1626,7 @@ export function PredictDetails() {
                           )}
                         </div>
                         {/* Bowler */}
-                        <div className="flex-1 p-3 flex flex-col text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}1a 0%, transparent 60%)` }}>
+                        <div className="flex min-w-0 flex-1 flex-col p-3 text-right" style={{ background: `linear-gradient(225deg, ${wMeta.primaryColor}1a 0%, transparent 60%)` }}>
                           {/* Team · Role pill */}
                           <div className="mb-2 flex justify-end">
                             <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[7px] sm:text-[clamp(0.65rem,0.75vw,0.8rem)] font-bold uppercase tracking-wider text-white" style={{
@@ -1637,7 +1638,7 @@ export function PredictDetails() {
                             </span>
                           </div>
                           {/* Photo + Name row */}
-                          <div className="flex items-center justify-end gap-2 sm:gap-3 mb-2">
+                          <div className="mb-2 flex min-w-0 items-center justify-end gap-2 sm:gap-3">
                             <div className="min-w-0 flex-1 text-right">
                               <p className="text-xl sm:text-[clamp(1.4rem,2.6vw,2rem)] font-black text-white leading-none tracking-tight truncate">{bowlerLast}</p>
                               {bowlerStats ? (
@@ -1666,7 +1667,7 @@ export function PredictDetails() {
                           {battle.bowler_figures && (
                             <div className="flex items-center justify-end gap-1 mt-auto pt-2">
                               {battle.bowler_figures.slice(0, 5).map((wkts, fi) => (
-                                <span key={fi} className="min-w-[20px] sm:min-w-[28px] px-1 h-5 sm:h-7 rounded text-[clamp(0.65rem,0.8vw,0.8rem)] font-black flex items-center justify-center shrink-0" style={{
+                                <span key={fi} className={`${fi >= 3 ? 'hidden min-[360px]:flex' : 'flex'} h-5 min-w-[20px] shrink-0 items-center justify-center rounded px-1 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black sm:h-7 sm:min-w-[28px]`} style={{
                                   background: wkts >= 3 ? '#16a34a55' : wkts >= 1 ? '#d9770655' : '#dc262655',
                                   color: wkts >= 3 ? '#4ade80' : wkts >= 1 ? '#fb923c' : '#f87171',
                                   border: `1px solid ${wkts >= 3 ? '#16a34a88' : wkts >= 1 ? '#d9770688' : '#dc262688'}`,
@@ -1703,7 +1704,7 @@ export function PredictDetails() {
 
                     {/* ── BACK FACE — H2H Matchup Stats ─────────── */}
                     <div
-                      className="w-full rounded-xl overflow-hidden"
+                      className="w-full min-w-0 overflow-hidden rounded-xl"
                       style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', gridArea: '1 / 1' }}
                     >
                       <div
