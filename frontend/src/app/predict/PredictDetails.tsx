@@ -785,17 +785,14 @@ export function PredictDetails() {
   return (
     <div className="max-w-7xl mx-auto">
       <div
-        className={`fixed inset-x-0 top-14 z-40 border-b border-amber-600/15 bg-[#10151b]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 sm:top-16 ${
+        className={`fixed inset-x-0 top-14 z-40 h-14 border-b border-amber-600/15 bg-[#10151b]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 sm:top-16 sm:h-16 ${
           showStickySummary ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         }`}
-        style={{
-          height: '44px',
-        }}
         aria-hidden={!showStickySummary}
       >
-        <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team1Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
+        <div className="mx-auto grid h-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-3 sm:gap-5 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className={`h-8 w-8 shrink-0 overflow-hidden border border-white/10 sm:h-10 sm:w-10 ${team1Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
               {team1LogoUrl || getFranchiseLogoUrl(displayTeam1) ? (
                 <img src={team1LogoUrl || getFranchiseLogoUrl(displayTeam1)} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
               ) : team1Meta.countryCode ? (
@@ -806,10 +803,10 @@ export function PredictDetails() {
                 </div>
               )}
             </div>
-            <span className="truncate text-[12px] sm:text-[13px] font-black text-white">
+            <span className="truncate text-sm font-black text-white sm:text-base">
               {team1Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}</span>
             </span>
-            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] font-bold text-gray-300 min-[380px]:inline-flex sm:text-[11px]">
+            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-xs font-bold text-gray-300 sm:inline-flex">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team1_odds) : '—'}
             </span>
           </div>
@@ -817,27 +814,27 @@ export function PredictDetails() {
           {isLiveMatch ? (
             <div className="text-center">
               <LiveStatusBadge compact />
-              <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-white">Match in progress</p>
+              <p className="mt-0.5 text-[10px] font-bold text-white sm:text-xs">Match in progress</p>
             </div>
           ) : (
             <div className="text-center">
-              <p className={`text-[8px] sm:text-[9px] font-black uppercase tracking-[0.18em] ${
+              <p className={`text-[9px] font-black uppercase tracking-[0.18em] sm:text-[11px] ${
                 isMarketBackedPick ? 'text-amber-500' : 'text-slate-400'
               }`}>
                 {isMarketBackedPick ? 'SixSense™ Pick' : 'Model projection'}
               </p>
-              <p className="text-[10px] sm:text-[11px] font-black text-white">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
+              <p className="mt-0.5 text-xs font-black text-white sm:text-sm">{modelPick ? getTeamMeta(modelPick).shortName : 'Pending'}</p>
             </div>
           )}
 
           <div className="flex min-w-0 items-center justify-end gap-2">
-            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] font-bold text-gray-300 min-[380px]:inline-flex sm:text-[11px]">
+            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-xs font-bold text-gray-300 sm:inline-flex">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team2_odds) : '—'}
             </span>
-            <span className="truncate text-right text-[12px] sm:text-[13px] font-black text-white">
+            <span className="truncate text-right text-sm font-black text-white sm:text-base">
               {team2Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team2_win_probability * 100)}%` : '—'}</span>
             </span>
-            <div className={`h-6 w-6 shrink-0 overflow-hidden border border-white/10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
+            <div className={`h-8 w-8 shrink-0 overflow-hidden border border-white/10 sm:h-10 sm:w-10 ${team2Meta.countryCode ? 'rounded-md' : 'rounded-full'}`}>
               {team2LogoUrl || getFranchiseLogoUrl(displayTeam2) ? (
                 <img src={team2LogoUrl || getFranchiseLogoUrl(displayTeam2)} alt="" className="h-full w-full rounded-md object-contain bg-slate-950/30 p-0.5" />
               ) : team2Meta.countryCode ? (

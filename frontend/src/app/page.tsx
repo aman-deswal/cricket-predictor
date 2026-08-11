@@ -351,7 +351,7 @@ function MatchBoardStrip({
             </span>
           )}
           {hasOverflow && (
-            <div className="hidden items-center gap-1 lg:flex">
+            <div className="hidden items-center gap-1 sm:flex">
               <button
                 type="button"
                 onClick={() => scrollTicker(-1)}
@@ -448,14 +448,23 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group relative min-w-[14rem] max-w-[16.5rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[16.5rem]"
+                className="group relative min-w-[14rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[16.5rem] lg:min-w-[calc((100%-2.25rem)/4)] lg:flex-1"
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
                 <div>
-                  <div className="mb-3 flex h-7 items-center gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <div className="mb-3 grid min-h-[3.625rem] grid-cols-[1fr_auto] content-start gap-x-2 gap-y-1.5">
+                    <div className="min-w-0">
                       <MatchFormatBadge match={match} className="text-amber-100" />
+                    </div>
+                    {isMatchLive(match) ? (
+                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="shrink-0 pt-0.5 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
+                    )}
+                    <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5">
                       {isFeatured && (
                         <span
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
@@ -479,13 +488,6 @@ function MatchBoardStrip({
                         </span>
                       )}
                     </div>
-                    {isMatchLive(match) ? (
-                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
-                        Live
-                      </span>
-                    ) : (
-                      <span className="shrink-0 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
-                    )}
                   </div>
 
                   <div className="space-y-2.5">
@@ -544,7 +546,7 @@ function MatchBoardStrip({
             );
           })}
           {filteredMatches.length === 0 && (
-            <div className="min-w-[14rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[16.5rem]">
+            <div className="min-w-[14rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[16.5rem] lg:flex-1">
               No {activeFilter} matches
             </div>
           )}
