@@ -87,6 +87,43 @@ assert.equal(
 
 assert.equal(
   selectFeaturedMatch([
+    candidate('featured-no-squad', 4, {
+      name: 'Ireland vs Afghanistan, ODI',
+      team1: 'Ireland',
+      team2: 'Afghanistan',
+      competition_name: 'ODI Series',
+      spotlight_signals: {
+        has_expert_preview: true,
+        has_espn_context: true,
+        h2h_match_count: 5,
+        source_link_count: 2,
+        player_update_count: 2,
+        possible_xi_player_count: 0,
+        squad_player_count: 0,
+      },
+    }),
+    candidate('featured-with-squad', 5, {
+      name: 'Zimbabwe vs Bangladesh, ODI',
+      team1: 'Zimbabwe',
+      team2: 'Bangladesh',
+      competition_name: 'ODI Series',
+      spotlight_signals: {
+        has_expert_preview: true,
+        has_espn_context: true,
+        h2h_match_count: 5,
+        source_link_count: 2,
+        player_update_count: 2,
+        possible_xi_player_count: 0,
+        squad_player_count: 22,
+      },
+    }),
+  ], NOW)?.match_id,
+  'featured-with-squad',
+  'featured selection prefers matches with actual squad evidence over equally strong squadless candidates',
+);
+
+assert.equal(
+  selectFeaturedMatch([
     candidate('sparse-established', 4, {
       name: 'Sparse match, Super Smash',
       competition_name: 'Super Smash',

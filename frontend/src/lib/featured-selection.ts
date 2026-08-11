@@ -41,6 +41,7 @@ interface SpotlightSignals {
   source_link_count?: number;
   key_player_count?: number;
   possible_xi_player_count?: number;
+  squad_player_count?: number;
   player_update_count?: number;
 }
 
@@ -122,9 +123,16 @@ function getMeaningfulEdgeScore(match: FeaturedCandidate): number {
   return edgeScore >= 7 ? edgeScore : 0;
 }
 
+function hasSquadEvidence(match: FeaturedCandidate): boolean {
+  return (match.spotlight_signals?.squad_player_count ?? 0) > 0;
+}
+
 export function compareFeaturedMatches(a: FeaturedCandidate, b: FeaturedCandidate): number {
   const marketDiff = Number(hasValidMarketOdds(b)) - Number(hasValidMarketOdds(a));
   if (marketDiff !== 0) return marketDiff;
+
+  const squadEvidenceDiff = Number(hasSquadEvidence(b)) - Number(hasSquadEvidence(a));
+  if (squadEvidenceDiff !== 0) return squadEvidenceDiff;
 
   const compositeDiff = getFeaturedCompositeScore(b) - getFeaturedCompositeScore(a);
   if (compositeDiff !== 0) return compositeDiff;
