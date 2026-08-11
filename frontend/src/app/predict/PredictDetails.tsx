@@ -154,8 +154,8 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-const detailTileClass = 'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-700/40';
-const detailTileStrongClass = 'bg-gradient-to-br from-[#141c25]/95 to-[#0c1218]/95 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-600/25';
+const detailTileClass = 'mobile-content-auto bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-700/40';
+const detailTileStrongClass = 'mobile-content-auto bg-gradient-to-br from-[#141c25]/95 to-[#0c1218]/95 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-600/25';
 const detailTileTitleClass = 'text-[clamp(0.8rem,1vw,1rem)] font-bold text-white uppercase tracking-wider flex items-center gap-1.5';
 const detailTileMetaClass = 'text-[clamp(0.65rem,0.8vw,0.8rem)]';
 const detailTileBodyClass = 'text-[clamp(0.875rem,1.05vw,1.05rem)] text-slate-300 leading-relaxed';
@@ -508,6 +508,7 @@ function MarketMovementPanel({
                         dot={chartRows.length <= 8 ? renderMarketDot : false}
                         activeDot={{ fill: book.color, r: 4, strokeWidth: 0 }}
                         connectNulls
+                        isAnimationActive={false}
                       />
                     ))}
                   </LineChart>
@@ -657,7 +658,6 @@ export function PredictDetails() {
   });
   const [loading, setLoading] = useState(true);
   const [showStickySummary, setShowStickySummary] = useState(false);
-  const [scrollDepth, setScrollDepth] = useState(0);
   const heroRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -727,31 +727,6 @@ export function PredictDetails() {
     return () => observer.disconnect();
   }, [loading, matchId]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    let raf = 0;
-    const updateScrollDepth = () => {
-      const start = 80;
-      const end = 520;
-      const depth = (window.scrollY - start) / (end - start);
-      setScrollDepth(Math.max(0, Math.min(1, depth)));
-      raf = 0;
-    };
-
-    const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(updateScrollDepth);
-    };
-
-    updateScrollDepth();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
-  }, []);
-
   // Live countdown timer
   const getCountdown = useCallback(() => {
     if (!match) return null;
@@ -762,14 +737,14 @@ export function PredictDetails() {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((diff % (1000 * 60)) / 1000);
-    return { days, hours, mins, secs };
+    return { days, hours, mins };
   }, [match]);
 
   const [countdown, setCountdown] = useState(getCountdown);
   useEffect(() => {
     if (!match) return;
-    const interval = setInterval(() => setCountdown(getCountdown()), 1000);
+    setCountdown(getCountdown());
+    const interval = setInterval(() => setCountdown(getCountdown()), 60_000);
     return () => clearInterval(interval);
   }, [match, getCountdown]);
 
@@ -938,7 +913,7 @@ export function PredictDetails() {
   return (
     <div className="max-w-7xl mx-auto">
       <div
-        className={`fixed inset-x-0 top-16 z-40 border-b border-amber-600/15 bg-[#10151b]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 ${
+        className={`fixed inset-x-0 top-14 z-40 border-b border-amber-600/15 bg-[#10151b]/95 shadow-lg shadow-black/25 backdrop-blur-xl transition-all duration-200 sm:top-16 ${
           showStickySummary ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         }`}
         style={{
@@ -962,7 +937,7 @@ export function PredictDetails() {
             <span className="truncate text-[12px] sm:text-[13px] font-black text-white">
               {team1Meta.shortName} <span className="font-mono text-amber-400">{prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}</span>
             </span>
-            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] font-bold text-gray-300">
+            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] font-bold text-gray-300 min-[380px]:inline-flex sm:text-[11px]">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team1_odds) : '—'}
             </span>
           </div>
@@ -984,7 +959,7 @@ export function PredictDetails() {
           )}
 
           <div className="flex min-w-0 items-center justify-end gap-2">
-            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] font-bold text-gray-300">
+            <span className="hidden shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] font-bold text-gray-300 min-[380px]:inline-flex sm:text-[11px]">
               {sportsbookOdds.length > 0 ? decimalToAmerican(sportsbookOdds[0].team2_odds) : '—'}
             </span>
             <span className="truncate text-right text-[12px] sm:text-[13px] font-black text-white">
@@ -1006,7 +981,7 @@ export function PredictDetails() {
       </div>
 
       {/* Back link + Countdown */}
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <Link
           href="/"
           className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
@@ -1018,7 +993,7 @@ export function PredictDetails() {
         {isLiveMatch ? (
           <LiveStatusBadge />
         ) : countdown && (
-          <div className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300">
+          <div className="order-last inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 sm:order-none sm:w-auto">
             <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
             <span className="font-semibold whitespace-nowrap">Begins in</span>
             <span className="font-mono tracking-[0.02em] whitespace-nowrap">
@@ -1027,9 +1002,7 @@ export function PredictDetails() {
               <span className="text-white font-semibold">{String(countdown.hours).padStart(2, '0')}</span>
               <span className="text-slate-300">h </span>
               <span className="text-white font-semibold">{String(countdown.mins).padStart(2, '0')}</span>
-              <span className="text-slate-300">m </span>
-              <span className="text-white font-semibold">{String(countdown.secs).padStart(2, '0')}</span>
-              <span className="text-slate-300">s</span>
+              <span className="text-slate-300">m</span>
             </span>
           </div>
         )}
@@ -1052,7 +1025,7 @@ export function PredictDetails() {
       `}</style>
       <motion.div
         ref={heroRef}
-        className="relative rounded-3xl bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 border border-slate-700/40 p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden"
+        className="relative mb-6 overflow-hidden rounded-3xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 p-3 sm:p-8 lg:p-10"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -1060,7 +1033,7 @@ export function PredictDetails() {
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
 
-        <div className="relative flex items-center justify-between gap-4 sm:gap-6 lg:gap-10">
+        <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
           <motion.div
             className="flex-1 text-center"
@@ -1072,7 +1045,7 @@ export function PredictDetails() {
             {team1LeadsProjection ? (
               <div className="mb-2 flex items-center justify-center">
                 <span
-                  className={`${isMarketBackedPick ? 'pick-badge' : ''} inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg`}
+                  className={`${isMarketBackedPick ? 'pick-badge' : ''} inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[8px] font-black uppercase tracking-wide sm:gap-1.5 sm:px-2.5 sm:text-[clamp(0.65rem,0.8vw,0.8rem)] sm:tracking-widest`}
                   style={isMarketBackedPick
                     ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.42)', boxShadow: '0 0 0 1px rgba(245,158,11,0.08) inset' }
                     : { background: 'rgba(148,163,184,0.08)', color: '#cbd5e1', border: '1px solid rgba(148,163,184,0.24)' }}
@@ -1083,7 +1056,7 @@ export function PredictDetails() {
               </div>
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className={`w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 overflow-hidden shadow-xl ${
+              className={`mx-auto mb-2 h-12 w-12 overflow-hidden shadow-xl sm:h-20 sm:w-20 lg:h-24 lg:w-24 ${
                 team1Meta.countryCode ? 'rounded-xl' : 'rounded-full'
               }`}
               style={isMarketBackedPick && team1LeadsProjection
@@ -1157,14 +1130,14 @@ export function PredictDetails() {
 
           {/* Center: Chart or VS */}
           <motion.div
-            className="flex flex-col items-center px-2"
+            className="flex min-w-0 flex-col items-center px-0.5 sm:px-2"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
           >
             {prediction ? (
               <div className="flex flex-col items-center gap-2">
-                <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44">
+                <div className="h-20 w-20 sm:h-36 sm:w-36 lg:h-44 lg:w-44">
                   <PredictionChart
                     team1={prediction.team1}
                     team2={prediction.team2}
@@ -1174,7 +1147,7 @@ export function PredictDetails() {
                   />
                 </div>
                 {/* Color legend */}
-                <div className="flex items-center gap-3">
+                <div className="hidden items-center gap-3 sm:flex">
                   <div className="flex items-center gap-1">
                     <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor1 }} />
                     <span className="text-[clamp(0.65rem,0.8vw,0.8rem)] font-bold uppercase tracking-wider" style={{ color: teamColor1 }}>{team1Meta.shortName}</span>
@@ -1212,7 +1185,7 @@ export function PredictDetails() {
             {team2LeadsProjection ? (
               <div className="mb-2 flex items-center justify-center">
                 <span
-                  className={`${isMarketBackedPick ? 'pick-badge' : ''} inline-flex items-center gap-1.5 text-[clamp(0.65rem,0.8vw,0.8rem)] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg`}
+                  className={`${isMarketBackedPick ? 'pick-badge' : ''} inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[8px] font-black uppercase tracking-wide sm:gap-1.5 sm:px-2.5 sm:text-[clamp(0.65rem,0.8vw,0.8rem)] sm:tracking-widest`}
                   style={isMarketBackedPick
                     ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.42)', boxShadow: '0 0 0 1px rgba(245,158,11,0.08) inset' }
                     : { background: 'rgba(148,163,184,0.08)', color: '#cbd5e1', border: '1px solid rgba(148,163,184,0.24)' }}
@@ -1223,7 +1196,7 @@ export function PredictDetails() {
               </div>
             ) : <div className="mb-2 h-[26px]" />}
             <motion.div
-              className={`w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-2 overflow-hidden shadow-xl ${
+              className={`mx-auto mb-2 h-12 w-12 overflow-hidden shadow-xl sm:h-20 sm:w-20 lg:h-24 lg:w-24 ${
                 team2Meta.countryCode ? 'rounded-xl' : 'rounded-full'
               }`}
               style={isMarketBackedPick && team2LeadsProjection
@@ -1342,7 +1315,7 @@ export function PredictDetails() {
           {...fadeUp}
           transition={{ delay: 0.25 }}
         >
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className={detailTileTitleClass}>
               <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2A5 5 0 018 1z" /><line x1="6" y1="14" x2="10" y2="14" /></svg>
               Our Take
@@ -1433,7 +1406,7 @@ export function PredictDetails() {
               {/* Team name + odds row + edge badge */}
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[clamp(0.9rem,1.1vw,1.1rem)] font-black text-white tracking-wider">{shortName}</span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {/* Odds comparison */}
                   <div className="flex items-center gap-1.5 text-[clamp(0.7rem,0.85vw,0.85rem)] font-mono">
                     <span className="text-gray-500">Fair</span>

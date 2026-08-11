@@ -3,20 +3,48 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Logo } from './Logo';
 import { isMockDataEnabled } from '@/lib/supabase';
 import { setStoredDemoMode } from '@/lib/demo-mode';
 
 const NAV_LINKS = [
-  { href: '/', label: 'Matches' },
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/history', label: 'History' },
+  { href: '/', label: 'Matches', icon: 'matches' },
+  { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/history', label: 'History', icon: 'history' },
 ];
+
+function NavIcon({ icon }: { icon: string }) {
+  if (icon === 'dashboard') {
+    return (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <rect x="3" y="3" width="5" height="5" rx="1" />
+        <rect x="12" y="3" width="5" height="5" rx="1" />
+        <rect x="3" y="12" width="5" height="5" rx="1" />
+        <rect x="12" y="12" width="5" height="5" rx="1" />
+      </svg>
+    );
+  }
+
+  if (icon === 'history') {
+    return (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+        <path d="M4.5 6.5A7 7 0 1 1 3 11" />
+        <path d="M3 4v4h4M10 6.5V10l2.5 1.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 5.5h12M4 10h12M4 14.5h8" />
+      <circle cx="15" cy="14.5" r="1.5" />
+    </svg>
+  );
+}
 
 export function Navbar() {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [demoEnabled, setDemoEnabled] = useState(false);
 
   const isActive = (href: string) => {
@@ -36,12 +64,14 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="relative border-b border-slate-700/35 bg-[#10151b]/95 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-black/10">
+    <>
+    <nav className="relative sticky top-0 z-50 border-b border-slate-700/35 bg-[#10151b]/95 shadow-lg shadow-black/10 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center space-x-3 group" onClick={() => setMobileOpen(false)}>
+        <div className="flex h-14 items-center justify-between sm:h-16">
+          <Link href="/" className="group flex min-h-11 items-center space-x-2 sm:space-x-3">
             <div className="group-hover:scale-110 transition-transform">
-              <Logo size={48} />
+              <span className="sm:hidden"><Logo size={40} /></span>
+              <span className="hidden sm:inline"><Logo size={48} /></span>
             </div>
             <span
               className="text-xl tracking-tight"
@@ -89,65 +119,33 @@ export function Navbar() {
             </button>
           </div>
 
-          {/* Mobile hamburger */}
-          <button
-            className="sm:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              {mobileOpen ? (
-                <>
-                  <line x1="4" y1="4" x2="16" y2="16" />
-                  <line x1="16" y1="4" x2="4" y2="16" />
-                </>
-              ) : (
-                <>
-                  <line x1="3" y1="5" x2="17" y2="5" />
-                  <line x1="3" y1="10" x2="17" y2="10" />
-                  <line x1="3" y1="15" x2="17" y2="15" />
-                </>
-              )}
-            </svg>
-          </button>
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:hidden">Match intelligence</span>
         </div>
       </div>
-
-      {/* Mobile dropdown */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            className="sm:hidden border-t border-slate-700/25 bg-[#10151b]/98 backdrop-blur-xl"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="px-4 py-3 space-y-1">
-              {NAV_LINKS.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`block px-3 py-2 rounded-lg text-sm font-display transition-all ${
-                    isActive(href)
-                      ? 'text-white bg-white/5 font-medium'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
-              <button
-                onClick={toggleDemoMode}
-                className="w-full text-left mt-2 px-3 py-2 rounded-lg text-xs font-display uppercase tracking-[0.18em] text-gray-500 hover:text-white hover:bg-white/5 opacity-70 transition-all"
-              >
-                {demoEnabled ? 'Demo mode: on' : 'Demo mode: off'}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </nav>
+    <nav
+      className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0c1117]/95 px-2 pt-1.5 shadow-[0_-10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:hidden"
+      aria-label="Primary navigation"
+    >
+      <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
+        {NAV_LINKS.map(({ href, label, icon }) => {
+          const active = isActive(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 text-[10px] font-black transition-colors ${
+                active ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 active:bg-white/[0.06] active:text-white'
+              }`}
+            >
+              <NavIcon icon={icon} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+    </>
   );
 }

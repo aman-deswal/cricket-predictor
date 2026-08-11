@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Navbar } from '@/components/Navbar';
 import './globals.css';
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
@@ -37,8 +37,26 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: `${productionBasePath}/icon.svg`,
-    apple: `${productionBasePath}/icon.svg`,
+    apple: `${productionBasePath}/apple-touch-icon.png`,
   },
+  manifest: `${productionBasePath}/manifest.webmanifest`,
+  applicationName: 'SixSense',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'SixSense',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0e1116',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({
@@ -56,11 +74,11 @@ export default function RootLayout({
         </div>
 
         <Navbar />
-        <main className="relative flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-10 pb-6">
+        <main className="relative mx-auto w-full max-w-7xl flex-1 px-3 pb-24 pt-7 sm:px-6 sm:pb-6 sm:pt-10 lg:px-8">
           {children}
         </main>
         <footer className="relative border-t border-slate-700/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 sm:py-6 flex items-center justify-center">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-600">
               SixSense<sup className="ml-0.5 text-[0.65em]">™</sup>, Reserved 2026
             </p>
