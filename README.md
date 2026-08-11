@@ -28,7 +28,8 @@ Roadmap alignment issue: **#72** (maps the master feature context into this back
 flowchart LR
     A[GitHub Actions Schedules] --> B[Python Pipelines]
     B --> C[(Supabase)]
-    C --> D[Next.js 14 Frontend]
+    C --> D[Next.js Web App]
+    C --> K[Expo Native App]
     D --> E[GitHub Pages Static Export]
 
     G[ESPN Cricinfo APIs] --> B
@@ -142,6 +143,25 @@ SQL assets in repo:
 ---
 
 ## Local Development
+
+### JavaScript workspaces
+
+The repository uses npm workspaces for the web app, Expo app, and platform-neutral domain code:
+
+| Workspace | Path | Purpose |
+|---|---|---|
+| `cricket-predictor-frontend` | `frontend/` | Next.js web client |
+| `@sixsense/mobile` | `apps/mobile/` | Expo Router native client |
+| `@sixsense/domain` | `packages/domain/` | Shared match and deterministic prediction contracts |
+
+```bash
+npm install
+npm run dev:web
+npm run dev:mobile
+npm run typecheck
+```
+
+Copy `apps/mobile/.env.example` to `apps/mobile/.env.local` before loading live native data.
 
 ## 1) Python pipeline setup
 ```bash
