@@ -1,15 +1,15 @@
-name: Refresh Imminent Match Squads
+name: Refresh Match Squads
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: imminent-match-squad-refresh
+  group: match-squad-refresh
   cancel-in-progress: false
 
 jobs:
@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Refresh squads for imminent matches
+      - name: Refresh squads for priority upcoming matches
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/refresh_match_squads.py --window-minutes 5 --live-grace-minutes 10
+        run: python pipeline/refresh_match_squads.py --lookahead-hours 72 --window-minutes 15 --live-grace-minutes 15

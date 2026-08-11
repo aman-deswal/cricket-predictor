@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -36,12 +37,25 @@ def _is_placeholder_image_url(url: str) -> bool:
     return any(token in lowered for token in PLACEHOLDER_IMAGE_TOKENS)
 
 
+def _is_confirmed_lineup(players: list[dict], _source: str) -> bool:
+    """Treat a roster as confirmed only when it looks like a playing XI."""
+    return len(players) == 11
+
+
+@dataclass(frozen=True)
+class MatchSquadFetchResult:
+    match_id: str
+    status: str
+    stored_team_count: int = 0
+    error: str = ""
+
+
 def fetch_squad_from_espn(match_id: str) -> Optional[list[dict]]:
     """
     Fetch squad/playing XI from ESPN summary for a match.
 
     Requires an ESPN event ID to be stored in espn_match_data table.
-    ESPN only has rosters after match starts (confirmed playing XI).
+    ESPN can surface either a broader squad or the eventual playing XI.
 
     Returns list of team dicts: [{teamName, players: [...]}] or None.
     """
@@ -105,7 +119,7 @@ def _classify_espn_position(position: str) -> str:
     return "Batter"  # default
 
 
-def fetch_squad_for_match(match_id: str) -> Optional[list[dict]]:
+def fetch_squad_for_match(match_id: str, raise_on_error: bool = False) -> Optional[list[dict]]:
     """
     Fetch squad/playing XI for a match from CricAPI.
 
@@ -137,6 +151,8 @@ def fetch_squad_for_match(match_id: str) -> Optional[list[dict]]:
 
     except requests.RequestException as e:
         print(f"  ❌ Request failed: {e}")
+        if raise_on_error:
+            raise
         return None
 
 
@@ -176,7 +192,7 @@ def _classify_role(player: dict) -> str:
 
 
 def store_squad(match_id: str, team_name: str, players: list[dict],
-                is_confirmed: bool = False, source: str = "cricapi_fantasy") -> None:
+                is_confirmed: bool = False, source: str = "cricapi_fantasy") -> bool:
     """Store squad in Supabase match_squads table."""
     client = get_client()
     squad_data = {
@@ -192,11 +208,16 @@ def store_squad(match_id: str, team_name: str, players: list[dict],
         client.table("match_squads").upsert(
             squad_data, on_conflict="match_id,team"
         ).execute()
+        return True
     except Exception as e:
         print(f"  ❌ Failed to store squad for {team_name}: {e}")
+        return False
 
 
-def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = False) -> None:
+def fetch_and_store_squads(
+    match_ids: Optional[list[str]] = None,
+    force: bool = False,
+) -> list[MatchSquadFetchResult]:
     """
     Fetch squads for upcoming matches and store in Supabase.
 
@@ -205,6 +226,7 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
         force: Re-fetch even if squad already exists
     """
     client = get_client()
+    results: list[MatchSquadFetchResult] = []
 
     if match_ids:
         matches = []
@@ -224,7 +246,7 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
 
     if not matches:
         print("No upcoming matches found.")
-        return
+        return results
 
     print(f"🏏 Fetching squads for {len(matches)} matches...\n")
     success_count = 0
@@ -247,6 +269,7 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
             if existing.data and any(s.get("is_confirmed") for s in existing.data):
                 print("  ✅ Confirmed squad already exists, skipping")
                 skip_count += 1
+                results.append(MatchSquadFetchResult(match_id=match_id, status="skipped"))
                 continue
 
         # Try ESPN first (free, unlimited)
@@ -256,13 +279,21 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
         # Fall back to CricAPI only if key is set and match is not ESPN-sourced
         api_key = _get_api_key()
         if not squad_data and api_key and not match_id.startswith("espn-"):
-            squad_data = fetch_squad_for_match(match_id)
+            try:
+                squad_data = fetch_squad_for_match(match_id, raise_on_error=True)
+            except Exception as exc:
+                print(f"  ❌ CricAPI squad fetch failed: {exc}")
+                results.append(MatchSquadFetchResult(match_id=match_id, status="error", error=str(exc)))
+                continue
             source = "cricapi_fantasy"
 
         if not squad_data:
             print("  ⏳ Squad not available yet")
+            results.append(MatchSquadFetchResult(match_id=match_id, status="unavailable"))
             continue
 
+        stored_team_count = 0
+        store_failed = False
         for team_squad in squad_data:
             team_name = team_squad.get("teamName", "")
             raw_players = team_squad.get("players", [])
@@ -277,19 +308,29 @@ def fetch_and_store_squads(match_ids: Optional[list[str]] = None, force: bool = 
             else:
                 players = [normalize_player(p) for p in raw_players]
 
-            # CricAPI fantasySquad usually returns full squad (15-18 players)
-            # ESPN always returns confirmed XI (11 players)
-            is_confirmed = len(players) == 11 or source == "espn"
+            is_confirmed = _is_confirmed_lineup(players, source)
 
-            store_squad(match_id, team_name, players, is_confirmed=is_confirmed, source=source)
+            stored = store_squad(match_id, team_name, players, is_confirmed=is_confirmed, source=source)
+            if not stored:
+                store_failed = True
+                continue
             print(f"  ✅ {team_name}: {len(players)} players {'(confirmed XI)' if is_confirmed else '(squad)'} [{source}]")
             success_count += 1
+            stored_team_count += 1
 
         # Rate limit: only needed for CricAPI calls
         if source == "cricapi_fantasy":
             time.sleep(1)
 
+        if store_failed and stored_team_count == 0:
+            results.append(MatchSquadFetchResult(match_id=match_id, status="error", error="Failed to store fetched squad data"))
+        elif stored_team_count > 0:
+            results.append(MatchSquadFetchResult(match_id=match_id, status="stored", stored_team_count=stored_team_count))
+        else:
+            results.append(MatchSquadFetchResult(match_id=match_id, status="unavailable"))
+
     print(f"\n✅ Done! Stored {success_count} team squads, skipped {skip_count}")
+    return results
 
 
 def main():
