@@ -19,6 +19,7 @@ from utils.db import (
     get_upcoming_matches,
     get_venue_from_cache,
     store_prediction,
+    store_prediction_snapshot,
     store_match_enrichment,
 )
 from fetch_squads import fetch_and_store_squads
@@ -424,6 +425,24 @@ def build_prediction(match: dict) -> dict:
     }
 
 
+def persist_prediction(prediction: dict) -> dict:
+    """Persist the latest contract and append a changed pre-match core snapshot."""
+    edge = prediction.get("edge_score") or {}
+    latest_prediction = {
+        key: value for key, value in prediction.items()
+        if key != "edge_score"
+    }
+    store_prediction(latest_prediction)
+    if edge:
+        _store_edge_score(prediction["match_id"], edge)
+    appended = store_prediction_snapshot(latest_prediction, edge)
+    logger.info(
+        "  Prediction snapshot %s",
+        "appended" if appended else "unchanged or past kickoff",
+    )
+    return latest_prediction
+
+
 def parse_match_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
@@ -458,11 +477,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
     for match in matches:
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
-            prediction = build_prediction(match)
-            edge = prediction.pop("edge_score", None)
-            store_prediction(prediction)
-            if edge:
-                _store_edge_score(match["match_id"], edge)
+            prediction = persist_prediction(build_prediction(match))
             logger.info(
                 f"  → {prediction['predicted_winner']} "
                 f"({prediction['team1_win_probability']:.1%} / {prediction['team2_win_probability']:.1%})"

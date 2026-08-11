@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getPredictionSnapshots, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -14,6 +14,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
+import { buildPreMatchMovement, hasValidTwoSidedOdds, toNormalizedImpliedProbability } from '@/lib/pre-match-movement';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -102,13 +103,6 @@ function normalizeBookmaker(bookmaker: string): string {
 
 function getTrustedSportsbook(bookmaker: string): { url: string; priority: number } | null {
   return TRUSTED_SPORTSBOOKS[normalizeBookmaker(bookmaker)] ?? null;
-}
-
-function hasValidTwoSidedOdds(odds: MatchOdds): boolean {
-  return Number.isFinite(odds.team1_odds)
-    && odds.team1_odds > 1
-    && Number.isFinite(odds.team2_odds)
-    && odds.team2_odds > 1;
 }
 
 function getBookmakerMarketUrl(bookmaker: string): string | null {
@@ -211,17 +205,7 @@ function PlayerHeadshot({
   );
 }
 
-const MARKET_BOOK_COLORS = ['#22d3ee', '#f59e0b', '#a78bfa'] as const;
-
-function toNormalizedImpliedProbability(snapshot: MatchOdds, trackedTeam: 'team1' | 'team2'): number | null {
-  if (!hasValidTwoSidedOdds(snapshot)) return null;
-  const raw1 = 1 / snapshot.team1_odds;
-  const raw2 = 1 / snapshot.team2_odds;
-  const rawDraw = snapshot.draw_odds && snapshot.draw_odds > 1 ? 1 / snapshot.draw_odds : 0;
-  const total = raw1 + raw2 + rawDraw;
-  if (total <= 0) return null;
-  return ((trackedTeam === 'team1' ? raw1 : raw2) / total) * 100;
-}
+const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
 
 function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
   const bookmakerKey = normalizeBookmaker(current.bookmaker);
@@ -238,6 +222,7 @@ function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
+  predictionHistory,
   displayTeam1,
   displayTeam2,
   trackedTeam,
@@ -246,6 +231,7 @@ function MarketMovementPanel({
 }: {
   sportsbookOdds: MatchOdds[];
   oddsHistory: MatchOdds[];
+  predictionHistory: PredictionSnapshot[];
   displayTeam1: string;
   displayTeam2: string;
   trackedTeam: string;
@@ -274,7 +260,18 @@ function MarketMovementPanel({
     };
   });
 
-  if (featuredBooks.length === 0) {
+  const movement = buildPreMatchMovement(
+    predictionHistory,
+    featuredBooks.map((book) => ({
+      id: book.id,
+      bookmaker: book.bookmaker,
+      color: book.color,
+      history: book.history,
+    })),
+    trackedTeamKey,
+  );
+
+  if (movement.series.length === 0) {
     return (
       <motion.div
         className={`${detailTileClass} mb-4`}
@@ -282,29 +279,13 @@ function MarketMovementPanel({
         transition={{ delay: 0.16 }}
       >
         <ComingSoonTile
-          title="Market board opening soon"
-          body="This panel will light up once trusted sportsbooks publish opening prices."
+          eyebrow="Pre-match movement"
+          title="Movement history is not available yet"
+          body="SixSense and market changes will appear after a pre-match refresh captures a new data point."
         />
       </motion.div>
     );
   }
-
-  const chartRowsByTimestamp = new Map<number, Record<string, number | null>>();
-  featuredBooks.forEach((book) => {
-    book.history.forEach((snapshot) => {
-      const timestamp = new Date(snapshot.fetched_at).getTime();
-      if (Number.isNaN(timestamp)) return;
-      const row = chartRowsByTimestamp.get(timestamp) ?? {};
-      row.timestamp = timestamp;
-      row[book.id] = toNormalizedImpliedProbability(snapshot, trackedTeamKey);
-      chartRowsByTimestamp.set(timestamp, row);
-    });
-  });
-
-  const chartRows = [...chartRowsByTimestamp.values()]
-    .sort((left, right) => Number(left.timestamp) - Number(right.timestamp));
-  const chartValues = chartRows.flatMap((row) => featuredBooks.map((book) => row[book.id]))
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 
   const fallbackLatest = featuredBooks
     .map((book) => book.latestProbability)
@@ -326,17 +307,6 @@ function MarketMovementPanel({
   const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
   const opposingMeta = getTeamMeta(opposingTeam);
 
-  let minDomain = 40;
-  let maxDomain = 60;
-  if (chartValues.length > 0) {
-    const rawMin = Math.min(...chartValues);
-    const rawMax = Math.max(...chartValues);
-    const spread = Math.max(rawMax - rawMin, 6);
-    const center = (rawMin + rawMax) / 2;
-    minDomain = Math.max(0, Math.floor(center - spread / 2 - 3));
-    maxDomain = Math.min(100, Math.ceil(center + spread / 2 + 3));
-  }
-
   return (
     <motion.div
       className={`${detailTileClass} mb-4 border-white/10`}
@@ -349,16 +319,18 @@ function MarketMovementPanel({
             <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 13h12M3 10l2.4-5 2.2 3.1L10.4 3l2.6 7" />
             </svg>
-            Market Movement
+            Pre-match movement
           </h2>
           <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
-            Tracking {marketSideMeta.shortName} implied win probability across the top 3 trusted books
+            SixSense probability vs normalized market-implied probability for {marketSideMeta.shortName}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
-            {featuredBooks.length} books shown
-          </span>
+          {featuredBooks.length > 0 && (
+            <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
+              {featuredBooks.length} books shown
+            </span>
+          )}
           {consensusLatest !== null && (
             <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
               {marketSideMeta.shortName} {consensusLatest.toFixed(0)}%
@@ -372,7 +344,7 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)]">
+      <div className={`mt-4 grid items-start gap-4 ${featuredBooks.length > 0 ? 'lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)]' : ''}`}>
         <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-3 sm:px-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
@@ -383,25 +355,33 @@ function MarketMovementPanel({
               <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">vs {opposingMeta.shortName}</span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {chartRows.length > 0 ? `${chartRows.length} snapshots` : 'awaiting history'}
+              {movement.modelPointCount} model / {movement.marketPointCount} market points
             </span>
           </div>
 
-          {chartRows.length > 0 ? (
+          {movement.chartRows.length > 0 ? (
             <MarketMovementChart
-              chartRows={chartRows}
-              books={featuredBooks}
-              minDomain={minDomain}
-              maxDomain={maxDomain}
+              chartRows={movement.chartRows}
+              series={movement.series}
+              minDomain={movement.minDomain}
+              maxDomain={movement.maxDomain}
+              ariaLabel={`Pre-match movement for ${trackedTeam}. Solid SixSense model probability is compared with dashed normalized bookmaker implied probabilities.`}
             />
           ) : (
             <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
-              Market history will plot here after the next sportsbook refresh captures opening movement.
+              Pre-match history will plot here after the next deterministic or sportsbook refresh.
             </div>
+          )}
+          {(movement.modelPointCount === 0 || movement.marketPointCount === 0) && (
+            <p className="mt-3 text-xs leading-relaxed text-slate-400" role="status">
+              {movement.modelPointCount === 0
+                ? 'SixSense history is not available yet; showing market movement only.'
+                : 'Trusted market history is not available yet; showing SixSense movement only.'}
+            </p>
           )}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {featuredBooks.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {featuredBooks.map((book) => (
             <button
               key={`${book.id}-mobile`}
@@ -445,9 +425,9 @@ function MarketMovementPanel({
               </div>
             </button>
           ))}
-        </div>
+        </div>}
 
-        <div className="hidden space-y-2.5 lg:block">
+        {featuredBooks.length > 0 && <div className="hidden space-y-2.5 lg:block">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -502,7 +482,7 @@ function MarketMovementPanel({
               </div>
             </button>
           ))}
-        </div>
+        </div>}
       </div>
     </motion.div>
   );
@@ -516,6 +496,7 @@ export function PredictDetails() {
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [odds, setOdds] = useState<MatchOdds[]>([]);
   const [oddsHistory, setOddsHistory] = useState<MatchOdds[]>([]);
+  const [predictionHistory, setPredictionHistory] = useState<PredictionSnapshot[]>([]);
   const [squads, setSquads] = useState<MatchSquad[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [espnData, setEspnData] = useState<ESPNMatchData | null>(null);
@@ -536,9 +517,10 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
+        const [matchData, predictionData, predictionHistoryData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
+          getPredictionSnapshots(matchId),
           getMatchEnrichment(matchId),
           getMatchOdds(matchId),
           getMatchOddsHistory(matchId),
@@ -548,6 +530,7 @@ export function PredictDetails() {
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
+        setPredictionHistory(predictionHistoryData);
         setEnrichment(enrichmentData);
         setOdds(oddsData);
         setOddsHistory(oddsHistoryData);
@@ -1170,6 +1153,7 @@ export function PredictDetails() {
       <MarketMovementPanel
         sportsbookOdds={featuredSportsbooks}
         oddsHistory={oddsHistory}
+        predictionHistory={predictionHistory}
         displayTeam1={displayTeam1}
         displayTeam2={displayTeam2}
         trackedTeam={marketTrackedTeam}

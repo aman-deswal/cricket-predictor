@@ -10,18 +10,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-
-export interface MarketChartBook {
-  id: string;
-  bookmaker: string;
-  color: string;
-}
+import type { MovementSeries } from '@/lib/pre-match-movement';
 
 interface MarketMovementChartProps {
   chartRows: Array<Record<string, number | null>>;
-  books: MarketChartBook[];
+  series: MovementSeries[];
   minDomain: number;
   maxDomain: number;
+  ariaLabel: string;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -32,21 +28,32 @@ function formatMarketTimestamp(timestamp: number, compact = false): string {
 
 export function MarketMovementChart({
   chartRows,
-  books,
+  series,
   minDomain,
   maxDomain,
+  ariaLabel,
 }: MarketMovementChartProps) {
+  const accessibleSummaries = series.map((entry) => {
+    const values = chartRows
+      .map((row) => row[entry.id])
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const opening = values[0];
+    const latest = values[values.length - 1];
+    const delta = latest - opening;
+    const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
+    return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${values.length} ${values.length === 1 ? 'snapshot' : 'snapshots'}.`;
+  });
   const overlappingDotOffsets = new Map<string, number>();
   chartRows.forEach((row) => {
     const timestamp = Number(row.timestamp);
     const groups = new Map<string, string[]>();
 
-    books.forEach((book) => {
-      const value = row[book.id];
+    series.forEach((entry) => {
+      const value = row[entry.id];
       if (typeof value !== 'number' || !Number.isFinite(value)) return;
       const bucketKey = `${timestamp}:${value.toFixed(1)}`;
       const entries = groups.get(bucketKey) ?? [];
-      entries.push(book.id);
+      entries.push(entry.id);
       groups.set(bucketKey, entries);
     });
 
@@ -100,7 +107,11 @@ export function MarketMovementChart({
 
   return (
     <>
-      <div className="h-32 sm:h-36 lg:h-44">
+      <div
+        className="h-32 sm:h-36 lg:h-44"
+        role="img"
+        aria-label={ariaLabel}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartRows} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
             <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.7} />
@@ -133,25 +144,26 @@ export function MarketMovementChart({
               }}
               labelFormatter={(value) => formatMarketTimestamp(Number(value))}
               formatter={(value, name) => {
-                const book = books.find((entry) => entry.id === name);
+                const entry = series.find((candidate) => candidate.id === name);
                 const numericValue = typeof value === 'number'
                   ? value
                   : Array.isArray(value) && typeof value[0] === 'number'
                     ? value[0]
                     : null;
-                if (numericValue === null) return ['—', book?.bookmaker ?? String(name)];
-                return [`${numericValue.toFixed(1)}%`, book?.bookmaker ?? String(name)];
+                if (numericValue === null) return ['—', entry?.label ?? String(name)];
+                return [`${numericValue.toFixed(1)}%`, entry?.label ?? String(name)];
               }}
             />
-            {books.map((book) => (
+            {series.map((entry) => (
               <Line
-                key={book.id}
+                key={entry.id}
                 type="monotone"
-                dataKey={book.id}
-                stroke={book.color}
-                strokeWidth={2.25}
+                dataKey={entry.id}
+                stroke={entry.color}
+                strokeWidth={entry.kind === 'model' ? 3 : 2}
+                strokeDasharray={entry.kind === 'market' ? '6 4' : undefined}
                 dot={chartRows.length <= 8 ? renderMarketDot : false}
-                activeDot={{ fill: book.color, r: 4, strokeWidth: 0 }}
+                activeDot={{ fill: entry.color, r: 4, strokeWidth: 0 }}
                 connectNulls
                 isAnimationActive={false}
               />
@@ -159,14 +171,23 @@ export function MarketMovementChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {books.map((book) => (
+      <ul className="sr-only">
+        {accessibleSummaries.map((summary, index) => (
+          <li key={series[index].id}>{summary}</li>
+        ))}
+      </ul>
+      <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
+        {series.map((entry) => (
           <span
-            key={`${book.id}-legend`}
+            key={`${entry.id}-legend`}
             className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
           >
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: book.color }} />
-            {book.bookmaker}
+            <span
+              className={`w-4 border-t-2 ${entry.kind === 'market' ? 'border-dashed' : ''}`}
+              style={{ borderColor: entry.color }}
+              aria-hidden="true"
+            />
+            {entry.label}
           </span>
         ))}
       </div>
