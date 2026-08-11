@@ -5,7 +5,7 @@ import type { MatchWithPredictions } from '@sixsense/domain';
 
 import { MatchCard } from '@/components/match-card';
 import { ScreenState } from '@/components/screen-state';
-import { getUpcomingMatches } from '@/data/matches';
+import { getUpcomingMatches } from '@/services/matches';
 import { theme } from '@/theme';
 
 export default function MatchesScreen() {
