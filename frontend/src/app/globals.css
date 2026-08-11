@@ -7,6 +7,8 @@
     font-family: var(--font-space-grotesk), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: rgba(245, 158, 11, 0.16);
   }
 
   /* Numbers and data feel like a Bloomberg terminal */
@@ -113,9 +115,31 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+
     .featured-cricket-border::before,
     .group:hover .featured-cricket-border::before {
       animation-play-state: paused;
     }
+  }
+
+  @media (max-width: 639px) {
+    .backdrop-blur-xl {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

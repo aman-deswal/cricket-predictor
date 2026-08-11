@@ -56,7 +56,7 @@ function isMatchLive(match: MatchWithPredictions): boolean {
   return String(match.status).toLowerCase() === 'live';
 }
 
-function getCountdown(date: string): { days: number; hours: number; mins: number; secs: number } | null {
+function getCountdown(date: string): { days: number; hours: number; mins: number } | null {
   const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
   const kickoff = new Date(raw).getTime();
   if (Number.isNaN(kickoff)) return null;
@@ -67,8 +67,7 @@ function getCountdown(date: string): { days: number; hours: number; mins: number
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const secs = Math.floor((diff % (1000 * 60)) / 1000);
-  return { days, hours, mins, secs };
+  return { days, hours, mins };
 }
 
 function decimalToAmerican(d: number): string {
@@ -442,6 +441,7 @@ function MatchBoardStrip({
               : 0;
             const edgePct = Math.max(ev1, ev2);
             const hasEdge = hasMarket && edgePct >= 7;
+            const edgeTeam = hasEdge ? (ev1 >= ev2 ? 1 : 2) : null;
             const isFeatured = match.match_id === featuredMatchId;
 
             return (
@@ -474,11 +474,6 @@ function MatchBoardStrip({
                           </span>
                         </span>
                       )}
-                      {hasEdge && (
-                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-200">
-                          +{edgePct} edge
-                        </span>
-                      )}
                     </div>
                     {isMatchLive(match) ? (
                       <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
@@ -502,6 +497,15 @@ function MatchBoardStrip({
                         >
                           {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
                         </span>
+                        {edgeTeam === 1 && (
+                          <span
+                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                            title={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                            aria-label={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                          >
+                            +{edgePct}pt edge
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-amber-100' : 'text-gray-400'}`}
@@ -522,6 +526,15 @@ function MatchBoardStrip({
                         >
                           {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
                         </span>
+                        {edgeTeam === 2 && (
+                          <span
+                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                            title={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                            aria-label={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                          >
+                            +{edgePct}pt edge
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-amber-100' : 'text-gray-400'}`}
@@ -586,7 +599,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
   useEffect(() => {
     setCountdown(getHeroCountdown());
-    const interval = window.setInterval(() => setCountdown(getHeroCountdown()), 1000);
+    const interval = window.setInterval(() => setCountdown(getHeroCountdown()), 60_000);
     return () => window.clearInterval(interval);
   }, [getHeroCountdown]);
 
@@ -623,7 +636,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
-            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-300">
+            <span className="order-first inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300 sm:order-none sm:ml-auto sm:w-auto sm:py-0.5">
               <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="8" cy="8" r="6" />
                 <path d="M8 4v4l3 2" />
@@ -635,8 +648,6 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
                   <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
                   <span className="text-slate-400"> </span>
                   <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
-                  <span className="text-slate-400"> </span>
-                  <span className="text-white">{String(countdown.secs).padStart(2, '0')}s</span>
                 </span>
               ) : (
                 <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
@@ -645,9 +656,9 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
           </div>
 
           {/* Row 2: Teams + chart */}
-          <div className="flex items-center gap-4 sm:gap-8">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-8">
             {/* Team 1 */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:gap-3 sm:text-left">
               <FeaturedTeamCrest
                 team={match.team1}
                 logoUrl={match.team1_logo_url}
@@ -670,13 +681,13 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             </div>
 
             {/* Center VS */}
-            <div className="flex flex-col items-center flex-shrink-0 px-2">
+            <div className="flex flex-col items-center flex-shrink-0 px-1 sm:px-2">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest">vs</span>
             </div>
 
             {/* Team 2 */}
-            <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-              <div className="min-w-0 text-right">
+            <div className="flex min-w-0 flex-col-reverse items-center gap-2 text-center sm:flex-row sm:justify-end sm:gap-3 sm:text-right">
+              <div className="min-w-0">
                 <p className="text-base sm:text-lg font-black text-white leading-none">{team2Meta.shortName}</p>
                 {prediction && (
                   <p className="text-2xl sm:text-3xl font-black tabular-nums mt-0.5 leading-none"
@@ -838,13 +849,13 @@ export default function HomePage() {
           <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10">
             <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
                 <SectionHeading icon={<GroundsIcon className="h-6 w-6" />}>
-                  <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Around the grounds</h2>
+                  <h2 className="text-sm font-black uppercase tracking-[0.1em] text-white sm:text-base sm:tracking-[0.18em]">Around the grounds</h2>
                 </SectionHeading>
                 <div className="flex shrink-0 items-center">
                   <button
                     type="button"
                     onClick={() => setCompetitionFiltersOpen((open) => !open)}
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors sm:h-8 sm:w-8 ${
                       competitionFiltersOpen
                         ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                         : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
@@ -867,7 +878,7 @@ export default function HomePage() {
                       setActiveCompetition('all');
                       setCompetitionFiltersOpen(false);
                     }}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                    className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 ${
                       activeCompetition === 'all'
                         ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                         : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
@@ -883,7 +894,7 @@ export default function HomePage() {
                         setActiveCompetition(key);
                         setCompetitionFiltersOpen(false);
                       }}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                      className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 ${
                         activeCompetition === key
                           ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                           : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
