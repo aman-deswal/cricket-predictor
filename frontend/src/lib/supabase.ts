@@ -167,7 +167,6 @@ export interface MatchSpotlightSignals {
   key_player_count?: number;
   player_update_count?: number;
   possible_xi_player_count?: number;
-  squad_player_count?: number;
   source_link_count?: number;
 }
 
@@ -307,7 +306,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   }
 
   const now = Date.now();
-  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: franchiseLogoData }, { data: oddsData }, { data: squadData }] = await Promise.all([
+  const [{ data, error }, { data: statsData }, { data: enrichmentData }, { data: espnData }, { data: franchiseLogoData }, { data: oddsData }] = await Promise.all([
     supabase
       .from('matches')
       .select('*, predictions(*)')
@@ -330,9 +329,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .from('match_odds')
       .select('match_id, bookmaker, team1_odds, team2_odds')
       .order('fetched_at', { ascending: false }),
-    supabase
-      .from('match_squads')
-      .select('match_id, players, is_confirmed'),
   ]);
 
   if (error) throw error;
@@ -382,7 +378,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   });
   const enrichmentVenue = new Map<string, string>();
   const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
-  const squadCounts = new Map<string, number>();
   const hasNamedEvidence = (value: unknown): boolean => (
     typeof value === 'string'
     && value.trim().length > 1
@@ -436,24 +431,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       source_link_count: sourceLinkCount,
     });
   });
-  const parseJSON = <T>(val: unknown, fallback: T): T => {
-    if (val === null || val === undefined) return fallback;
-    if (typeof val !== 'string') return val as T;
-    try { return JSON.parse(val) as T; } catch { return fallback; }
-  };
-  (squadData ?? []).forEach((row: {
-    match_id: string;
-    players: unknown[] | string | null;
-    is_confirmed: boolean | null;
-  }) => {
-    const players = parseJSON(row.players, []);
-    const playerCount = Array.isArray(players) ? players.length : 0;
-    if (playerCount === 0) return;
-    const weight = row.is_confirmed ? playerCount + 100 : playerCount;
-    const current = squadCounts.get(row.match_id) ?? 0;
-    if (weight > current) squadCounts.set(row.match_id, weight);
-  });
-
   // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
   const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
   (oddsData ?? []).forEach((o: { match_id: string; bookmaker: string; team1_odds: number; team2_odds: number }) => {
@@ -504,9 +481,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       } catch {}
     }
     const rosters = espnRosters.get(match.match_id) ?? [];
-    const espnRosterPlayerCount = rosters.reduce((sum, roster) => sum + (roster.players?.length ?? 0), 0);
-    const storedSquadWeight = squadCounts.get(match.match_id) ?? 0;
-    const squadPlayerCount = Math.max(storedSquadWeight, espnRosterPlayerCount);
     const findTeamLogo = (teamName: string): string | undefined => {
       const teamMeta = getTeamMeta(teamName);
       const normalizedName = normalizeLogoTeamName(teamName);
@@ -544,7 +518,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
         ...enrichmentSignals.get(match.match_id),
         has_espn_context: espnVenue.has(match.match_id) || h2hMatchCount > 0,
         h2h_match_count: h2hMatchCount,
-        squad_player_count: squadPlayerCount,
       },
     };
   });

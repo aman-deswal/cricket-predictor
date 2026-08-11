@@ -1,7 +1,9 @@
-"""Fetch squad / playing XI data from ESPN (primary) and CricAPI (fallback)."""
+"""Fetch squad / playing XI data from ESPN, Cricbuzz, and CricAPI."""
 
 import argparse
+import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -12,11 +14,14 @@ import requests
 from dotenv import load_dotenv
 
 from utils.db import get_client
-from utils.espn import get_match_summary
+from utils.espn import _normalize_team, get_match_summary
 
 load_dotenv()
 
 BASE_URL = "https://api.cricapi.com/v1"
+CRICBUZZ_UPCOMING_URL = "https://www.cricbuzz.com/cricket-match/live-scores/upcoming-matches"
+CRICBUZZ_SQUADS_URL = "https://www.cricbuzz.com/cricket-match-squads/{match_id}/{slug}"
+CRICBUZZ_USER_AGENT = "Mozilla/5.0"
 PLACEHOLDER_IMAGE_TOKENS = (
     "default-player-logo",
     "generic-headshot",
@@ -48,6 +53,156 @@ class MatchSquadFetchResult:
     status: str
     stored_team_count: int = 0
     error: str = ""
+
+
+def _match_teams(team1: str, team2: str, candidate1: str, candidate2: str) -> bool:
+    return {
+        _normalize_team(team1),
+        _normalize_team(team2),
+    } == {
+        _normalize_team(candidate1),
+        _normalize_team(candidate2),
+    }
+
+
+def _extract_cricbuzz_match_links(page_html: str) -> list[dict]:
+    links: list[dict] = []
+    seen: set[str] = set()
+    pattern = re.compile(
+        r'<a href="/live-cricket-scores/(?P<match_id>\d+)/(?P<slug>[^"]+)"[^>]*title="(?P<title>[^"]+)"',
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(page_html):
+        title = match.group("title")
+        matchup = title.split(" - ", 1)[0].split(",", 1)[0].strip()
+        if " vs " not in matchup:
+            continue
+        team1, team2 = [part.strip() for part in matchup.split(" vs ", 1)]
+        match_id = match.group("match_id")
+        if match_id in seen:
+            continue
+        seen.add(match_id)
+        links.append({
+            "match_id": match_id,
+            "slug": match.group("slug"),
+            "team1": team1,
+            "team2": team2,
+            "title": title,
+        })
+    return links
+
+
+def _find_cricbuzz_match_link(team1: str, team2: str) -> Optional[dict]:
+    try:
+        response = requests.get(
+            CRICBUZZ_UPCOMING_URL,
+            headers={"User-Agent": CRICBUZZ_USER_AGENT},
+            timeout=30,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"  ⚠️  Cricbuzz upcoming fetch failed: {exc}")
+        return None
+
+    candidates = [
+        link for link in _extract_cricbuzz_match_links(response.text)
+        if _match_teams(team1, team2, link["team1"], link["team2"])
+    ]
+    return candidates[0] if candidates else None
+
+
+def _cricbuzz_image_url(image_id: Optional[int]) -> str:
+    if not image_id:
+        return ""
+    return f"https://static.cricbuzz.com/a/img/v1/48x48/i1/c{image_id}/i.jpg"
+
+
+def _normalize_cricbuzz_player(player: dict) -> dict:
+    image_details = player.get("imageDetails") or {}
+    return {
+        "id": str(player.get("id", "")),
+        "name": player.get("fullName") or player.get("name", ""),
+        "role": _classify_role({
+            "role": player.get("role", ""),
+            "isKeeper": player.get("keeper", False),
+            "battingStyle": player.get("battingStyle", ""),
+            "bowlingStyle": player.get("bowlingStyle", ""),
+        }),
+        "batting_style": player.get("battingStyle", ""),
+        "bowling_style": player.get("bowlingStyle", ""),
+        "is_captain": player.get("captain", False),
+        "is_keeper": player.get("keeper", False),
+        "image_url": _cricbuzz_image_url(image_details.get("imageId")),
+    }
+
+
+def _extract_cricbuzz_team_objects(page_html: str) -> list[dict]:
+    normalized_page = page_html.replace('\\"', '"')
+    team_objects: list[dict] = []
+    seen_teams: set[str] = set()
+    pattern = re.compile(
+        r'"teamId":(?P<team_id>\d+),"teamName":"(?P<team>[^"]+)","teamSName":"[^"]+",'
+        r'(?:\"imageDetails\":\{.*?\},)?'
+        r'"profileUrl":"[^"]+"\},"players":\{"Squad":(?P<squad>\[.*?\])'
+        r'(?:,"Playing XI":(?P<xi>\[.*?\]))?\}',
+        re.S,
+    )
+    for match in pattern.finditer(normalized_page):
+        team_name = match.group("team")
+        if team_name in seen_teams:
+            continue
+        try:
+            squad = json.loads(match.group("squad"))
+            playing_xi = json.loads(match.group("xi")) if match.group("xi") else []
+        except json.JSONDecodeError:
+            continue
+        seen_teams.add(team_name)
+        team_objects.append({
+            "teamId": int(match.group("team_id")),
+            "teamName": team_name,
+            "players": {
+                "Squad": squad,
+                "Playing XI": playing_xi,
+            },
+        })
+    return team_objects
+
+
+def fetch_squad_from_cricbuzz(team1: str, team2: str) -> Optional[list[dict]]:
+    link = _find_cricbuzz_match_link(team1, team2)
+    if not link:
+        return None
+
+    try:
+        response = requests.get(
+            CRICBUZZ_SQUADS_URL.format(match_id=link["match_id"], slug=link["slug"]),
+            headers={"User-Agent": CRICBUZZ_USER_AGENT},
+            timeout=30,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"  ⚠️  Cricbuzz squads fetch failed: {exc}")
+        return None
+
+    team_objects = _extract_cricbuzz_team_objects(response.text)
+    if not team_objects:
+        return None
+
+    squads: list[dict] = []
+    for team_object in team_objects:
+        players_block = team_object.get("players") or {}
+        raw_players = players_block.get("Playing XI") or players_block.get("Squad") or []
+        if not raw_players:
+            continue
+        players = [_normalize_cricbuzz_player(player) for player in raw_players]
+        is_confirmed = "Playing XI" in players_block and len(raw_players) == 11
+        squads.append({
+            "teamName": team_object.get("teamName", ""),
+            "players": players,
+            "is_confirmed": is_confirmed,
+        })
+
+    return squads if squads else None
 
 
 def fetch_squad_from_espn(match_id: str) -> Optional[list[dict]]:
@@ -276,6 +431,12 @@ def fetch_and_store_squads(
         squad_data = fetch_squad_from_espn(match_id)
         source = "espn"
 
+        # Fall back to Cricbuzz's public squads page when ESPN has the fixture
+        # but future-match rosters are still blank in the summary response.
+        if not squad_data:
+            squad_data = fetch_squad_from_cricbuzz(team1, team2)
+            source = "cricbuzz"
+
         # Fall back to CricAPI only if key is set and match is not ESPN-sourced
         api_key = _get_api_key()
         if not squad_data and api_key and not match_id.startswith("espn-"):
@@ -302,13 +463,13 @@ def fetch_and_store_squads(
                 print(f"  ⚠️  No players listed for {team_name}")
                 continue
 
-            # ESPN players are already normalized
-            if source == "espn":
+            # ESPN and Cricbuzz players are already normalized
+            if source in {"espn", "cricbuzz"}:
                 players = raw_players
             else:
                 players = [normalize_player(p) for p in raw_players]
 
-            is_confirmed = _is_confirmed_lineup(players, source)
+            is_confirmed = bool(team_squad.get("is_confirmed")) or _is_confirmed_lineup(players, source)
 
             stored = store_squad(match_id, team_name, players, is_confirmed=is_confirmed, source=source)
             if not stored:
