@@ -352,6 +352,20 @@ function getCompetitionSource(match: CompetitionMatch): string {
   return commaIndex >= 0 ? match.name.slice(commaIndex + 1).trim() : '';
 }
 
+function getStableCompetitionLabel(source: string): string {
+  const segments = source.split(',').map((segment) => segment.trim()).filter(Boolean);
+  const isMatchSpecificSegment = (segment: string) =>
+    /\b(?:vs?\.?)\b/i.test(segment)
+    || /^(?:\d+(?:st|nd|rd|th)\s+)?(?:odi|t20i?|test|match)(?:\s+match)?$/i.test(segment)
+    || /^match\s+\d+$/i.test(segment);
+
+  while (segments.length > 1 && isMatchSpecificSegment(segments[0])) {
+    segments.shift();
+  }
+
+  return segments.join(', ');
+}
+
 function getCompetitionSearchText(match: CompetitionMatch): string {
   const commaIndex = match.name.indexOf(',');
   const namedCompetition = commaIndex >= 0 ? match.name.slice(commaIndex + 1).trim() : '';
@@ -430,7 +444,7 @@ function getInternationalQualifierLabel(source: string): string | null {
 }
 
 function getFallbackLabel(match: CompetitionMatch): string {
-  const source = getCompetitionSource(match);
+  const source = getStableCompetitionLabel(getCompetitionSource(match));
   if (source && !['cricket', 'match', 't20', 't20 cricket'].includes(normalizeText(source))) {
     return source;
   }

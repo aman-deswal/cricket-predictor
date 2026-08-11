@@ -133,7 +133,6 @@ export function Navbar() {
             </button>
           </div>
 
-          <span className="hidden text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 min-[430px]:inline sm:hidden">Match intelligence</span>
         </div>
       </div>
     </nav>
