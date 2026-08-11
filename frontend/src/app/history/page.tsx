@@ -115,13 +115,13 @@ function AccuracyStrip({
   if (!intl && !league) return null;
   return (
     <motion.div
-      className="grid grid-cols-2 gap-3 mb-5"
+      className="mb-5 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08 }}
     >
       {/* International */}
-      <div className="bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
         <GlobeIcon className="w-5 h-5 text-amber-600 shrink-0" />
         <div className="min-w-0">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider">International · {periodLabel}</p>
@@ -137,7 +137,7 @@ function AccuracyStrip({
       </div>
 
       {/* League */}
-      <div className="bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
           <ShieldIcon className="w-5 h-5 text-slate-500 shrink-0" />
         <div className="min-w-0">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider">League · {periodLabel}</p>
@@ -204,7 +204,8 @@ function ReasoningToggle({ text }: { text: string }) {
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+        className="flex min-h-11 items-center gap-1.5 rounded-lg pr-3 text-[10px] text-slate-500 transition-colors hover:text-slate-300"
+        aria-expanded={open}
       >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.15 }}>
           <ChevronDownIcon className="w-3 h-3" />
@@ -462,7 +463,7 @@ export default function HistoryPage() {
   return (
     <div>
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
+        <h1 className="mb-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
           Prediction <span className="text-amber-600">History</span>
         </h1>
         <p className="text-slate-500 mb-5 text-sm">Tap any result to see the full AI breakdown</p>
@@ -473,18 +474,19 @@ export default function HistoryPage() {
 
       {/* Controls row */}
       <motion.div
-        className="flex flex-wrap items-center gap-3 mb-6"
+        className="mb-6 flex flex-wrap items-center gap-3"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.12 }}
       >
         {/* Period tabs */}
-        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1 gap-0.5">
+        <div className="grid w-full grid-cols-3 gap-0.5 rounded-xl border border-white/10 bg-white/[0.04] p-1 sm:flex sm:w-auto">
           {periodOptions.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setPeriod(key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              aria-pressed={period === key}
+              className={`min-h-11 rounded-lg px-2 py-2 text-xs font-semibold transition-all sm:min-h-0 sm:px-3 sm:py-1.5 ${
                 period === key
                   ? 'bg-amber-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -498,12 +500,13 @@ export default function HistoryPage() {
         <div className="w-px h-5 bg-gray-700/60 hidden sm:block" />
 
         {/* Outcome filter */}
-        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1 gap-0.5">
+        <div className="grid w-full grid-cols-3 gap-0.5 rounded-xl border border-white/10 bg-white/[0.04] p-1 sm:flex sm:w-auto">
           {outcomeOptions.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setOutcome(key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              aria-pressed={outcome === key}
+              className={`min-h-11 rounded-lg px-2 py-2 text-xs font-semibold transition-all sm:min-h-0 sm:px-3 sm:py-1.5 ${
                 outcome === key
                   ? outcome === 'correct' ? 'bg-emerald-500/20 text-emerald-400'
                   : outcome === 'incorrect' ? 'bg-red-500/20 text-red-400'
