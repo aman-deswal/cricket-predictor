@@ -431,7 +431,6 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       source_link_count: sourceLinkCount,
     });
   });
-
   // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
   const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
   (oddsData ?? []).forEach((o: { match_id: string; bookmaker: string; team1_odds: number; team2_odds: number }) => {
