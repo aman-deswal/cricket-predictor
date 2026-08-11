@@ -206,11 +206,10 @@ const INTERNATIONAL_TEAMS = new Set([
 ]);
 
 function normalizeTeamName(team: string): string {
-  return team
-    .toLowerCase()
-    .replace(/\s+\((men|women)\)$/, '')
-    .replace(/\s+(men|women)$/, '')
-    .trim();
+  const normalized = team.toLowerCase().trim();
+  const genderSuffixes = [' (women)', ' (men)', ' women', ' men'];
+  const suffix = genderSuffixes.find((candidate) => normalized.endsWith(candidate));
+  return suffix ? normalized.slice(0, -suffix.length).trimEnd() : normalized;
 }
 
 export function isInternationalMatch(item: Pick<PredictionHistoryItem, 'team1' | 'team2'>): boolean {
