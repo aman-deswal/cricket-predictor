@@ -341,7 +341,7 @@ function MatchBoardStrip({
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-500/35 bg-gradient-to-br from-slate-200/12 to-slate-900/10 text-amber-600 shadow-[0_0_24px_rgba(148,163,184,0.12)]">
               <BowlIcon className="h-5 w-5" />
             </span>
-            <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white sm:text-base sm:tracking-[0.18em]">Match center</h2>
+            <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">Match center</h2>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -351,7 +351,7 @@ function MatchBoardStrip({
             </span>
           )}
           {hasOverflow && (
-            <div className="hidden items-center gap-1 sm:flex">
+            <div className="hidden items-center gap-1 lg:flex">
               <button
                 type="button"
                 onClick={() => scrollTicker(-1)}
@@ -379,7 +379,7 @@ function MatchBoardStrip({
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
-            className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors sm:h-8 sm:w-8 ${
+            className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
               filtersOpen
                 ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                 : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
@@ -404,7 +404,7 @@ function MatchBoardStrip({
                 setActiveFilter(option.key);
                 setFiltersOpen(false);
               }}
-              className={`min-h-11 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 ${
+              className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
                 activeFilter === option.key
                   ? 'border-amber-600/35 bg-amber-600/[0.12] text-amber-600'
                   : 'border-slate-500/30 bg-white/[0.04] text-slate-300 hover:border-slate-300/50 hover:text-white'
@@ -419,7 +419,7 @@ function MatchBoardStrip({
       <div className="relative">
         <div
           ref={tickerRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-3 py-3 sm:px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
           aria-label="Swipe horizontally through Match Center"
         >
           {filteredMatches.map((match) => {
@@ -448,23 +448,14 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group relative min-w-[14rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[16.5rem] lg:min-w-[calc((100%-2.25rem)/4)] lg:flex-1"
+                className="group min-w-[17rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
                 <div>
-                  <div className="mb-3 grid min-h-[3.625rem] grid-cols-[1fr_auto] content-start gap-x-2 gap-y-1.5">
-                    <div className="min-w-0">
+                  <div className="mb-3 flex h-7 items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       <MatchFormatBadge match={match} className="text-amber-100" />
-                    </div>
-                    {isMatchLive(match) ? (
-                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
-                        Live
-                      </span>
-                    ) : (
-                      <span className="shrink-0 pt-0.5 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
-                    )}
-                    <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5">
                       {isFeatured && (
                         <span
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-500/25 bg-white/[0.04] px-1.5"
@@ -488,6 +479,13 @@ function MatchBoardStrip({
                         </span>
                       )}
                     </div>
+                    {isMatchLive(match) ? (
+                      <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-right text-[9px] font-black uppercase tracking-widest text-red-200">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-right text-xs font-bold text-gray-300">{getMatchDateLabel(match.date)}</span>
+                    )}
                   </div>
 
                   <div className="space-y-2.5">
@@ -546,7 +544,7 @@ function MatchBoardStrip({
             );
           })}
           {filteredMatches.length === 0 && (
-            <div className="min-w-[14rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[16.5rem] lg:flex-1">
+            <div className="min-w-[17rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[18.5rem]">
               No {activeFilter} matches
             </div>
           )}
@@ -561,7 +559,7 @@ function MatchBoardStrip({
             <button
               type="button"
               onClick={() => scrollTicker(1)}
-              className="pointer-events-auto relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/30 bg-slate-200/[0.10] text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(148,163,184,0.08)] backdrop-blur-xl transition-colors active:bg-slate-200/20"
+              className="pointer-events-auto relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-500/30 bg-slate-200/[0.10] text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,0.45),0_0_18px_rgba(148,163,184,0.08)] backdrop-blur-xl transition-colors active:bg-slate-200/20"
               aria-label="Scroll Match Center right"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
