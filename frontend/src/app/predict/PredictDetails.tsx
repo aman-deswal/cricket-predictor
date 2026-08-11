@@ -157,8 +157,8 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-const detailTileClass = 'mobile-content-auto bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-700/40';
-const detailTileStrongClass = 'mobile-content-auto bg-gradient-to-br from-[#141c25]/95 to-[#0c1218]/95 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-600/25';
+const detailTileClass = 'bg-gradient-to-br from-[#121922]/90 to-[#0c1218]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-700/40';
+const detailTileStrongClass = 'bg-gradient-to-br from-[#141c25]/95 to-[#0c1218]/95 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-600/25';
 const detailTileTitleClass = 'text-[clamp(0.8rem,1vw,1rem)] font-bold text-white uppercase tracking-wider flex items-center gap-1.5';
 const detailTileMetaClass = 'text-[clamp(0.65rem,0.8vw,0.8rem)]';
 const detailTileBodyClass = 'text-[clamp(0.875rem,1.05vw,1.05rem)] text-slate-300 leading-relaxed';
@@ -558,7 +558,11 @@ export function PredictDetails() {
         // Fetch player stats for all squad players
         if (squadData.length > 0 && matchData) {
           const allNames = squadData.flatMap(s => (s.players ?? []).map(p => p.name));
-          const format = matchFormat === 'ODI' ? 'odi' : 't20i';
+          const fetchedMatchFormat = getMatchFormatLabel({
+            ...matchData,
+            competition_name: espn?.series_note ?? null,
+          });
+          const format = fetchedMatchFormat === 'ODI' ? 'odi' : 't20i';
           const stats = await getPlayerStats(allNames, format);
           setPlayerStats(stats);
         }

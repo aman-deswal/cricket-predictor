@@ -81,12 +81,20 @@ export function Navbar() {
               <span className="text-white">Sense</span>
               <sup className="ml-0.5 align-super text-[0.4em] font-black text-amber-600">™</sup>
             </span>
-            {demoEnabled && (
-              <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 text-slate-300 border border-slate-500/20">
-                Demo
-              </span>
-            )}
           </Link>
+          <button
+            type="button"
+            onClick={toggleDemoMode}
+            className={`ml-1 inline-flex min-h-9 items-center rounded-full border px-2.5 text-[9px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
+              demoEnabled
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                : 'border-slate-600/30 bg-white/[0.03] text-slate-500'
+            }`}
+            aria-pressed={demoEnabled}
+            title="Toggle demo data"
+          >
+            Demo {demoEnabled ? 'on' : 'off'}
+          </button>
 
           {/* Desktop nav */}
           <div className="hidden sm:flex items-center space-x-1">
@@ -111,15 +119,21 @@ export function Navbar() {
               </Link>
             ))}
             <button
+              type="button"
               onClick={toggleDemoMode}
-              className="ml-2 px-2 py-1 rounded text-[10px] font-display uppercase tracking-[0.18em] text-gray-600 hover:text-white hover:bg-white/5 opacity-40 hover:opacity-100 transition-all"
+              className={`ml-2 inline-flex min-h-9 items-center rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
+                demoEnabled
+                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'
+                  : 'border-slate-600/30 bg-white/[0.03] text-slate-500 hover:border-slate-500/50 hover:text-white'
+              }`}
               title="Toggle demo data"
+              aria-pressed={demoEnabled}
             >
               {demoEnabled ? 'Demo on' : 'Demo off'}
             </button>
           </div>
 
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:hidden">Match intelligence</span>
+          <span className="hidden text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 min-[430px]:inline sm:hidden">Match intelligence</span>
         </div>
       </div>
     </nav>

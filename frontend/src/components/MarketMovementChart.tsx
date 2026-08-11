@@ -87,6 +87,7 @@ export function MarketMovementChart({
     const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
     return (
       <circle
+        key={offsetKey}
         cx={dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0)}
         cy={dotProps.cy}
         r={3.25}

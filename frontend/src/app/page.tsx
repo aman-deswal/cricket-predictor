@@ -448,7 +448,7 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group relative min-w-[calc(100vw-4.5rem)] max-w-[19rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
+                className="group relative min-w-[14rem] max-w-[16.5rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[16.5rem]"
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
@@ -544,7 +544,7 @@ function MatchBoardStrip({
             );
           })}
           {filteredMatches.length === 0 && (
-            <div className="min-w-[17rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[18.5rem]">
+            <div className="min-w-[14rem] rounded-xl border border-white/[0.08] bg-black/20 px-3 py-6 text-center text-xs font-bold text-gray-400 sm:min-w-[16.5rem]">
               No {activeFilter} matches
             </div>
           )}
