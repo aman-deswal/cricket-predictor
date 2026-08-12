@@ -344,41 +344,8 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
         "series_note": notes_map.get("seriesnote", ""),
     }
 
-    # -- Rosters (Playing XI) --
-    rosters = []
-    for r in data.get("rosters", []):
-        team = r.get("team", {})
-        players = []
-        for p in r.get("roster", []):
-            ath = p.get("athlete", {})
-            pos = p.get("position", {})
-            headshot = ath.get("headshot", {})
-            headshot_url = ""
-            if isinstance(headshot, dict):
-                headshot_url = headshot.get("href", "")
-            elif isinstance(headshot, str):
-                headshot_url = headshot
-
-            # Skip default placeholder headshots
-            if "default-player-logo" in headshot_url:
-                headshot_url = ""
-
-            players.append({
-                "name": ath.get("displayName", ""),
-                "espn_id": ath.get("id", ""),
-                "position": pos.get("name", "") if isinstance(pos, dict) else str(pos),
-                "position_abbr": pos.get("abbreviation", "") if isinstance(pos, dict) else "",
-                "headshot_url": headshot_url,
-            })
-        rosters.append({
-            "team_name": team.get("displayName", ""),
-            "team_abbr": team.get("abbreviation", ""),
-            "team_id": team.get("id", ""),
-            "team_logo": (team.get("logos") or [{}])[0].get("href", "") if team.get("logos") else "",
-            "home_away": r.get("homeAway", ""),
-            "players": players,
-        })
-    result["rosters"] = rosters
+    # -- Rosters / Squads --
+    result["rosters"] = _extract_summary_rosters(data)
 
     # -- Head to Head --
     h2h_games = []
@@ -520,6 +487,71 @@ def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
     result["debuts"] = data.get("debuts", [])
 
     return result
+
+
+def _espn_headshot_url(raw_headshot: Any) -> str:
+    headshot_url = ""
+    if isinstance(raw_headshot, dict):
+        headshot_url = raw_headshot.get("href", "")
+    elif isinstance(raw_headshot, str):
+        headshot_url = raw_headshot
+    if "default-player-logo" in headshot_url:
+        return ""
+    return headshot_url
+
+
+def _extract_roster_players(roster_entries: list[dict]) -> list[dict]:
+    players = []
+    for entry in roster_entries:
+        athlete = entry.get("athlete", {})
+        position = entry.get("position", {})
+        players.append({
+            "name": athlete.get("displayName", ""),
+            "espn_id": athlete.get("id", ""),
+            "position": position.get("name", "") if isinstance(position, dict) else str(position),
+            "position_abbr": position.get("abbreviation", "") if isinstance(position, dict) else "",
+            "headshot_url": _espn_headshot_url(athlete.get("headshot", {})),
+        })
+    return players
+
+
+def _extract_summary_rosters(data: dict) -> list[dict]:
+    rosters = []
+    for roster in data.get("rosters", []):
+        team = roster.get("team", {})
+        rosters.append({
+            "team_name": team.get("displayName", ""),
+            "team_abbr": team.get("abbreviation", ""),
+            "team_id": team.get("id", ""),
+            "team_logo": (team.get("logos") or [{}])[0].get("href", "") if team.get("logos") else "",
+            "home_away": roster.get("homeAway", ""),
+            "players": _extract_roster_players(roster.get("roster", [])),
+        })
+    if any(roster.get("players") for roster in rosters):
+        return rosters
+
+    fallback_rosters = []
+    for squad in data.get("squads", []):
+        team = squad.get("team", {})
+        players = []
+        for athlete in squad.get("athletes", []):
+            position = athlete.get("position", {})
+            players.append({
+                "name": athlete.get("displayName", ""),
+                "espn_id": athlete.get("id", ""),
+                "position": position.get("name", "") if isinstance(position, dict) else str(position),
+                "position_abbr": position.get("abbreviation", "") if isinstance(position, dict) else "",
+                "headshot_url": _espn_headshot_url(athlete.get("headshot", {})),
+            })
+        fallback_rosters.append({
+            "team_name": team.get("displayName", ""),
+            "team_abbr": team.get("abbreviation", ""),
+            "team_id": team.get("id", ""),
+            "team_logo": (team.get("logos") or [{}])[0].get("href", "") if team.get("logos") else "",
+            "home_away": "",
+            "players": players,
+        })
+    return fallback_rosters
 
 
 # ---------------------------------------------------------------------------

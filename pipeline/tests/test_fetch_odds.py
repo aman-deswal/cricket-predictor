@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import fetch_odds
 
-NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2036, 8, 10, 12, 0, tzinfo=timezone.utc)
 
 
 def _http_error(status_code: int, payload=None, headers=None) -> requests.HTTPError:
@@ -188,6 +188,7 @@ class TestFreshnessAndRequestContract(unittest.TestCase):
             fetch_odds.is_sport_fresh(
                 "cricket_ipl",
                 {"cricket_ipl": NOW - timedelta(hours=7, minutes=59)},
+                [_fixture("minor", "Club Friendly", team1="Team A", team2="Team B", hours=24)],
                 NOW,
             )
         )
@@ -195,9 +196,49 @@ class TestFreshnessAndRequestContract(unittest.TestCase):
             fetch_odds.is_sport_fresh(
                 "cricket_ipl",
                 {"cricket_ipl": NOW - timedelta(hours=8)},
+                [_fixture("minor", "Club Friendly", team1="Team A", team2="Team B", hours=24)],
                 NOW,
             )
         )
+
+    def test_high_signal_fixture_uses_three_hour_window_inside_eighteen_hours(self):
+        fixtures = [_fixture(
+            "test",
+            "Bangladesh tour of Australia 2026",
+            team1="Australia",
+            team2="Bangladesh",
+            hours=10,
+            match_type="Test",
+        )]
+
+        self.assertEqual(fetch_odds.refresh_interval_for_fixtures(fixtures, NOW), timedelta(hours=3))
+        self.assertTrue(
+            fetch_odds.is_sport_fresh(
+                "cricket_test_match",
+                {"cricket_test_match": NOW - timedelta(hours=2, minutes=59)},
+                fixtures,
+                NOW,
+            )
+        )
+        self.assertFalse(
+            fetch_odds.is_sport_fresh(
+                "cricket_test_match",
+                {"cricket_test_match": NOW - timedelta(hours=3)},
+                fixtures,
+                NOW,
+            )
+        )
+
+    def test_high_signal_fixture_uses_two_hour_window_near_kickoff(self):
+        fixtures = [_fixture(
+            "ipl",
+            "Indian Premier League",
+            team1="Mumbai Indians",
+            team2="Chennai Super Kings",
+            hours=4,
+        )]
+
+        self.assertEqual(fetch_odds.refresh_interval_for_fixtures(fixtures, NOW), timedelta(hours=2))
 
     def test_paid_request_uses_at_most_ten_bookmakers_and_no_regions(self):
         params = fetch_odds.paid_request_params()

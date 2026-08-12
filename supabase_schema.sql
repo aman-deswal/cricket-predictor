@@ -101,7 +101,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $$
+AS $append_prediction_snapshot$
   SELECT EXISTS (
     SELECT 1
     FROM match_odds latest
@@ -141,7 +141,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$;
+$append_prediction_snapshot$;
 
 DROP TRIGGER IF EXISTS enforce_match_odds_history_snapshot
   ON match_odds_history;
@@ -238,7 +238,7 @@ BEGIN
     SELECT 1
     FROM matches fixture
     WHERE fixture.match_id::text = candidate_match_id
-      AND fixture.status = 'upcoming'
+      AND COALESCE(fixture.status, '') != 'completed'
       AND fixture.date::timestamptz > clock_timestamp()
   ) THEN
     RETURN FALSE;
