@@ -41,6 +41,10 @@ export interface HomepageTrustMetrics {
   month: HomepageTrustSignal | null;
   primary: HomepageTrustSignal | null;
   sparkline: number[];
+  breakdown: {
+    week: Record<AccuracyScope, HomepageTrustSignal | null>;
+    month: Record<AccuracyScope, HomepageTrustSignal | null>;
+  };
 }
 
 const PERIOD_SAMPLE_FLOOR: Record<PeriodWithHomepagePriority, number> = {
@@ -125,28 +129,34 @@ function filterHistoryByScope<T extends PredictionHistoryLike>(items: T[], scope
   return items.filter((item) => (scope === 'international' ? isInternationalMatch(item) : !isInternationalMatch(item)));
 }
 
-function buildHomepageSignal<T extends PredictionHistoryLike>(
+function buildScopedHomepageSignal<T extends PredictionHistoryLike>(
   items: T[],
   period: PeriodWithHomepagePriority,
+  scope: AccuracyScope,
 ): HomepageTrustSignal | null {
   const periodItems = filterHistoryByPeriod(items, period);
   if (!periodItems.length) return null;
 
-  const candidates = (Object.keys(SCOPE_META) as AccuracyScope[])
-    .map((scope) => {
-      const stats = computeAccuracy(filterHistoryByScope(periodItems, scope));
-      if (!stats) return null;
+  const stats = computeAccuracy(filterHistoryByScope(periodItems, scope));
+  if (!stats) return null;
 
-      return {
-        period,
-        periodLabel: PERIOD_META[period].label,
-        shortPeriodLabel: PERIOD_META[period].shortLabel,
-        scope,
-        scopeLabel: SCOPE_META[scope].label,
-        shortScopeLabel: SCOPE_META[scope].shortLabel,
-        stats,
-      } satisfies HomepageTrustSignal;
-    })
+  return {
+    period,
+    periodLabel: PERIOD_META[period].label,
+    shortPeriodLabel: PERIOD_META[period].shortLabel,
+    scope,
+    scopeLabel: SCOPE_META[scope].label,
+    shortScopeLabel: SCOPE_META[scope].shortLabel,
+    stats,
+  };
+}
+
+function buildHomepageSignal<T extends PredictionHistoryLike>(
+  items: T[],
+  period: PeriodWithHomepagePriority,
+): HomepageTrustSignal | null {
+  const candidates = (Object.keys(SCOPE_META) as AccuracyScope[])
+    .map((scope) => buildScopedHomepageSignal(items, period, scope))
     .filter((signal): signal is HomepageTrustSignal => signal !== null);
 
   if (!candidates.length) return null;
@@ -204,6 +214,18 @@ function buildSparkline<T extends PredictionHistoryLike>(items: T[], signal: Hom
 export function getHomepageTrustMetrics<T extends PredictionHistoryLike>(items: T[]): HomepageTrustMetrics {
   const week = buildHomepageSignal(items, 'week');
   const month = buildHomepageSignal(items, 'month');
+  const breakdown = {
+    week: {
+      international: buildScopedHomepageSignal(items, 'week', 'international'),
+      league: buildScopedHomepageSignal(items, 'week', 'league'),
+      overall: buildScopedHomepageSignal(items, 'week', 'overall'),
+    },
+    month: {
+      international: buildScopedHomepageSignal(items, 'month', 'international'),
+      league: buildScopedHomepageSignal(items, 'month', 'league'),
+      overall: buildScopedHomepageSignal(items, 'month', 'overall'),
+    },
+  };
   const primary = [week, month]
     .filter((signal): signal is HomepageTrustSignal => signal !== null)
     .sort((left, right) => getHomepageSignalScore(right) - getHomepageSignalScore(left))[0] ?? null;
@@ -213,5 +235,6 @@ export function getHomepageTrustMetrics<T extends PredictionHistoryLike>(items: 
     month,
     primary,
     sparkline: buildSparkline(items, primary),
+    breakdown,
   };
 }
