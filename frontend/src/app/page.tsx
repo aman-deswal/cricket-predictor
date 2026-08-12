@@ -17,7 +17,7 @@ import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
-import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon } from '@/components/CricketIcons';
+import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon, TrophyIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import {
   getHomepageTrustMetrics,
@@ -284,12 +284,13 @@ function SixSensePickHeading({
           <div className="hidden sm:flex">
             <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
           </div>
-          <div className="flex items-baseline gap-1.5 sm:gap-2">
+          <div
+            className="flex items-baseline gap-1.5 sm:gap-2"
+            aria-label={`${trustSignal.stats.correct} wins from ${trustSignal.stats.total} international picks in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
+          >
+            <TrophyIcon className="h-4 w-4 shrink-0 text-amber-500" />
             <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
               {trustSignal.stats.correct}
-            </span>
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-500 sm:text-[11px]">
-              wins
             </span>
             <span className="text-sm font-black tabular-nums text-slate-400 sm:text-base">
               /{trustSignal.stats.total}
