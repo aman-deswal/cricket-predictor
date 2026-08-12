@@ -4,13 +4,14 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
-import type { MovementSeries } from '@/lib/pre-match-movement';
+import type { MovementAnnotation, MovementSeries } from '@/lib/pre-match-movement';
 
 interface MarketMovementChartProps {
   chartRows: Array<Record<string, number | null>>;
@@ -18,6 +19,7 @@ interface MarketMovementChartProps {
   minDomain: number;
   maxDomain: number;
   ariaLabel: string;
+  annotations: MovementAnnotation[];
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -32,6 +34,7 @@ export function MarketMovementChart({
   minDomain,
   maxDomain,
   ariaLabel,
+  annotations,
 }: MarketMovementChartProps) {
   const accessibleSummaries = series.map((entry) => {
     const values = chartRows
@@ -134,6 +137,18 @@ export function MarketMovementChart({
               width={34}
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
+            {annotations.map((annotation) => (
+              <ReferenceDot
+                key={`${annotation.timestamp}-${annotation.probability}`}
+                x={annotation.timestamp}
+                y={annotation.probability}
+                r={5}
+                fill="#0b1016"
+                stroke="#fbbf24"
+                strokeWidth={2.5}
+                ifOverflow="extendDomain"
+              />
+            ))}
             <Tooltip
               contentStyle={{
                 backgroundColor: '#111820',

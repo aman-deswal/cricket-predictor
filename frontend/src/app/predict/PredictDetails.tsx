@@ -219,6 +219,17 @@ function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
   );
 }
 
+function formatMovementEventTime(value: string): string {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return 'Time unavailable';
+  return timestamp.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
@@ -366,6 +377,7 @@ function MarketMovementPanel({
               minDomain={movement.minDomain}
               maxDomain={movement.maxDomain}
               ariaLabel={`Pre-match movement for ${trackedTeam}. Solid SixSense model probability is compared with dashed normalized bookmaker implied probabilities.`}
+              annotations={movement.annotations}
             />
           ) : (
             <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
@@ -484,6 +496,67 @@ function MarketMovementPanel({
           ))}
         </div>}
       </div>
+
+      <section className="mt-4 rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-4 sm:px-4" aria-labelledby="movement-events-title">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 id="movement-events-title" className="text-sm font-black uppercase tracking-[0.14em] text-white">
+              Inputs around each model move
+            </h3>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
+              These are observed structured-input updates that coincided with a SixSense change. They are not claims that one update caused the move.
+            </p>
+          </div>
+          <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">
+            {movement.events.length} {movement.events.length === 1 ? 'event' : 'events'}
+          </span>
+        </div>
+
+        {movement.events.length > 0 ? (
+          <ol className="relative mt-4 space-y-3 before:absolute before:bottom-3 before:left-[7px] before:top-3 before:w-px before:bg-white/10">
+            {movement.events.map((event, index) => {
+              const deltaPoints = event.display_probability_delta === null
+                ? null
+                : event.display_probability_delta * 100;
+              return (
+                <li key={`${event.snapshot_at}-${event.type}-${index}`} className="relative pl-7">
+                  <span
+                    className="absolute left-0 top-2 h-[15px] w-[15px] rounded-full border-2 border-amber-300 bg-[#0b1016]"
+                    aria-hidden="true"
+                  />
+                  <article className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
+                    <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
+                      <time className="text-slate-400" dateTime={event.event_at}>
+                        {formatMovementEventTime(event.event_at)}
+                      </time>
+                      <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-slate-300">
+                        {event.category.replaceAll('_', ' ')}
+                      </span>
+                      {deltaPoints !== null && Math.abs(deltaPoints) >= 0.05 && (
+                        <span className={deltaPoints > 0 ? 'text-emerald-300' : 'text-red-300'}>
+                          {marketSideMeta.shortName} {deltaPoints > 0 ? '+' : ''}{deltaPoints.toFixed(1)} pts
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-white">{event.label}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">{event.summary}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                      <span>Input: {event.affected_input.replaceAll('_', ' ')}</span>
+                      {event.affected_team && <span>Team: {event.affected_team}</span>}
+                      {event.source?.name && <span>Source: {event.source.name}</span>}
+                      {event.source?.reference && <span>Reference: {event.source.reference}</span>}
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-5 text-center text-sm text-slate-400" role="status">
+            Model input events will appear after a SixSense probability snapshot is available.
+          </p>
+        )}
+      </section>
     </motion.div>
   );
 }
