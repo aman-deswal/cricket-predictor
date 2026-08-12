@@ -705,11 +705,13 @@ function FeaturedHero({
   const predictionGap = prediction
     ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
     : 0;
-  const actionableLabel = prediction && winner
-    ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
-    : trustSignal
-      ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
-      : null;
+  const actionableLabel = trustSignal?.scope === 'international'
+    ? `${trustSignal.stats.pct}% international accuracy ${periodLabel}`
+    : prediction && winner
+      ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
+      : trustSignal
+        ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
+        : null;
 
   useEffect(() => {
     setCountdown(getHeroCountdown());
