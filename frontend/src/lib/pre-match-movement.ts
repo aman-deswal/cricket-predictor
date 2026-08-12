@@ -1,3 +1,5 @@
+import { hasValidTwoSidedOdds } from './market-odds';
+
 export interface MovementPredictionSnapshot {
   team1_win_probability: number;
   team2_win_probability: number;
@@ -70,13 +72,6 @@ export interface PreMatchMovement {
 }
 
 export const SIXSENSE_SERIES_ID = 'sixsense-model';
-
-export function hasValidTwoSidedOdds(snapshot: MovementOddsSnapshot): boolean {
-  return Number.isFinite(snapshot.team1_odds)
-    && snapshot.team1_odds > 1
-    && Number.isFinite(snapshot.team2_odds)
-    && snapshot.team2_odds > 1;
-}
 
 export function toNormalizedImpliedProbability(
   snapshot: MovementOddsSnapshot,
