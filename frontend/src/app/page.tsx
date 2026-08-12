@@ -2,6 +2,7 @@
 
 import type { ReactElement, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import {
@@ -269,7 +270,10 @@ function CountdownDisplay({ matchDate }: { matchDate: string }) {
 function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSignal }) {
   const [open, setOpen] = useState(false);
   const [beaconPulse, setBeaconPulse] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; right: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
   const hasPlayedPulseRef = useRef(false);
 
   useEffect(() => {
@@ -294,8 +298,20 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
   useEffect(() => {
     if (!open) return;
 
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPopoverPosition({
+        top: rect.bottom + 10,
+        right: Math.max(window.innerWidth - rect.right, 12),
+      });
+    };
+
+    updatePosition();
+
     const handlePointerDown = (event: MouseEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!wrapperRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
         setOpen(false);
       }
     };
@@ -306,9 +322,13 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
       }
     };
 
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleEscape);
     return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleEscape);
     };
@@ -320,6 +340,7 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
   return (
     <div ref={wrapperRef} className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         aria-label={`Explain ${trustSignal.scopeLabel.toLowerCase()} win-rate record`}
         aria-expanded={open}
@@ -329,38 +350,48 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
         {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close trust explainer"
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-[320px] rounded-2xl border border-white/[0.08] bg-[#0f1620]/98 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
-                {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
-                <p className="mt-1 text-sm font-semibold leading-snug text-white">
-                  {trustSignal.stats.pct}% win rate over the {periodLabel}.
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
-                </p>
-                <Link
-                  href="/history"
-                  className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
+      {open && popoverPosition && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-40 w-[260px] rounded-2xl border border-white/[0.12] bg-[#0f1620]/98 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.48)] backdrop-blur-xl sm:w-[290px]"
+          style={{ top: popoverPosition.top, right: popoverPosition.right }}
+        >
+          <div className="absolute -top-2 right-3 h-4 w-4 rotate-45 border-l border-t border-white/[0.12] bg-[#0f1620]/98" />
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
+              {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
+                  <p className="mt-1 text-sm font-semibold leading-snug text-white">
+                    {trustSignal.stats.pct}% win rate over the {periodLabel}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close trust explainer"
                   onClick={() => setOpen(false)}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-slate-400 transition-colors hover:text-white"
                 >
-                  Prediction history <span aria-hidden="true">→</span>
-                </Link>
+                  ×
+                </button>
               </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
+              </p>
+              <Link
+                href="/history"
+                className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
+                onClick={() => setOpen(false)}
+              >
+                Prediction history <span aria-hidden="true">→</span>
+              </Link>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
