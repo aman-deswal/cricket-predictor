@@ -154,19 +154,23 @@ function MatchCenterTeamMark({
 
   return (
     <span
-      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm text-[6px] font-black text-white"
-      style={{ backgroundColor: imageUrl ? 'transparent' : meta.primaryColor }}
+      className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f1620] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
       aria-hidden="true"
     >
       {imageUrl ? (
         <img
           src={imageUrl}
           alt=""
-          className={`h-full w-full ${isInternational ? 'rounded-sm object-cover' : 'object-contain'}`}
+          className={`h-full w-full ${isInternational ? 'rounded-lg object-cover' : 'object-contain'}`}
           onError={() => setImageFailed(true)}
         />
       ) : (
-        meta.shortName.slice(0, 2)
+        <span
+          className="flex h-full w-full items-center justify-center rounded-lg text-[10px] font-black text-white"
+          style={{ background: `linear-gradient(145deg, ${meta.primaryColor}, ${meta.secondaryColor})` }}
+        >
+          {meta.shortName.slice(0, 2)}
+        </span>
       )}
     </span>
   );
@@ -449,7 +453,7 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group min-w-[17rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
+                className="group min-w-[17.75rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
@@ -485,28 +489,35 @@ function MatchBoardStrip({
                   </div>
 
                   <div className="space-y-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
-                        <span className={`truncate text-base font-black ${team1Leads ? 'text-white' : 'text-gray-300'}`}>
-                          {team1Meta.shortName}
-                        </span>
-                        <span
-                          className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                          title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
-                        >
-                          {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
-                        </span>
-                        {edgeTeam === 1 && (
-                          <span
-                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
-                            title={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
-                            aria-label={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
-                          >
-                            +{edgePct}pt edge
-                          </span>
-                        )}
-                      </span>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <p
+                              className={`shrink-0 text-[18px] font-black leading-none tracking-[0.02em] ${team1Leads ? 'text-white' : 'text-gray-300'}`}
+                              title={match.team1}
+                            >
+                              {team1Meta.shortName}
+                            </p>
+                            <span
+                              className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
+                              title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                            >
+                              {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team1_odds) : '—'}
+                            </span>
+                            {edgeTeam === 1 && (
+                              <span
+                                className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                                title={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                                aria-label={`${team1Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                              >
+                                +{edgePct} edge
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team1Leads ? 'text-amber-100' : 'text-gray-400'}`}
                         title={team1Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
@@ -514,28 +525,35 @@ function MatchBoardStrip({
                         {prediction ? `${Math.round(prediction.team1_win_probability * 100)}%` : '—'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
-                        <span className={`truncate text-base font-black ${team2Leads ? 'text-white' : 'text-gray-300'}`}>
-                          {team2Meta.shortName}
-                        </span>
-                        <span
-                          className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs font-bold tabular-nums text-gray-300"
-                          title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
-                        >
-                          {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
-                        </span>
-                        {edgeTeam === 2 && (
-                          <span
-                            className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
-                            title={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
-                            aria-label={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
-                          >
-                            +{edgePct}pt edge
-                          </span>
-                        )}
-                      </span>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <p
+                              className={`shrink-0 text-[18px] font-black leading-none tracking-[0.02em] ${team2Leads ? 'text-white' : 'text-gray-300'}`}
+                              title={match.team2}
+                            >
+                              {team2Meta.shortName}
+                            </p>
+                            <span
+                              className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
+                              title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
+                            >
+                              {hasMarket && match.bookmaker_odds ? decimalToAmerican(match.bookmaker_odds.team2_odds) : '—'}
+                            </span>
+                            {edgeTeam === 2 && (
+                              <span
+                                className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-emerald-200"
+                                title={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                                aria-label={`${team2Meta.shortName} has a ${edgePct} percentage point model edge over the market`}
+                              >
+                                +{edgePct} edge
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                       <span
                         className={`w-14 shrink-0 text-right font-mono text-lg font-black tabular-nums ${team2Leads ? 'text-amber-100' : 'text-gray-400'}`}
                         title={team2Leads ? 'SixSense lean: higher model win probability' : 'SixSense model win probability'}
