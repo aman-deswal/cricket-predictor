@@ -74,7 +74,7 @@ export function Navbar() {
               <span className="hidden sm:inline"><Logo size={48} /></span>
             </div>
             <span
-              className="text-xl tracking-tight"
+              className="text-2xl tracking-tight sm:text-[2rem]"
               style={{ fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 900, letterSpacing: '-0.02em' }}
             >
               <span className="bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 bg-clip-text text-transparent">Six</span>
@@ -85,7 +85,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={toggleDemoMode}
-            className={`ml-1 inline-flex min-h-11 items-center rounded-full border px-3.5 text-[10px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
+            className={`ml-1 inline-flex min-h-11 items-center rounded-full border px-3.5 text-[11px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
               demoEnabled
                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                 : 'border-slate-600/30 bg-white/[0.03] text-slate-500'
@@ -121,7 +121,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={toggleDemoMode}
-              className={`ml-2 inline-flex min-h-11 items-center rounded-full border px-4 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
+              className={`ml-2 inline-flex min-h-11 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.16em] transition-colors ${
                 demoEnabled
                   ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'
                   : 'border-slate-600/30 bg-white/[0.03] text-slate-500 hover:border-slate-500/50 hover:text-white'
