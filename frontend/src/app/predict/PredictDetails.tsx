@@ -230,6 +230,16 @@ function formatMovementEventTime(value: string): string {
   });
 }
 
+function formatMovementPointTime(value: string): string {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return 'Unknown snapshot';
+  return timestamp.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+  });
+}
+
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
@@ -317,6 +327,10 @@ function MarketMovementPanel({
   const marketSideMeta = getTeamMeta(trackedTeam);
   const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
   const opposingMeta = getTeamMeta(opposingTeam);
+  const [selectedSnapshotAt, setSelectedSnapshotAt] = useState<string | null>(null);
+  const selectedAnnotation = movement.annotations.find((annotation) => annotation.snapshotAt === selectedSnapshotAt)
+    ?? movement.annotations[movement.annotations.length - 1]
+    ?? null;
 
   return (
     <motion.div
@@ -378,6 +392,8 @@ function MarketMovementPanel({
               maxDomain={movement.maxDomain}
               ariaLabel={`Market movement for ${trackedTeam}. This chart tracks only ${trackedTeam}'s win probability, comparing the SixSense model with normalized bookmaker implied probabilities.`}
               annotations={movement.annotations}
+              selectedAnnotationTimestamp={selectedAnnotation?.timestamp}
+              onAnnotationSelect={(annotation) => setSelectedSnapshotAt(annotation.snapshotAt)}
             />
           ) : (
             <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
@@ -390,6 +406,24 @@ function MarketMovementPanel({
                 ? 'SixSense history is not available yet; showing market movement only.'
                 : 'Trusted market history is not available yet; showing SixSense movement only.'}
             </p>
+          )}
+          {movement.annotations.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {movement.annotations.map((annotation) => (
+                <button
+                  key={annotation.snapshotAt}
+                  type="button"
+                  onClick={() => setSelectedSnapshotAt(annotation.snapshotAt)}
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] transition-colors ${
+                    selectedAnnotation?.snapshotAt === annotation.snapshotAt
+                      ? 'border-amber-400/40 bg-amber-400/12 text-amber-200'
+                      : 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200'
+                  }`}
+                >
+                  {formatMovementPointTime(annotation.snapshotAt)} · {annotation.eventCount} {annotation.eventCount === 1 ? 'event' : 'events'}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -501,29 +535,36 @@ function MarketMovementPanel({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 id="movement-events-title" className="text-sm font-black uppercase tracking-[0.14em] text-white">
-              Inputs around each model move
+              Selected model move
             </h3>
             <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
-              These are observed structured-input updates that coincided with a SixSense change. They are not claims that one update caused the move.
+              Tap a gold SixSense point to inspect the structured inputs that coincided with that probability change. These are not claims of causation.
             </p>
           </div>
-          <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">
-            {movement.events.length} {movement.events.length === 1 ? 'event' : 'events'}
-          </span>
+          {selectedAnnotation && (
+            <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">
+              {selectedAnnotation.eventCount} {selectedAnnotation.eventCount === 1 ? 'event' : 'events'}
+            </span>
+          )}
         </div>
 
-        {movement.events.length > 0 ? (
-          <ol className="relative mt-4 space-y-3 before:absolute before:bottom-3 before:left-[7px] before:top-3 before:w-px before:bg-white/10">
-            {movement.events.map((event, index) => {
+        {selectedAnnotation ? (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
+                {formatMovementPointTime(selectedAnnotation.snapshotAt)}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                {Math.round(selectedAnnotation.probability)}% SixSense
+              </span>
+            </div>
+            <ol className="space-y-3">
+            {selectedAnnotation.events.map((event, index) => {
               const deltaPoints = event.display_probability_delta === null
                 ? null
                 : event.display_probability_delta * 100;
               return (
-                <li key={`${event.snapshot_at}-${event.type}-${index}`} className="relative pl-7">
-                  <span
-                    className="absolute left-0 top-2 h-[15px] w-[15px] rounded-full border-2 border-amber-300 bg-[#0b1016]"
-                    aria-hidden="true"
-                  />
+                <li key={`${event.snapshot_at}-${event.type}-${index}`}>
                   <article className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
                     <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
                       <time className="text-slate-400" dateTime={event.event_at}>
@@ -550,7 +591,8 @@ function MarketMovementPanel({
                 </li>
               );
             })}
-          </ol>
+            </ol>
+          </div>
         ) : (
           <p className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-5 text-center text-sm text-slate-400" role="status">
             Model input events will appear after a SixSense probability snapshot is available.

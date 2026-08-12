@@ -25,7 +25,9 @@ export interface MovementChangeEvent {
 export interface MovementAnnotation {
   timestamp: number;
   probability: number;
+  snapshotAt: string;
   eventCount: number;
+  events: MovementEventItem[];
 }
 
 export interface MovementEventItem extends MovementChangeEvent {
@@ -150,7 +152,9 @@ export function buildPreMatchMovement(
     annotations.push({
       timestamp,
       probability: probability * 100,
+      snapshotAt: snapshot.captured_at,
       eventCount: shapedEvents.length,
+      events: shapedEvents,
     });
     previousModelProbability = probability;
   });

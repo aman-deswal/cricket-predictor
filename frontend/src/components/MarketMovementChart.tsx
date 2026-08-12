@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -20,6 +19,8 @@ interface MarketMovementChartProps {
   maxDomain: number;
   ariaLabel: string;
   annotations: MovementAnnotation[];
+  selectedAnnotationTimestamp?: number;
+  onAnnotationSelect?: (annotation: MovementAnnotation) => void;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -35,7 +36,12 @@ export function MarketMovementChart({
   maxDomain,
   ariaLabel,
   annotations,
+  selectedAnnotationTimestamp,
+  onAnnotationSelect,
 }: MarketMovementChartProps) {
+  const annotationsByTimestamp = new Map(
+    annotations.map((annotation) => [annotation.timestamp, annotation]),
+  );
   const accessibleSummaries = series.map((entry) => {
     const values = chartRows
       .map((row) => row[entry.id])
@@ -105,11 +111,60 @@ export function MarketMovementChart({
     if (!Number.isFinite(timestamp) || numericValue === null) return emptyDot;
 
     const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
+    const annotation = dotProps.dataKey === 'sixsense-model'
+      ? annotationsByTimestamp.get(timestamp)
+      : undefined;
+    const isSelected = annotation?.timestamp === selectedAnnotationTimestamp;
+    const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
+    const cy = dotProps.cy;
+
+    if (annotation) {
+      return (
+        <g
+          key={offsetKey}
+          role="button"
+          tabIndex={0}
+          onClick={() => onAnnotationSelect?.(annotation)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onAnnotationSelect?.(annotation);
+            }
+          }}
+          aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
+          className="cursor-pointer"
+        >
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSelected ? 8.5 : 7}
+            fill="rgba(245, 158, 11, 0.14)"
+            stroke="none"
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSelected ? 5.75 : 5}
+            fill="#0b1016"
+            stroke="#fbbf24"
+            strokeWidth={2.5}
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={2.2}
+            fill="#fbbf24"
+            stroke="none"
+          />
+        </g>
+      );
+    }
+
     return (
       <circle
         key={offsetKey}
-        cx={dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0)}
-        cy={dotProps.cy}
+        cx={cx}
+        cy={cy}
         r={3.25}
         fill={dotProps.stroke}
         stroke="#0b1016"
@@ -147,18 +202,6 @@ export function MarketMovementChart({
               width={42}
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
-            {annotations.map((annotation) => (
-              <ReferenceDot
-                key={`${annotation.timestamp}-${annotation.probability}`}
-                x={annotation.timestamp}
-                y={annotation.probability}
-                r={5}
-                fill="#0b1016"
-                stroke="#fbbf24"
-                strokeWidth={2.5}
-                ifOverflow="extendDomain"
-              />
-            ))}
             <Tooltip
               contentStyle={{
                 backgroundColor: '#111820',
