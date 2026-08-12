@@ -196,7 +196,7 @@ function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
           style={{ borderColor: 'rgba(217,119,6,0.28)', color: LOGO_AMBER }}
         >
           <TargetIcon className="h-3.5 w-3.5" />
-          {primarySignal?.scope === 'international' ? 'International edge' : 'Verified record'}
+          Verified record
         </div>
         <div className="relative min-w-0 flex-1 overflow-hidden">
           <div className="flex w-max min-w-full items-center gap-4 text-[11px] font-semibold text-slate-200 animate-[homepage-trust-ticker_26s_linear_infinite] group-hover:[animation-play-state:paused]">
