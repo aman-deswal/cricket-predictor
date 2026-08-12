@@ -814,8 +814,8 @@ function FeaturedHero({
         whileTap={{ scale: 0.98 }}
       >
         <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-slate-400/0 via-amber-200/0 to-cyan-400/0 blur-md transition-all duration-500 group-hover:from-slate-400/12 group-hover:via-amber-200/8 group-hover:to-cyan-400/12" />
-        <div className="featured-cricket-border relative overflow-hidden rounded-[18px] p-px">
-        <div className="relative overflow-hidden rounded-[17px] bg-[#10161d]">
+        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#10161d]">
+        <div className="relative overflow-hidden rounded-[18px] bg-[#10161d]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
@@ -1054,17 +1054,19 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
+              className="group featured-cricket-border relative min-w-0 overflow-hidden rounded-2xl p-px shadow-xl shadow-black/10"
             >
-              <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading trustSignal={featuredTrustSignal} />
-              </div>
-              <div className="p-3">
-                <FeaturedHero
-                  key={featuredMatch.match_id}
-                  match={featuredMatch}
-                  trustSignal={featuredTrustSignal}
-                />
+              <div className="overflow-hidden rounded-[15px] border border-slate-700/45 bg-[#111820]/95">
+                <div className="border-b border-white/[0.07] px-4 py-3">
+                  <SixSensePickHeading trustSignal={featuredTrustSignal} />
+                </div>
+                <div className="p-3">
+                  <FeaturedHero
+                    key={featuredMatch.match_id}
+                    match={featuredMatch}
+                    trustSignal={featuredTrustSignal}
+                  />
+                </div>
               </div>
             </motion.section>
           )}
