@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
@@ -160,78 +160,82 @@ function AccuracySparkline({ points }: { points: number[] }) {
   );
 }
 
-function TrustMetricCard({
-  signal,
-  icon,
-}: {
-  signal: HomepageTrustSignal;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-        <span className="text-amber-500">{icon}</span>
-        <span>{signal.scopeLabel}</span>
-        <span className="text-slate-600">/</span>
-        <span>{signal.periodLabel}</span>
-      </div>
-      <div className="mt-2 flex items-end gap-2">
-        <span className="text-2xl font-black tabular-nums text-white">{signal.stats.pct}%</span>
-        <span className="pb-0.5 text-[11px] font-semibold text-slate-500">
-          {signal.stats.correct}/{signal.stats.total}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function HomeTrustBanner({ metrics }: { metrics: HomepageTrustMetrics }) {
+function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
   if (!metrics.week && !metrics.month) return null;
 
   const primarySignal = metrics.primary;
-  type MetricCard = { signal: HomepageTrustSignal; icon: ReactElement };
   const getMetricIcon = (signal: HomepageTrustSignal) => {
     if (signal.scope === 'international') return <GlobeIcon className="h-3.5 w-3.5" />;
     if (signal.scope === 'league') return <ShieldIcon className="h-3.5 w-3.5" />;
     return <TargetIcon className="h-3.5 w-3.5" />;
   };
-  const metricCards = [
+  const tickerItems = [
+    primarySignal ? {
+      key: 'primary',
+      label: primarySignal.scope === 'international' ? 'Verified record' : 'Model record',
+      signal: primarySignal,
+    } : null,
     metrics.week ? {
+      key: 'week',
+      label: metrics.week.scope === 'international' ? 'International 7d' : 'Recent 7d',
       signal: metrics.week,
-      icon: getMetricIcon(metrics.week),
     } : null,
     metrics.month ? {
+      key: 'month',
+      label: metrics.month.scope === 'international' ? 'International 30d' : 'Recent 30d',
       signal: metrics.month,
-      icon: getMetricIcon(metrics.month),
     } : null,
-  ].filter((item): item is MetricCard => item !== null);
+    {
+      key: 'history',
+      label: 'Open full history',
+      signal: null,
+    },
+  ].filter((item): item is { key: string; label: string; signal: HomepageTrustSignal | null } => item !== null);
+  const tickerLoop = [...tickerItems, ...tickerItems];
 
   return (
     <Link
       href="/history"
-      className="group block overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10 transition-colors hover:border-amber-600/30"
+      className="group block overflow-hidden rounded-2xl border border-amber-500/25 bg-[linear-gradient(90deg,rgba(245,158,11,0.12),rgba(17,24,32,0.96)_20%,rgba(17,24,32,0.98)_80%,rgba(34,197,94,0.10))] shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition-colors hover:border-amber-400/40"
     >
-      <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="max-w-xl">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-500">
-            <TargetIcon className="h-4 w-4" />
-            Model track record
-          </div>
-          <p className="mt-2 text-sm font-black text-white sm:text-base">
-            {primarySignal?.scope === 'international'
-              ? 'International picks have been especially sharp lately.'
-              : 'Recent settled picks are holding up well.'}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-400">
-            Follow the recent hit rate behind SixSense Pick and open full history for result cards, splits, and calibration.
-          </p>
+      <div className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-amber-400/25 bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-300">
+          <TargetIcon className="h-3.5 w-3.5" />
+          {primarySignal?.scope === 'international' ? 'International edge' : 'Verified record'}
         </div>
-        <div className={`grid gap-3 ${metricCards.length > 1 ? 'sm:grid-cols-2' : ''}`}>
-          {metricCards.map(({ signal, icon }) => (
-            <TrustMetricCard key={`${signal.scope}-${signal.period}`} signal={signal} icon={icon} />
-          ))}
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          <div className="flex w-max min-w-full items-center gap-3 text-[11px] font-semibold text-slate-200 animate-[homepage-trust-ticker_26s_linear_infinite] group-hover:[animation-play-state:paused]">
+            {tickerLoop.map(({ key, label, signal }, index) => (
+              <div
+                key={`${key}-${index}`}
+                className="flex shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1"
+              >
+                {signal ? (
+                  <>
+                    <span className="text-amber-400">{getMetricIcon(signal)}</span>
+                    <span className="text-slate-400">{label}</span>
+                    <span className="font-black tabular-nums text-white">{signal.stats.pct}%</span>
+                    <span className="text-slate-500">{signal.stats.correct}/{signal.stats.total}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-slate-400">{label}</span>
+                    <span className="font-black text-white">→</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#111820] to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#111820] to-transparent" />
         </div>
       </div>
+      <style jsx>{`
+        @keyframes homepage-trust-ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </Link>
   );
 }
@@ -1003,9 +1007,9 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
+          {trustMetrics && <HomeTrustTicker metrics={trustMetrics} />}
 
-          {trustMetrics && <HomeTrustBanner metrics={trustMetrics} />}
+          <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
             <motion.section
