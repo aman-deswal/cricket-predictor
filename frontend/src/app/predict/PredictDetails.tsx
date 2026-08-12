@@ -437,28 +437,28 @@ function MarketMovementPanel({
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-3 border-t border-white/[0.08] pt-3">
+        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.08] pt-3 sm:gap-3">
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">SixSense</p>
-            <p className="mt-1 text-lg font-black text-white">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
+            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
               {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Market</p>
-            <p className="mt-1 text-lg font-black text-white">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market</p>
+            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
               {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Gap</p>
-            <p className={`mt-1 text-lg font-black ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap</p>
+            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
               {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Last move</p>
-            <p className={`mt-1 text-lg font-black ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Last move</p>
+            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
               {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
             </p>
           </div>
