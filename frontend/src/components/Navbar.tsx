@@ -102,7 +102,7 @@ export function Navbar() {
               <Link
                 key={href}
                 href={href}
-                className={`relative min-h-[2.75rem] px-3.5 py-2 rounded-xl text-sm font-display transition-all ${
+                className={`relative min-h-[2.75rem] px-3.5 py-2 rounded-xl text-[15px] font-display transition-all ${
                   isActive(href)
                     ? 'text-white bg-white/5'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -148,7 +148,7 @@ export function Navbar() {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-black transition-colors ${
+              className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[13px] font-black transition-colors ${
                 active ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 active:bg-white/[0.06] active:text-white'
               }`}
             >
