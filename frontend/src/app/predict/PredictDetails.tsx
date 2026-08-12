@@ -862,22 +862,22 @@ export function PredictDetails() {
       </div>
 
       {/* Back link + Countdown */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <Link
           href="/"
-          className="inline-flex items-center gap-2.5 min-h-12 px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.05] text-[clamp(0.88rem,1vw,1rem)] font-semibold text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors group"
+          className="inline-flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
         >
-          <svg className="w-4.5 h-4.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
+          <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
           All Matches
         </Link>
-        <MatchFormatBadge match={match} competitionName={espnData?.series_note ?? null} className="min-h-11 min-w-[4.7rem] px-4 py-1.5 text-[11px] tracking-[0.18em]" />
+        <MatchFormatBadge match={match} competitionName={espnData?.series_note ?? null} />
         {isLiveMatch ? (
           <LiveStatusBadge />
         ) : countdown && (
-          <div className="order-last inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-[clamp(0.88rem,1vw,1rem)] text-slate-200 sm:order-none sm:w-auto">
-            <svg className="w-4.5 h-4.5 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
+          <div className="order-last inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 sm:order-none sm:w-auto">
+            <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
             <span className="font-semibold whitespace-nowrap">Begins in</span>
-            <span className="font-mono tracking-[0.02em] whitespace-nowrap text-[0.95em]">
+            <span className="font-mono tracking-[0.02em] whitespace-nowrap">
               {countdown.days > 0 && <span className="text-white font-semibold">{countdown.days}</span>}
               {countdown.days > 0 && <span className="text-slate-300">d </span>}
               <span className="text-white font-semibold">{String(countdown.hours).padStart(2, '0')}</span>
@@ -906,7 +906,7 @@ export function PredictDetails() {
       `}</style>
       <motion.div
         ref={heroRef}
-        className="relative mb-6 overflow-hidden rounded-3xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 p-3.5 sm:p-8 lg:p-10"
+        className="relative mb-6 overflow-hidden rounded-3xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 p-3 sm:p-8 lg:p-10"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -914,7 +914,7 @@ export function PredictDetails() {
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
 
-        <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-10">
+        <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-6 lg:gap-10">
           {/* Team 1 */}
           <motion.div
             className="flex-1 text-center"
@@ -1018,7 +1018,7 @@ export function PredictDetails() {
           >
             {prediction ? (
               <div className="flex flex-col items-center gap-2">
-                <div className="h-20 w-20 sm:h-40 sm:w-40 lg:h-48 lg:w-48">
+                <div className="h-20 w-20 sm:h-36 sm:w-36 lg:h-44 lg:w-44">
                   <PredictionChart
                     team1={prediction.team1}
                     team2={prediction.team2}

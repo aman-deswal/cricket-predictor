@@ -74,7 +74,7 @@ export default function RootLayout({
         </div>
 
         <Navbar />
-        <main className="relative mx-auto w-full max-w-7xl flex-1 px-3 pb-24 pt-4 sm:px-6 sm:pb-6 sm:pt-8 lg:px-8">
+        <main className="relative mx-auto w-full max-w-7xl flex-1 px-3 pb-24 pt-7 sm:px-6 sm:pb-6 sm:pt-10 lg:px-8">
           {children}
         </main>
         <footer className="relative border-t border-slate-700/30">
