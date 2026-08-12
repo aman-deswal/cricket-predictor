@@ -8,6 +8,8 @@ import { Logo } from './Logo';
 import { isMockDataEnabled } from '@/lib/supabase';
 import { setStoredDemoMode } from '@/lib/demo-mode';
 
+const LOGO_AMBER = '#d97706';
+
 const NAV_LINKS = [
   { href: '/', label: 'Matches', icon: 'matches' },
   { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -87,9 +89,10 @@ export function Navbar() {
             onClick={toggleDemoMode}
             className={`ml-1 inline-flex min-h-11 items-center rounded-full border px-3.5 text-[11px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
               demoEnabled
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                ? ''
                 : 'border-slate-600/30 bg-white/[0.03] text-slate-500'
             }`}
+            style={demoEnabled ? { borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(217,119,6,0.10)', color: LOGO_AMBER } : undefined}
             aria-pressed={demoEnabled}
             title="Toggle demo data"
           >
@@ -104,14 +107,16 @@ export function Navbar() {
                 href={href}
                 className={`relative min-h-[2.75rem] px-3.5 py-2 rounded-xl text-[15px] font-display transition-all ${
                   isActive(href)
-                    ? 'text-white bg-white/5'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-[rgba(217,119,6,0.10)]'
+                    : 'text-gray-400 hover:bg-[rgba(217,119,6,0.08)] hover:text-white'
                 }`}
+                style={isActive(href) ? { color: LOGO_AMBER } : undefined}
               >
                 {label}
                 {isActive(href) && (
                   <motion.div
-                    className="absolute -bottom-[13px] left-2 right-2 h-[2px] bg-amber-600 rounded-full"
+                    className="absolute -bottom-[13px] left-2 right-2 h-[2px] rounded-full"
+                    style={{ backgroundColor: LOGO_AMBER }}
                     layoutId="nav-underline"
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
@@ -123,9 +128,10 @@ export function Navbar() {
               onClick={toggleDemoMode}
               className={`ml-2 inline-flex min-h-11 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.16em] transition-colors ${
                 demoEnabled
-                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'
+                  ? 'hover:bg-[rgba(217,119,6,0.16)]'
                   : 'border-slate-600/30 bg-white/[0.03] text-slate-500 hover:border-slate-500/50 hover:text-white'
               }`}
+              style={demoEnabled ? { borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(217,119,6,0.10)', color: LOGO_AMBER } : undefined}
               title="Toggle demo data"
               aria-pressed={demoEnabled}
             >
@@ -149,8 +155,9 @@ export function Navbar() {
               href={href}
               aria-current={active ? 'page' : undefined}
               className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[13px] font-black transition-colors ${
-                active ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 active:bg-white/[0.06] active:text-white'
+                active ? '' : 'text-slate-400 active:bg-white/[0.06] active:text-white'
               }`}
+              style={active ? { backgroundColor: 'rgba(217,119,6,0.10)', color: LOGO_AMBER } : undefined}
             >
               <NavIcon icon={icon} />
               <span>{label}</span>

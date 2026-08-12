@@ -9,35 +9,14 @@ import {
   ChevronDownIcon, CoinIcon, TargetIcon,
 } from '@/components/CricketIcons';
 import { getPredictionHistory, PredictionHistoryItem } from '@/lib/supabase';
-import { getTeamMeta } from '@/lib/teams';
+import {
+  computeAccuracy,
+  filterHistoryByPeriod,
+  isInternationalMatch,
+  type AccuracyPeriod as Period,
+} from '@/lib/prediction-history';
 
 type Outcome = 'all' | 'correct' | 'incorrect';
-type Period = 'week' | 'month' | 'all';
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function isInternationalMatch(r: PredictionHistoryItem): boolean {
-  const t1 = r.team1 || r.predicted_winner;
-  const t2 = r.team2 || r.actual_winner;
-  return Boolean(getTeamMeta(t1).countryCode) && Boolean(getTeamMeta(t2).countryCode);
-}
-
-function filterByPeriod(items: PredictionHistoryItem[], period: Period): PredictionHistoryItem[] {
-  if (period === 'all') return items;
-  const now = new Date();
-  return items.filter((r) => {
-    const d = new Date(r.scored_at);
-    const ms = now.getTime() - d.getTime();
-    if (period === 'week') return ms >= 0 && ms < 7 * 24 * 60 * 60 * 1000;
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-}
-
-function computeAccuracy(items: PredictionHistoryItem[]) {
-  if (!items.length) return null;
-  const correct = items.filter((r) => r.correct).length;
-  return { correct, total: items.length, pct: Math.round((correct / items.length) * 100) };
-}
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
@@ -433,7 +412,7 @@ export default function HistoryPage() {
   }, []);
 
   // Accuracy metrics: period-only (never polluted by outcome filter)
-  const byPeriod = filterByPeriod(results, period);
+  const byPeriod = filterHistoryByPeriod(results, period);
   const intlAccuracy = computeAccuracy(byPeriod.filter(isInternationalMatch));
   const leagueAccuracy = computeAccuracy(byPeriod.filter((r) => !isInternationalMatch(r)));
 

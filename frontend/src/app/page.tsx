@@ -1,13 +1,13 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
+import { getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import {
   compareMatchCenterMatches,
   compareMatchesByCompetition,
-  getCompetitionPriority,
   getCompetitionProfile,
   getMatchTimestamp,
   hasValidMarketOdds,
@@ -18,9 +18,17 @@ import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
-import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
+import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
+import {
+  getHomepageTrustMetrics,
+  getHomepageTrustSignalForScope,
+  type HomepageTrustMetrics,
+  type HomepageTrustSignal,
+} from '@/lib/prediction-history';
 import Link from 'next/link';
+
+const LOGO_AMBER = '#d97706';
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
   return Array.isArray(match.predictions) ? match.predictions[0] ?? null : match.predictions ?? null;
@@ -56,7 +64,7 @@ function isMatchLive(match: MatchWithPredictions): boolean {
   return String(match.status).toLowerCase() === 'live';
 }
 
-function getCountdown(date: string): { days: number; hours: number; mins: number } | null {
+function getCountdown(date: string): { days: number; hours: number; mins: number; secs: number } | null {
   const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
   const kickoff = new Date(raw).getTime();
   if (Number.isNaN(kickoff)) return null;
@@ -67,7 +75,8 @@ function getCountdown(date: string): { days: number; hours: number; mins: number
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return { days, hours, mins };
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  return { days, hours, mins, secs };
 }
 
 function decimalToAmerican(d: number): string {
@@ -127,14 +136,302 @@ function SectionHeading({
   );
 }
 
-function SixSensePickHeading() {
+function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
+  if (!metrics.week && !metrics.month) return null;
+
+  const primarySignal = metrics.primary;
+  type TickerItem = {
+    key: string;
+    label: string;
+    signal: HomepageTrustSignal | null;
+    icon: ReactElement;
+  };
+  const tickerItems = [
+    metrics.breakdown.week.international ? { key: 'intl-7d', label: 'International 7d', signal: metrics.breakdown.week.international, icon: <GlobeIcon className="h-3.5 w-3.5" /> } : null,
+    metrics.breakdown.week.league ? { key: 'league-7d', label: 'League 7d', signal: metrics.breakdown.week.league, icon: <ShieldIcon className="h-3.5 w-3.5" /> } : null,
+    metrics.breakdown.month.international ? { key: 'intl-30d', label: 'International 30d', signal: metrics.breakdown.month.international, icon: <GlobeIcon className="h-3.5 w-3.5" /> } : null,
+    metrics.breakdown.month.league ? { key: 'league-30d', label: 'League 30d', signal: metrics.breakdown.month.league, icon: <ShieldIcon className="h-3.5 w-3.5" /> } : null,
+    { key: 'history', label: 'View full history', signal: null, icon: <TargetIcon className="h-3.5 w-3.5" /> },
+  ].filter((item): item is TickerItem => item !== null);
+  const tickerLoop = [...tickerItems, ...tickerItems];
+
   return (
-    <SectionHeading icon={<Logo size={40} />} bareIcon>
-      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
-        <span className="text-amber-600">SixSense</span>
-        <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
-      </h2>
-    </SectionHeading>
+    <Link
+      href="/history"
+      className="group block overflow-hidden rounded-2xl border transition-colors shadow-[0_10px_24px_rgba(0,0,0,0.24)]"
+      style={{
+        borderColor: 'rgba(217,119,6,0.3)',
+        background: 'linear-gradient(90deg, rgba(217,119,6,0.14), rgba(17,24,32,0.96) 18%, rgba(17,24,32,0.98) 82%, rgba(217,119,6,0.10))',
+      }}
+    >
+      <div className="flex items-center gap-3 px-3 py-2 sm:px-4">
+        <div
+          className="flex shrink-0 items-center gap-2 rounded-full border bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em]"
+          style={{ borderColor: 'rgba(217,119,6,0.28)', color: LOGO_AMBER }}
+        >
+          <TargetIcon className="h-3.5 w-3.5" />
+          Verified record
+        </div>
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          <div className="flex w-max min-w-full items-center gap-4 text-[11px] font-semibold text-slate-200 animate-[homepage-trust-ticker_26s_linear_infinite] group-hover:[animation-play-state:paused]">
+            {tickerLoop.map(({ key, label, signal, icon }, index) => (
+              <div
+                key={`${key}-${index}`}
+                className="flex shrink-0 items-center gap-2"
+              >
+                <span style={{ color: LOGO_AMBER }}>{icon}</span>
+                {signal ? (
+                  <>
+                    <span className="text-slate-400">{label}</span>
+                    <span className="font-black tabular-nums" style={{ color: LOGO_AMBER }}>{signal.stats.pct}%</span>
+                    <span className="text-slate-500">{signal.stats.correct}/{signal.stats.total}</span>
+                    <span className="text-slate-600">•</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-slate-400">{label}</span>
+                    <span className="font-black" style={{ color: LOGO_AMBER }}>→</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#111820] to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#111820] to-transparent" />
+        </div>
+      </div>
+      <style jsx>{`
+        @keyframes homepage-trust-ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
+    </Link>
+  );
+}
+
+function SixSenseLiveClockIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.25" stroke={LOGO_AMBER} strokeWidth="1.4" opacity="0.95" />
+      <path d="M8 5.2v3.1l2 1.2" stroke={LOGO_AMBER} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2.2 8a5.8 5.8 0 0 1 1.1-3.3" stroke={LOGO_AMBER} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      <path d="M13.8 8a5.8 5.8 0 0 1-1.1 3.3" stroke={LOGO_AMBER} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  );
+}
+
+function AccuracyTeaseGraphic({ correct, total }: { correct: number; total: number }) {
+  const segments = Math.min(Math.max(total, 8), 14);
+  const highlighted = Math.max(1, Math.min(segments, Math.round((correct / Math.max(total, 1)) * segments)));
+
+  return (
+    <div className="flex items-center gap-1" aria-hidden="true">
+      {Array.from({ length: segments }, (_, index) => (
+        <span
+          key={index}
+          className="h-1.5 w-3 rounded-full"
+          style={{ backgroundColor: index < highlighted ? LOGO_AMBER : 'rgba(148,163,184,0.18)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CountdownDisplay({ matchDate }: { matchDate: string }) {
+  const getCountdownValue = useCallback(() => getCountdown(matchDate), [matchDate]);
+  const [countdown, setCountdown] = useState(getCountdownValue);
+
+  useEffect(() => {
+    setCountdown(getCountdownValue());
+    const interval = window.setInterval(() => setCountdown(getCountdownValue()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [getCountdownValue]);
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 text-slate-300">
+      <SixSenseLiveClockIcon />
+      {countdown ? (
+        <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">
+          {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+          <span className="text-white">{String(countdown.hours).padStart(2, '0')}</span>
+          <span className="text-slate-500">:</span>
+          <span className="text-white">{String(countdown.mins).padStart(2, '0')}</span>
+          <span className="text-slate-500">:</span>
+          <span className="text-white">{String(countdown.secs).padStart(2, '0')}</span>
+        </span>
+      ) : (
+        <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">{getMatchDateLabel(matchDate)}</span>
+      )}
+    </div>
+  );
+}
+
+function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSignal }) {
+  const [open, setOpen] = useState(false);
+  const [beaconPulse, setBeaconPulse] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; right: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const hasPlayedPulseRef = useRef(false);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || hasPlayedPulseRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting || hasPlayedPulseRef.current) return;
+        hasPlayedPulseRef.current = true;
+        setBeaconPulse(true);
+        window.setTimeout(() => setBeaconPulse(false), 5200);
+        observer.disconnect();
+      },
+      { threshold: 0.65 },
+    );
+
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPopoverPosition({
+        top: rect.top - 162,
+        right: Math.max(window.innerWidth - rect.right, 12),
+      });
+    };
+
+    updatePosition();
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!wrapperRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  const isLeague = trustSignal.scope === 'league';
+  const compactPeriodLabel = trustSignal.period === 'week' ? '7 days' : '30 days';
+
+  return (
+    <div ref={wrapperRef} className="relative shrink-0">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Explain ${trustSignal.scopeLabel.toLowerCase()} win-rate record`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500 shadow-[0_0_18px_rgba(217,119,6,0.22)] transition-all duration-200 hover:scale-105 hover:bg-amber-500/16 ${beaconPulse ? 'animate-trust-icon-beacon' : ''}`}
+      >
+        {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+      </button>
+
+      {open && popoverPosition && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-40 w-[280px] rounded-2xl border border-white/[0.14] bg-[#091018] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.56)] sm:w-[312px]"
+          style={{ top: popoverPosition.top, right: popoverPosition.right }}
+        >
+          <div className="absolute -bottom-2 right-3 h-4 w-4 rotate-45 border-b border-r border-white/[0.14] bg-[#091018]" />
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
+              {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
+                  <p className="mt-1 text-base font-black leading-tight text-white">
+                    {trustSignal.stats.pct}% win rate
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close trust explainer"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.03] text-slate-300 transition-colors hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                {trustSignal.stats.correct} of {trustSignal.stats.total} picks landed over the last {compactPeriodLabel}.
+              </p>
+              <Link
+                href="/history"
+                className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
+                onClick={() => setOpen(false)}
+              >
+                Prediction history <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+function SixSensePickHeading({
+  trustSignal,
+}: {
+  trustSignal: HomepageTrustSignal | null;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <SectionHeading icon={<Logo size={40} />} bareIcon className="min-w-0">
+        <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+          <span className="text-amber-600">SixSense</span>
+          <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
+        </h2>
+      </SectionHeading>
+      {trustSignal && (
+        <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
+          <TrustSignalInfoTrigger trustSignal={trustSignal} />
+          <div
+            className="flex flex-col items-end gap-1"
+            aria-label={`${trustSignal.stats.pct}% ${trustSignal.scopeLabel.toLowerCase()} win rate in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
+          >
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl font-black tabular-nums leading-none sm:text-[22px]" style={{ color: LOGO_AMBER }}>
+                {trustSignal.stats.pct}%
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[11px]">
+                win rate
+              </span>
+            </div>
+            <div className="hidden sm:flex">
+              <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -606,20 +903,30 @@ function MatchBoardStrip({
 }
 
 /** Spotlight hero for the highest-ranked upcoming match */
-function FeaturedHero({ match }: { match: MatchWithPredictions }) {
+function FeaturedHero({
+  match,
+  trustSignal,
+}: {
+  match: MatchWithPredictions;
+  trustSignal: HomepageTrustSignal | null;
+}) {
   const prediction = getPrimaryPrediction(match);
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
   const hasMarket = hasValidMarketOdds(match);
-  const getHeroCountdown = useCallback(() => getCountdown(match.date), [match.date]);
-  const [countdown, setCountdown] = useState(getHeroCountdown);
-
-  useEffect(() => {
-    setCountdown(getHeroCountdown());
-    const interval = window.setInterval(() => setCountdown(getHeroCountdown()), 60_000);
-    return () => window.clearInterval(interval);
-  }, [getHeroCountdown]);
+  const periodLabel = trustSignal?.period === 'week' ? 'last 7 days' : 'last 30 days';
+  const predictedTeamMeta = winner === match.team2 ? team2Meta : team1Meta;
+  const predictionGap = prediction
+    ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
+    : 0;
+  const actionableLabel = trustSignal?.scope === 'international'
+    ? null
+    : prediction && winner
+      ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
+      : trustSignal
+        ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
+        : null;
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
@@ -632,8 +939,8 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
         whileTap={{ scale: 0.98 }}
       >
         <div className="absolute -inset-0.5 rounded-[20px] bg-gradient-to-r from-slate-400/0 via-amber-200/0 to-cyan-400/0 blur-md transition-all duration-500 group-hover:from-slate-400/12 group-hover:via-amber-200/8 group-hover:to-cyan-400/12" />
-        <div className="featured-cricket-border relative overflow-hidden rounded-[18px] p-px">
-        <div className="relative overflow-hidden rounded-[17px] bg-[#10161d]">
+        <div className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#10161d]">
+        <div className="relative overflow-hidden rounded-[18px] bg-[#10161d]">
         {/* Dual-team color wash — left and right bleeds */}
         <div
           className="absolute inset-0"
@@ -654,23 +961,26 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
-            <span className="order-first inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300 sm:order-none sm:ml-auto sm:w-auto sm:py-0.5">
-              <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="6" />
-                <path d="M8 4v4l3 2" />
-              </svg>
-              {countdown ? (
-                <span className="whitespace-nowrap">
-                  Begins in{' '}
-                  {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-                  <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
-                  <span className="text-slate-400"> </span>
-                  <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
-                </span>
-              ) : (
-                <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
+          </div>
+
+          {actionableLabel && (
+            <div className="mb-4">
+              <p className="text-sm font-black tracking-[0.01em] text-white sm:text-base">
+                <span style={{ color: LOGO_AMBER }}>{actionableLabel}</span>
+              </p>
+              {trustSignal && (
+                <div className="mt-2 flex items-center gap-3">
+                  <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {trustSignal.stats.correct}/{trustSignal.stats.total} right
+                  </span>
+                </div>
               )}
-            </span>
+            </div>
+          )}
+
+          <div className="mb-5 flex items-center justify-center sm:justify-start">
+            <CountdownDisplay matchDate={match.date} />
           </div>
 
           {/* Row 2: Teams + chart */}
@@ -755,11 +1065,18 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
+  const [trustMetrics, setTrustMetrics] = useState<HomepageTrustMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
 
   const featuredMatch = selectFeaturedMatch(matches);
+  const featuredMatchScope = featuredMatch
+    ? (isInternationalTeam(featuredMatch.team1) && isInternationalTeam(featuredMatch.team2) ? 'international' : 'league')
+    : null;
+  const featuredTrustSignal = trustMetrics && featuredMatchScope
+    ? getHomepageTrustSignalForScope(trustMetrics, featuredMatchScope)
+    : trustMetrics?.primary ?? null;
 
   const sectionPool = matches;
 
@@ -803,14 +1120,24 @@ export default function HomePage() {
     : matchesByCompetition.filter((group) => group.key === activeCompetition);
   useEffect(() => {
     async function load() {
-      try {
-        const data = await getUpcomingMatches();
-        setMatches(data);
-      } catch (err) {
-        console.error('Failed to load matches:', err);
-      } finally {
-        setLoading(false);
+      const [matchesResult, historyResult] = await Promise.allSettled([
+        getUpcomingMatches(),
+        getPredictionHistory(),
+      ]);
+
+      if (matchesResult.status === 'fulfilled') {
+        setMatches(matchesResult.value);
+      } else {
+        console.error('Failed to load matches:', matchesResult.reason);
       }
+
+      if (historyResult.status === 'fulfilled') {
+        setTrustMetrics(getHomepageTrustMetrics(historyResult.value));
+      } else {
+        console.error('Failed to load prediction history:', historyResult.reason);
+      }
+
+      setLoading(false);
     }
     load();
   }, []);
@@ -843,6 +1170,8 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
+          {trustMetrics && <HomeTrustTicker metrics={trustMetrics} />}
+
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
           {featuredMatch && (
@@ -850,13 +1179,19 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
+              className="group featured-cricket-border relative min-w-0 overflow-hidden rounded-2xl p-px shadow-xl shadow-black/10"
             >
-              <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading />
-              </div>
-              <div className="p-3">
-                <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
+              <div className="overflow-hidden rounded-[15px] border border-slate-700/45 bg-[#111820]/95">
+                <div className="border-b border-white/[0.07] px-4 py-3">
+                  <SixSensePickHeading trustSignal={featuredTrustSignal} />
+                </div>
+                <div className="p-3">
+                  <FeaturedHero
+                    key={featuredMatch.match_id}
+                    match={featuredMatch}
+                    trustSignal={featuredTrustSignal}
+                  />
+                </div>
               </div>
             </motion.section>
           )}
