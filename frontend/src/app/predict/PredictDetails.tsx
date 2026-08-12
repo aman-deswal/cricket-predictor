@@ -337,10 +337,10 @@ function MarketMovementPanel({
   const primaryInsight = marketGap === null
     ? `Tracking ${marketSideMeta.shortName} against the market`
     : Math.abs(marketGap) < 0.75
-      ? `SixSense and the market are broadly aligned on ${marketSideMeta.shortName}`
+      ? `${marketSideMeta.shortName}: SixSense and market aligned`
       : marketGap > 0
-        ? `Market is ${Math.abs(marketGap).toFixed(1)} pts higher on ${marketSideMeta.shortName} than SixSense`
-        : `SixSense is ${Math.abs(marketGap).toFixed(1)} pts higher on ${marketSideMeta.shortName} than the market`;
+        ? `${marketSideMeta.shortName}: market +${Math.abs(marketGap).toFixed(1)} pts vs SixSense`
+        : `${marketSideMeta.shortName}: SixSense +${Math.abs(marketGap).toFixed(1)} pts vs market`;
   const latestMoveDelta = latestAnnotation && previousAnnotation
     ? latestAnnotation.probability - previousAnnotation.probability
     : null;
@@ -384,49 +384,48 @@ function MarketMovementPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-3xl">
            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-100">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: marketSideMeta.primaryColor }} />
-                {marketSideMeta.shortName}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">vs {opposingMeta.shortName}</span>
-              {gapStrength && (
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone}`}>
-                  {gapStrength.label}
-                </span>
-              )}
-            </div>
-            <p className="mt-3 text-xl font-black leading-tight text-white sm:text-2xl">
-              {primaryInsight}
-            </p>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-              {latestMoveStory}
-            </p>
+             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-300">
+               {marketSideMeta.shortName} <span className="text-slate-500">vs</span> {opposingMeta.shortName}
+             </span>
+             {gapStrength && (
+               <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone}`}>
+                 {gapStrength.label}
+               </span>
+             )}
+           </div>
+           <p className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,4.3vw,1.85rem)] font-black leading-tight text-white">
+             {primaryInsight}
+           </p>
+           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+             {latestMoveStory}
+           </p>
           </div>
-          <div className="grid min-w-[13rem] grid-cols-2 gap-2 self-stretch">
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">SixSense</p>
-              <p className="mt-1 text-xl font-black text-white">
-                {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Market</p>
-              <p className="mt-1 text-xl font-black text-white">
-                {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Gap</p>
-              <p className={`mt-1 text-xl font-black ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
-                {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Last move</p>
-              <p className={`mt-1 text-xl font-black ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
-                {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
-              </p>
-            </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/[0.08] pt-3">
+          <div className="min-w-[6rem]">
+           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">SixSense</p>
+           <p className="mt-1 text-lg font-black text-white">
+             {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
+           </p>
+          </div>
+          <div className="min-w-[6rem]">
+           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Market</p>
+           <p className="mt-1 text-lg font-black text-white">
+             {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
+           </p>
+          </div>
+          <div className="min-w-[6rem]">
+           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Gap</p>
+           <p className={`mt-1 text-lg font-black ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+             {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
+           </p>
+          </div>
+          <div className="min-w-[6rem]">
+           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Last move</p>
+           <p className={`mt-1 text-lg font-black ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+             {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
+           </p>
           </div>
         </div>
 
