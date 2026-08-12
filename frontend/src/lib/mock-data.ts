@@ -12,6 +12,7 @@ import type {
   PredictionSnapshot,
 } from './supabase';
 import { compareMatchCenterMatches } from './competition';
+import { buildAccuracyTrend } from './prediction-history';
 
 const now = Date.now();
 
@@ -715,21 +716,6 @@ const demoCalibration = [
   { bin_center: 0.95, predicted_avg: 0.93, actual_avg: 0.9, count: 10 },
 ];
 
-function buildRollingTrend(results: PredictionHistoryItem[]): Array<{ date: string; accuracy: number }> {
-  const ordered = [...results].sort((a, b) => new Date(a.scored_at).getTime() - new Date(b.scored_at).getTime());
-  const window = 10;
-  const trend: Array<{ date: string; accuracy: number }> = [];
-  for (let i = window - 1; i < ordered.length; i++) {
-    const slice = ordered.slice(i - window + 1, i + 1);
-    const correct = slice.filter((result) => result.correct).length;
-    trend.push({
-      date: new Date(ordered[i].scored_at).toLocaleDateString(),
-      accuracy: (correct / window) * 100,
-    });
-  }
-  return trend;
-}
-
 export function getMockUpcomingMatches(): MatchWithPredictions[] {
   return demoMatches;
 }
@@ -798,5 +784,5 @@ export function getMockCalibrationData(): Array<{ bin_center: number; predicted_
 }
 
 export function getMockAccuracyTrend(): Array<{ date: string; accuracy: number }> {
-  return buildRollingTrend(demoHistory);
+  return buildAccuracyTrend(demoHistory, 10);
 }

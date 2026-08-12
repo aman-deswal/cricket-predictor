@@ -4,6 +4,7 @@ import { getFranchiseLogoUrl } from './franchise-logos';
 import { getStoredDemoMode } from './demo-mode';
 import { compareMatchCenterMatches } from './competition';
 import { selectFreshestTrustedSportsbookOdds } from './market-odds';
+import { buildAccuracyTrend } from './prediction-history';
 export { getMatchSection } from './competition';
 export type { MatchSection } from './competition';
 import {
@@ -1060,17 +1061,5 @@ export async function getAccuracyTrend(): Promise<Array<{ date: string; accuracy
     .select('correct, scored_at')
     .order('scored_at', { ascending: true });
 
-  if (!data || data.length < 10) return [];
-
-  const window = 10;
-  const trend = [];
-  for (let i = window - 1; i < data.length; i++) {
-    const slice = data.slice(i - window + 1, i + 1);
-    const correct = slice.filter((r) => r.correct).length;
-    trend.push({
-      date: new Date(data[i].scored_at).toLocaleDateString(),
-      accuracy: (correct / window) * 100,
-    });
-  }
-  return trend;
+  return buildAccuracyTrend(data ?? [], 10);
 }

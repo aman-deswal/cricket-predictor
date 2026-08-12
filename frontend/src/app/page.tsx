@@ -1,13 +1,12 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
+import { getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import {
   compareMatchCenterMatches,
   compareMatchesByCompetition,
-  getCompetitionPriority,
   getCompetitionProfile,
   getMatchTimestamp,
   hasValidMarketOdds,
@@ -18,8 +17,13 @@ import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
-import { BowlIcon, GroundsIcon } from '@/components/CricketIcons';
+import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
+import {
+  getHomepageTrustMetrics,
+  type HomepageTrustMetrics,
+  type HomepageTrustSignal,
+} from '@/lib/prediction-history';
 import Link from 'next/link';
 
 function getPrimaryPrediction(match: MatchWithPredictions) {
@@ -127,14 +131,159 @@ function SectionHeading({
   );
 }
 
-function SixSensePickHeading() {
+function AccuracySparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return null;
+
+  const width = 72;
+  const height = 26;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = Math.max(max - min, 1);
+
+  const polyline = points.map((point, index) => {
+    const x = (index / (points.length - 1)) * width;
+    const y = height - ((point - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+
   return (
-    <SectionHeading icon={<Logo size={40} />} bareIcon>
-      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
-        <span className="text-amber-600">SixSense</span>
-        <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
-      </h2>
-    </SectionHeading>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-6 w-[72px] shrink-0 text-amber-400" aria-hidden="true">
+      <polyline
+        points={polyline}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrustMetricCard({
+  signal,
+  icon,
+}: {
+  signal: HomepageTrustSignal;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+        <span className="text-amber-500">{icon}</span>
+        <span>{signal.scopeLabel}</span>
+        <span className="text-slate-600">/</span>
+        <span>{signal.periodLabel}</span>
+      </div>
+      <div className="mt-2 flex items-end gap-2">
+        <span className="text-2xl font-black tabular-nums text-white">{signal.stats.pct}%</span>
+        <span className="pb-0.5 text-[11px] font-semibold text-slate-500">
+          {signal.stats.correct}/{signal.stats.total}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HomeTrustBanner({ metrics }: { metrics: HomepageTrustMetrics }) {
+  if (!metrics.week && !metrics.month) return null;
+
+  const primarySignal = metrics.primary;
+  type MetricCard = { signal: HomepageTrustSignal; icon: ReactElement };
+  const getMetricIcon = (signal: HomepageTrustSignal) => {
+    if (signal.scope === 'international') return <GlobeIcon className="h-3.5 w-3.5" />;
+    if (signal.scope === 'league') return <ShieldIcon className="h-3.5 w-3.5" />;
+    return <TargetIcon className="h-3.5 w-3.5" />;
+  };
+  const metricCards = [
+    metrics.week ? {
+      signal: metrics.week,
+      icon: getMetricIcon(metrics.week),
+    } : null,
+    metrics.month ? {
+      signal: metrics.month,
+      icon: getMetricIcon(metrics.month),
+    } : null,
+  ].filter((item): item is MetricCard => item !== null);
+
+  return (
+    <Link
+      href="/history"
+      className="group block overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10 transition-colors hover:border-amber-600/30"
+    >
+      <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="max-w-xl">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-500">
+            <TargetIcon className="h-4 w-4" />
+            Model track record
+          </div>
+          <p className="mt-2 text-sm font-black text-white sm:text-base">
+            {primarySignal?.scope === 'international'
+              ? 'International picks have been especially sharp lately.'
+              : 'Recent settled picks are holding up well.'}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            Follow the recent hit rate behind SixSense Pick and open full history for result cards, splits, and calibration.
+          </p>
+        </div>
+        <div className={`grid gap-3 ${metricCards.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+          {metricCards.map(({ signal, icon }) => (
+            <TrustMetricCard key={`${signal.scope}-${signal.period}`} signal={signal} icon={icon} />
+          ))}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SixSenseTrustBadge({
+  signal,
+  sparkline,
+}: {
+  signal: HomepageTrustSignal | null;
+  sparkline: number[];
+}) {
+  if (!signal) return null;
+
+  return (
+    <Link
+      href="/history"
+      className="group inline-flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 transition-colors hover:border-amber-600/30 hover:bg-white/[0.06]"
+      aria-label={`View ${signal.scopeLabel} ${signal.periodLabel.toLowerCase()} accuracy in history`}
+    >
+      <div className="min-w-0">
+        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+          {signal.shortScopeLabel} / {signal.shortPeriodLabel}
+        </p>
+        <p className="mt-0.5 text-sm font-black tabular-nums text-white">
+          {signal.stats.pct}% accuracy
+          <span className="ml-2 text-[10px] font-semibold text-slate-500">
+            {signal.stats.correct}/{signal.stats.total}
+          </span>
+        </p>
+      </div>
+      <AccuracySparkline points={sparkline} />
+    </Link>
+  );
+}
+
+function SixSensePickHeading({
+  trustSignal,
+  sparkline,
+}: {
+  trustSignal: HomepageTrustSignal | null;
+  sparkline: number[];
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <SectionHeading icon={<Logo size={40} />} bareIcon>
+        <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+          <span className="text-amber-600">SixSense</span>
+          <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
+        </h2>
+      </SectionHeading>
+      <SixSenseTrustBadge signal={trustSignal} sparkline={sparkline} />
+    </div>
   );
 }
 
@@ -755,6 +904,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
 
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
+  const [trustMetrics, setTrustMetrics] = useState<HomepageTrustMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
@@ -803,14 +953,24 @@ export default function HomePage() {
     : matchesByCompetition.filter((group) => group.key === activeCompetition);
   useEffect(() => {
     async function load() {
-      try {
-        const data = await getUpcomingMatches();
-        setMatches(data);
-      } catch (err) {
-        console.error('Failed to load matches:', err);
-      } finally {
-        setLoading(false);
+      const [matchesResult, historyResult] = await Promise.allSettled([
+        getUpcomingMatches(),
+        getPredictionHistory(),
+      ]);
+
+      if (matchesResult.status === 'fulfilled') {
+        setMatches(matchesResult.value);
+      } else {
+        console.error('Failed to load matches:', matchesResult.reason);
       }
+
+      if (historyResult.status === 'fulfilled') {
+        setTrustMetrics(getHomepageTrustMetrics(historyResult.value));
+      } else {
+        console.error('Failed to load prediction history:', historyResult.reason);
+      }
+
+      setLoading(false);
     }
     load();
   }, []);
@@ -845,6 +1005,8 @@ export default function HomePage() {
         <div className="space-y-6">
           <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
 
+          {trustMetrics && <HomeTrustBanner metrics={trustMetrics} />}
+
           {featuredMatch && (
             <motion.section
               initial={{ opacity: 0, y: 10 }}
@@ -853,7 +1015,10 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading />
+                <SixSensePickHeading
+                  trustSignal={trustMetrics?.primary ?? null}
+                  sparkline={trustMetrics?.sparkline ?? []}
+                />
               </div>
               <div className="p-3">
                 <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
