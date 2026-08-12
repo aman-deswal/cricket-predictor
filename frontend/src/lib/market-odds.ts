@@ -55,16 +55,11 @@ export function selectFreshestTrustedSportsbookOdds<T extends MarketOddsLike>(od
   ));
   if (trusted.length === 0) return [];
 
-  const freshestTimestamp = trusted.reduce((latest, entry) => {
-    const timestamp = entry.fetched_at ? new Date(entry.fetched_at).getTime() : Number.NEGATIVE_INFINITY;
-    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
-  }, Number.NEGATIVE_INFINITY);
+  return [...trusted].sort((left, right) => {
+    const leftTimestamp = left.fetched_at ? new Date(left.fetched_at).getTime() : Number.NEGATIVE_INFINITY;
+    const rightTimestamp = right.fetched_at ? new Date(right.fetched_at).getTime() : Number.NEGATIVE_INFINITY;
+    if (leftTimestamp !== rightTimestamp) return rightTimestamp - leftTimestamp;
 
-  const freshestCohort = Number.isFinite(freshestTimestamp)
-    ? trusted.filter((entry) => new Date(entry.fetched_at ?? '').getTime() === freshestTimestamp)
-    : trusted;
-
-  return [...freshestCohort].sort((left, right) => {
     const leftPriority = getTrustedSportsbook(left.bookmaker)?.priority ?? Number.MAX_SAFE_INTEGER;
     const rightPriority = getTrustedSportsbook(right.bookmaker)?.priority ?? Number.MAX_SAFE_INTEGER;
     if (leftPriority !== rightPriority) return leftPriority - rightPriority;

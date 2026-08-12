@@ -10,20 +10,23 @@ const rows = [
 ];
 
 const freshest = selectFreshestTrustedSportsbookOdds(rows);
-assert.equal(freshest.length, 2, 'only trusted books from the freshest cohort are selected');
+assert.equal(freshest.length, 4, 'all trusted books are retained after filtering');
 assert.deepEqual(
   freshest.map((row) => normalizeBookmaker(row.bookmaker)),
-  ['paddypower', 'betfair'],
-  'freshest trusted books are ordered by configured priority inside the latest cohort',
+  ['paddypower', 'betfair', 'paddypower', 'betfair'],
+  'trusted books are ordered newest-first, then by configured priority inside the same timestamp',
 );
 assert.equal(freshest[0].team1_odds, 1.02);
 assert.equal(freshest[1].team1_odds, 1.03);
+assert.equal(freshest[2].team1_odds, 1.4);
+assert.equal(freshest[3].team1_odds, 1.42);
 
 const staleButHigherPriority = selectFreshestTrustedSportsbookOdds([
   { bookmaker: 'DraftKings', team1_odds: 1.5, team2_odds: 2.6, fetched_at: '2026-08-12T05:00:00Z' },
   { bookmaker: 'Betfair', team1_odds: 1.35, team2_odds: 3.4, fetched_at: '2026-08-12T07:00:00Z' },
 ]);
-assert.equal(staleButHigherPriority.length, 1, 'stale higher-priority books are excluded from the current cohort');
+assert.equal(staleButHigherPriority.length, 2, 'older trusted books remain available after the newest row is selected first');
 assert.equal(normalizeBookmaker(staleButHigherPriority[0].bookmaker), 'betfair');
+assert.equal(normalizeBookmaker(staleButHigherPriority[1].bookmaker), 'draftkings');
 
 console.log('Market odds requirements passed');
