@@ -133,35 +133,6 @@ function SectionHeading({
   );
 }
 
-function AccuracySparkline({ points }: { points: number[] }) {
-  if (points.length < 2) return null;
-
-  const width = 72;
-  const height = 26;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = Math.max(max - min, 1);
-
-  const polyline = points.map((point, index) => {
-    const x = (index / (points.length - 1)) * width;
-    const y = height - ((point - min) / range) * (height - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-6 w-[72px] shrink-0" style={{ color: LOGO_AMBER }} aria-hidden="true">
-      <polyline
-        points={polyline}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
   if (!metrics.week && !metrics.month) return null;
 
@@ -236,55 +207,14 @@ function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
   );
 }
 
-function SixSenseTrustBadge({
-  signal,
-  sparkline,
-}: {
-  signal: HomepageTrustSignal | null;
-  sparkline: number[];
-}) {
-  if (!signal) return null;
-
-  const periodLabel = signal.period === 'week' ? 'last 7 days' : 'last 30 days';
-
+function SixSensePickHeading() {
   return (
-    <Link
-      href="/history"
-      className="group inline-flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 transition-colors hover:border-amber-600/30 hover:bg-white/[0.06]"
-      aria-label={`View ${signal.scopeLabel} ${signal.periodLabel.toLowerCase()} accuracy in history`}
-    >
-      <div className="min-w-0">
-        <p className="text-sm font-black tabular-nums text-white">
-          {signal.stats.pct}% accuracy <span className="font-semibold text-slate-400">{periodLabel}</span>
-        </p>
-        <p className="mt-0.5 text-[10px] font-semibold text-slate-500">
-          {signal.scopeLabel} picks
-        </p>
-      </div>
-      <div className="shrink-0 opacity-90 transition-opacity group-hover:opacity-100">
-        <AccuracySparkline points={sparkline} />
-      </div>
-    </Link>
-  );
-}
-
-function SixSensePickHeading({
-  trustSignal,
-  sparkline,
-}: {
-  trustSignal: HomepageTrustSignal | null;
-  sparkline: number[];
-}) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <SectionHeading icon={<Logo size={40} />} bareIcon>
-        <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
-          <span className="text-amber-600">SixSense</span>
-          <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
-        </h2>
-      </SectionHeading>
-      <SixSenseTrustBadge signal={trustSignal} sparkline={sparkline} />
-    </div>
+    <SectionHeading icon={<Logo size={40} />} bareIcon>
+      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+        <span className="text-amber-600">SixSense</span>
+        <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
+      </h2>
+    </SectionHeading>
   );
 }
 
@@ -756,7 +686,13 @@ function MatchBoardStrip({
 }
 
 /** Spotlight hero for the highest-ranked upcoming match */
-function FeaturedHero({ match }: { match: MatchWithPredictions }) {
+function FeaturedHero({
+  match,
+  trustSignal,
+}: {
+  match: MatchWithPredictions;
+  trustSignal: HomepageTrustSignal | null;
+}) {
   const prediction = getPrimaryPrediction(match);
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
@@ -764,6 +700,7 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
   const hasMarket = hasValidMarketOdds(match);
   const getHeroCountdown = useCallback(() => getCountdown(match.date), [match.date]);
   const [countdown, setCountdown] = useState(getHeroCountdown);
+  const periodLabel = trustSignal?.period === 'week' ? 'last 7 days' : 'last 30 days';
 
   useEffect(() => {
     setCountdown(getHeroCountdown());
@@ -822,6 +759,21 @@ function FeaturedHero({ match }: { match: MatchWithPredictions }) {
               )}
             </span>
           </div>
+
+          {trustSignal && (
+            <div className="mb-4">
+              <Link
+                href="/history"
+                className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-white/[0.08]"
+                style={{ borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(255,255,255,0.03)' }}
+                aria-label={`View ${trustSignal.scopeLabel} ${trustSignal.periodLabel.toLowerCase()} accuracy in history`}
+              >
+                <span style={{ color: LOGO_AMBER }}>{trustSignal.stats.pct}%</span>
+                <span className="text-slate-200">accuracy</span>
+                <span className="text-slate-400">{periodLabel}</span>
+              </Link>
+            </div>
+          )}
 
           {/* Row 2: Teams + chart */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-8">
@@ -1016,13 +968,14 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading
-                  trustSignal={trustMetrics?.primary ?? null}
-                  sparkline={trustMetrics?.sparkline ?? []}
-                />
+                <SixSensePickHeading />
               </div>
               <div className="p-3">
-                <FeaturedHero key={featuredMatch.match_id} match={featuredMatch} />
+                <FeaturedHero
+                  key={featuredMatch.match_id}
+                  match={featuredMatch}
+                  trustSignal={trustMetrics?.primary ?? null}
+                />
               </div>
             </motion.section>
           )}
