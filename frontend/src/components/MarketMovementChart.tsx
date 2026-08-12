@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -19,14 +20,23 @@ interface MarketMovementChartProps {
   maxDomain: number;
   ariaLabel: string;
   annotations: MovementAnnotation[];
-  selectedAnnotationTimestamp?: number;
-  onAnnotationSelect?: (annotation: MovementAnnotation) => void;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
   return new Date(timestamp).toLocaleString(undefined, compact
     ? { month: 'short', day: 'numeric', hour: 'numeric' }
     : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric' });
+}
+
+function formatPopupEventTime(value: string): string {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return 'Time unavailable';
+  return timestamp.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export function MarketMovementChart({
@@ -36,12 +46,23 @@ export function MarketMovementChart({
   maxDomain,
   ariaLabel,
   annotations,
-  selectedAnnotationTimestamp,
-  onAnnotationSelect,
 }: MarketMovementChartProps) {
-  const annotationsByTimestamp = new Map(
+  const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
-  );
+  ), [annotations]);
+  const [selectedMarker, setSelectedMarker] = useState<{
+    annotation: MovementAnnotation;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedMarker) return;
+    if (!annotationsByTimestamp.has(selectedMarker.annotation.timestamp)) {
+      setSelectedMarker(null);
+    }
+  }, [annotationsByTimestamp, selectedMarker]);
+
   const accessibleSummaries = series.map((entry) => {
     const values = chartRows
       .map((row) => row[entry.id])
@@ -114,7 +135,7 @@ export function MarketMovementChart({
     const annotation = dotProps.dataKey === 'sixsense-model'
       ? annotationsByTimestamp.get(timestamp)
       : undefined;
-    const isSelected = annotation?.timestamp === selectedAnnotationTimestamp;
+    const isSelected = annotation?.timestamp === selectedMarker?.annotation.timestamp;
     const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
     const cy = dotProps.cy;
 
@@ -124,13 +145,20 @@ export function MarketMovementChart({
           key={offsetKey}
           role="button"
           tabIndex={0}
-          onClick={() => onAnnotationSelect?.(annotation)}
+          onClick={() => setSelectedMarker((current) => (
+            current?.annotation.timestamp === annotation.timestamp
+              ? null
+              : { annotation, x: cx, y: cy }
+          ))}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onAnnotationSelect?.(annotation);
+              setSelectedMarker({ annotation, x: cx, y: cy });
+            } else if (event.key === 'Escape') {
+              setSelectedMarker(null);
             }
           }}
+          aria-expanded={isSelected}
           aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
           className="cursor-pointer"
         >
@@ -176,7 +204,7 @@ export function MarketMovementChart({
   return (
     <>
       <div
-        className="h-40 sm:h-48 lg:h-56"
+        className="relative h-40 sm:h-48 lg:h-56"
         role="img"
         aria-label={ariaLabel}
       >
@@ -238,12 +266,66 @@ export function MarketMovementChart({
             ))}
           </LineChart>
         </ResponsiveContainer>
+        {selectedMarker && (
+          <div
+            className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl border border-amber-400/20 bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
+              selectedMarker.y < 88 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
+            }`}
+            style={{
+              left: `clamp(0.5rem, calc(${selectedMarker.x}px - 9rem), calc(100% - 18.5rem))`,
+              top: `${selectedMarker.y}px`,
+            }}
+            role="dialog"
+            aria-label={`Model move details for ${formatMarketTimestamp(selectedMarker.annotation.timestamp)}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-200">
+                  {formatMarketTimestamp(selectedMarker.annotation.timestamp)}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {selectedMarker.annotation.eventCount} structured input {selectedMarker.annotation.eventCount === 1 ? 'update' : 'updates'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMarker(null)}
+                className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300 hover:border-white/20 hover:text-white"
+                aria-label="Close move details"
+              >
+                Close
+              </button>
+            </div>
+            <ol className="mt-3 space-y-2">
+              {selectedMarker.annotation.events.map((event, index) => (
+                <li
+                  key={`${event.snapshot_at}-${event.type}-${index}`}
+                  className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
+                    <time className="text-slate-400" dateTime={event.event_at}>
+                      {formatPopupEventTime(event.event_at)}
+                    </time>
+                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-slate-300">
+                      {event.category.replaceAll('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs font-bold text-white">{event.label}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{event.summary}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </div>
       <ul className="sr-only">
         {accessibleSummaries.map((summary, index) => (
           <li key={series[index].id}>{summary}</li>
         ))}
       </ul>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+        Tap a gold SixSense point to inspect the input changes tied to that move.
+      </p>
       <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
         {series.map((entry) => (
           <span
