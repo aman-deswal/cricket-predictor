@@ -238,3 +238,25 @@ export function getHomepageTrustMetrics<T extends PredictionHistoryLike>(items: 
     breakdown,
   };
 }
+
+export function getHomepageTrustSignalForScope(
+  metrics: HomepageTrustMetrics,
+  scope: AccuracyScope,
+): HomepageTrustSignal | null {
+  const candidates = [
+    metrics.breakdown.week[scope],
+    metrics.breakdown.month[scope],
+  ].filter((signal): signal is HomepageTrustSignal => signal !== null);
+
+  if (candidates.length) {
+    return [...candidates].sort((left, right) => getHomepageSignalScore(right) - getHomepageSignalScore(left))[0] ?? null;
+  }
+
+  const fallbackCandidates = [
+    metrics.breakdown.week.overall,
+    metrics.breakdown.month.overall,
+    metrics.primary,
+  ].filter((signal): signal is HomepageTrustSignal => signal !== null);
+
+  return [...fallbackCandidates].sort((left, right) => getHomepageSignalScore(right) - getHomepageSignalScore(left))[0] ?? null;
+}

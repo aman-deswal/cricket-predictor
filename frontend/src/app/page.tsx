@@ -21,6 +21,7 @@ import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon } from '@/comp
 import { Logo } from '@/components/Logo';
 import {
   getHomepageTrustMetrics,
+  getHomepageTrustSignalForScope,
   type HomepageTrustMetrics,
   type HomepageTrustSignal,
 } from '@/lib/prediction-history';
@@ -278,14 +279,18 @@ function SixSensePickHeading({
           <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
         </h2>
       </SectionHeading>
-      {trustSignal?.scope === 'international' && (
+      {trustSignal && (
         <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
-          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500">
-            <GlobeIcon className="h-4 w-4" />
-          </span>
+          <Link
+            href="/history"
+            aria-label={`View ${trustSignal.scopeLabel.toLowerCase()} prediction history`}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500 shadow-[0_0_18px_rgba(217,119,6,0.22)] transition-transform duration-200 hover:scale-105 hover:bg-amber-500/16"
+          >
+            {trustSignal.scope === 'league' ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+          </Link>
           <div
             className="flex flex-col items-end gap-1"
-            aria-label={`${trustSignal.stats.pct}% international win rate in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
+            aria-label={`${trustSignal.stats.pct}% ${trustSignal.scopeLabel.toLowerCase()} win rate in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
           >
             <div className="flex items-baseline gap-1.5 sm:gap-2">
               <span className="text-xl font-black tabular-nums leading-none sm:text-[22px]" style={{ color: LOGO_AMBER }}>
@@ -293,9 +298,6 @@ function SixSensePickHeading({
               </span>
               <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[11px]">
                 win rate
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:text-[11px]">
-                {trustSignal.period === 'week' ? '7D' : '30D'}
               </span>
             </div>
             <div className="hidden sm:flex">
@@ -944,6 +946,12 @@ export default function HomePage() {
   const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
 
   const featuredMatch = selectFeaturedMatch(matches);
+  const featuredMatchScope = featuredMatch
+    ? (isInternationalTeam(featuredMatch.team1) && isInternationalTeam(featuredMatch.team2) ? 'international' : 'league')
+    : null;
+  const featuredTrustSignal = trustMetrics && featuredMatchScope
+    ? getHomepageTrustSignalForScope(trustMetrics, featuredMatchScope)
+    : trustMetrics?.primary ?? null;
 
   const sectionPool = matches;
 
@@ -1049,13 +1057,13 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading trustSignal={trustMetrics?.primary ?? null} />
+                <SixSensePickHeading trustSignal={featuredTrustSignal} />
               </div>
               <div className="p-3">
                 <FeaturedHero
                   key={featuredMatch.match_id}
                   match={featuredMatch}
-                  trustSignal={trustMetrics?.primary ?? null}
+                  trustSignal={featuredTrustSignal}
                 />
               </div>
             </motion.section>
