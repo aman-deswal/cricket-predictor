@@ -2,6 +2,36 @@ export interface MovementPredictionSnapshot {
   team1_win_probability: number;
   team2_win_probability: number;
   captured_at: string;
+  change_events?: MovementChangeEvent[] | null;
+}
+
+export interface MovementChangeEvent {
+  event_at: string;
+  category: string;
+  type: string;
+  label: string;
+  summary: string;
+  affected_team?: string | null;
+  affected_input: string;
+  relationship: 'coincided_input_change';
+  probability_delta?: number | null;
+  source?: {
+    name?: string;
+    reference?: string;
+    observed_at?: string;
+  };
+}
+
+export interface MovementAnnotation {
+  timestamp: number;
+  probability: number;
+  eventCount: number;
+}
+
+export interface MovementEventItem extends MovementChangeEvent {
+  snapshot_at: string;
+  display_probability_delta: number | null;
+  isLegacyFallback: boolean;
 }
 
 export interface MovementOddsSnapshot {
@@ -32,6 +62,8 @@ export interface PreMatchMovement {
   maxDomain: number;
   modelPointCount: number;
   marketPointCount: number;
+  annotations: MovementAnnotation[];
+  events: MovementEventItem[];
 }
 
 export const SIXSENSE_SERIES_ID = 'sixsense-model';
@@ -64,6 +96,9 @@ export function buildPreMatchMovement(
   const rowsByTimestamp = new Map<number, Record<string, number | null>>();
   let modelPointCount = 0;
   let marketPointCount = 0;
+  const annotations: MovementAnnotation[] = [];
+  const events: MovementEventItem[] = [];
+  let previousModelProbability: number | null = null;
 
   predictionHistory.forEach((snapshot) => {
     const timestamp = new Date(snapshot.captured_at).getTime();
@@ -75,6 +110,49 @@ export function buildPreMatchMovement(
     row[SIXSENSE_SERIES_ID] = probability * 100;
     rowsByTimestamp.set(timestamp, row);
     modelPointCount += 1;
+    const storedEvents = Array.isArray(snapshot.change_events)
+      ? snapshot.change_events
+      : [];
+    const probabilityDelta = previousModelProbability === null
+      ? null
+      : probability - previousModelProbability;
+    const displayDelta = trackedTeam === 'team1'
+      ? probabilityDelta
+      : probabilityDelta === null ? null : -probabilityDelta;
+    const shapedEvents = storedEvents.length > 0
+      ? storedEvents.map((event) => ({
+          ...event,
+          snapshot_at: snapshot.captured_at,
+          display_probability_delta: event.probability_delta === null
+            || event.probability_delta === undefined
+            ? displayDelta
+            : trackedTeam === 'team1'
+              ? event.probability_delta
+              : -event.probability_delta,
+          isLegacyFallback: false,
+        }))
+      : [{
+          event_at: snapshot.captured_at,
+          category: 'legacy',
+          type: 'attribution_unavailable',
+          label: 'Input attribution unavailable',
+          summary: 'This legacy model snapshot did not retain the structured input changes that coincided with its probability.',
+          affected_team: null,
+          affected_input: 'structured_inputs',
+          relationship: 'coincided_input_change' as const,
+          probability_delta: displayDelta,
+          source: {},
+          snapshot_at: snapshot.captured_at,
+          display_probability_delta: displayDelta,
+          isLegacyFallback: true,
+        }];
+    events.push(...shapedEvents);
+    annotations.push({
+      timestamp,
+      probability: probability * 100,
+      eventCount: shapedEvents.length,
+    });
+    previousModelProbability = probability;
   });
 
   const marketSeries: MovementSeries[] = [];
@@ -134,5 +212,9 @@ export function buildPreMatchMovement(
     maxDomain,
     modelPointCount,
     marketPointCount,
+    annotations,
+    events: events.sort(
+      (left, right) => new Date(right.event_at).getTime() - new Date(left.event_at).getTime(),
+    ),
   };
 }

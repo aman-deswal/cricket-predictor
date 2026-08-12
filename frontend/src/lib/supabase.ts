@@ -98,7 +98,26 @@ export interface PredictionSnapshot {
   edge_score: Record<string, unknown>;
   model: string;
   ensemble_size: number;
+  input_state: Record<string, unknown>;
+  change_events: PredictionChangeEvent[];
   captured_at: string;
+}
+
+export interface PredictionChangeEvent {
+  event_at: string;
+  category: string;
+  type: string;
+  label: string;
+  summary: string;
+  affected_team: string | null;
+  affected_input: string;
+  relationship: 'coincided_input_change';
+  probability_delta: number | null;
+  source: {
+    name?: string;
+    reference?: string;
+    observed_at?: string;
+  };
 }
 
 export interface PredictionResult {
@@ -629,7 +648,7 @@ export async function getPredictionSnapshots(matchId: string): Promise<Predictio
 
   const { data, error } = await supabase
     .from('prediction_snapshots')
-    .select('match_id, team1, team2, predicted_winner, team1_win_probability, team2_win_probability, confidence, edge_score, model, ensemble_size, captured_at')
+    .select('match_id, team1, team2, predicted_winner, team1_win_probability, team2_win_probability, confidence, edge_score, model, ensemble_size, input_state, change_events, captured_at')
     .eq('match_id', matchId)
     .order('captured_at', { ascending: false })
     .limit(200);

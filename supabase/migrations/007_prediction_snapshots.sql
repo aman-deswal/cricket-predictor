@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS prediction_snapshots (
     edge_score JSONB NOT NULL,
     model TEXT NOT NULL,
     ensemble_size INTEGER NOT NULL,
+    input_state JSONB NOT NULL DEFAULT '{}'::JSONB,
+    change_events JSONB NOT NULL DEFAULT '[]'::JSONB
+        CHECK (jsonb_typeof(change_events) = 'array'),
     captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -31,7 +34,9 @@ CREATE OR REPLACE FUNCTION append_prediction_snapshot(
     candidate_confidence TEXT,
     candidate_edge_score JSONB,
     candidate_model TEXT,
-    candidate_ensemble_size INTEGER
+    candidate_ensemble_size INTEGER,
+    candidate_input_state JSONB,
+    candidate_change_events JSONB
 )
 RETURNS BOOLEAN
 LANGUAGE PLPGSQL
@@ -40,6 +45,8 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     latest prediction_snapshots%ROWTYPE;
+    probability_delta DECIMAL;
+    attributed_events JSONB;
 BEGIN
     -- Serialize retries and concurrent scheduled runs for one fixture.
     PERFORM pg_advisory_xact_lock(hashtext(candidate_match_id));
@@ -106,6 +113,19 @@ BEGIN
         RETURN FALSE;
     END IF;
 
+    probability_delta := CASE
+        WHEN latest.id IS NULL THEN NULL
+        ELSE candidate_team1_win_probability - latest.team1_win_probability
+    END;
+    SELECT COALESCE(
+        jsonb_agg(
+            event || jsonb_build_object('probability_delta', probability_delta)
+        ),
+        '[]'::JSONB
+    )
+    INTO attributed_events
+    FROM jsonb_array_elements(COALESCE(candidate_change_events, '[]'::JSONB)) event;
+
     INSERT INTO prediction_snapshots (
         match_id,
         team1,
@@ -116,7 +136,9 @@ BEGIN
         confidence,
         edge_score,
         model,
-        ensemble_size
+        ensemble_size,
+        input_state,
+        change_events
     ) VALUES (
         candidate_match_id,
         candidate_team1,
@@ -127,7 +149,9 @@ BEGIN
         candidate_confidence,
         candidate_edge_score,
         candidate_model,
-        candidate_ensemble_size
+        candidate_ensemble_size,
+        COALESCE(candidate_input_state, '{}'::JSONB),
+        attributed_events
     );
 
     RETURN TRUE;
@@ -145,8 +169,8 @@ REVOKE ALL ON TABLE prediction_snapshots FROM PUBLIC, anon, authenticated, servi
 GRANT SELECT ON TABLE prediction_snapshots TO anon, authenticated, service_role;
 
 REVOKE ALL ON FUNCTION append_prediction_snapshot(
-    TEXT, TEXT, TEXT, TEXT, DECIMAL, DECIMAL, TEXT, JSONB, TEXT, INTEGER
+    TEXT, TEXT, TEXT, TEXT, DECIMAL, DECIMAL, TEXT, JSONB, TEXT, INTEGER, JSONB, JSONB
 ) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION append_prediction_snapshot(
-    TEXT, TEXT, TEXT, TEXT, DECIMAL, DECIMAL, TEXT, JSONB, TEXT, INTEGER
-) TO anon, authenticated, service_role;
+    TEXT, TEXT, TEXT, TEXT, DECIMAL, DECIMAL, TEXT, JSONB, TEXT, INTEGER, JSONB, JSONB
+) TO service_role;

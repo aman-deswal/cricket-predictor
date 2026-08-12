@@ -7,7 +7,11 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.db import get_all_predictions, store_prediction_snapshot
+from utils.db import (
+    get_all_predictions,
+    get_latest_prediction_snapshot,
+    store_prediction_snapshot,
+)
 
 
 class TestGetAllPredictions(unittest.TestCase):
@@ -46,8 +50,10 @@ class TestStorePredictionSnapshot(unittest.TestCase):
             "reasoning": "Narrative is not part of the deterministic snapshot.",
         }
         edge = {"net_edge": 7, "edge_team": "Team A"}
+        input_state = {"version": 1, "market": None}
+        events = [{"type": "initial_snapshot"}]
 
-        self.assertTrue(store_prediction_snapshot(prediction, edge))
+        self.assertTrue(store_prediction_snapshot(prediction, edge, input_state, events))
         client.rpc.assert_called_once_with(
             "append_prediction_snapshot",
             {
@@ -61,6 +67,8 @@ class TestStorePredictionSnapshot(unittest.TestCase):
                 "candidate_edge_score": edge,
                 "candidate_model": "deterministic-core",
                 "candidate_ensemble_size": 1,
+                "candidate_input_state": input_state,
+                "candidate_change_events": events,
             },
         )
 
@@ -81,7 +89,31 @@ class TestStorePredictionSnapshot(unittest.TestCase):
             "ensemble_size": 1,
         }
 
-        self.assertFalse(store_prediction_snapshot(prediction, {"net_edge": 7}))
+        self.assertFalse(store_prediction_snapshot(
+            prediction,
+            {"net_edge": 7},
+            {"version": 1},
+            [],
+        ))
+
+    @patch("utils.db.get_client")
+    def test_fetches_latest_snapshot_inputs_for_attribution(self, mock_get_client):
+        client = MagicMock()
+        query = client.table.return_value
+        query.select.return_value = query
+        query.eq.return_value = query
+        query.order.return_value = query
+        query.limit.return_value = query
+        expected = {
+            "team1_win_probability": 0.58,
+            "input_state": {"version": 1},
+            "captured_at": "2026-08-11T10:00:00Z",
+        }
+        query.execute.return_value = MagicMock(data=[expected])
+        mock_get_client.return_value = client
+
+        self.assertEqual(get_latest_prediction_snapshot("espn-1"), expected)
+        query.order.assert_called_once_with("captured_at", desc=True)
 
 
 if __name__ == "__main__":
