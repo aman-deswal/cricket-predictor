@@ -399,9 +399,6 @@ function MarketMovementPanel({
 
         <div className="mt-4 rounded-[24px] bg-[#060b13]/72 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {movement.modelPointCount} model / {movement.marketPointCount} market points
-            </span>
             <span className="inline-flex items-center rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
               {gapBadgeLabel}
             </span>
@@ -488,14 +485,14 @@ function MarketMovementPanel({
               <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
                 <div>
                   <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-sm font-black text-white sm:px-2 sm:text-base">
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.current.team1_odds)}
                   </p>
                 </div>
                 <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
                 <div className="text-right">
                   <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-sm font-black text-white sm:px-2 sm:text-base">
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.current.team2_odds)}
                   </p>
                 </div>

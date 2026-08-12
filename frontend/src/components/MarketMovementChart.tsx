@@ -345,9 +345,6 @@ export function MarketMovementChart({
           <li key={series[index].id}>{summary}</li>
         ))}
       </ul>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-        {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
-      </p>
       <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
         {series.map((entry) => (
           <span
@@ -373,6 +370,9 @@ export function MarketMovementChart({
           </span>
         ))}
       </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+        {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
+      </p>
     </>
   );
 }
