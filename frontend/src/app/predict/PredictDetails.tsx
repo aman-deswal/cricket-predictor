@@ -350,10 +350,10 @@ function MarketMovementPanel({
       .map((event) => event.affected_input.replaceAll('_', ' ')))]
     : [];
   const latestMoveStory = latestMoveDelta === null || !latestAnnotation
-    ? 'Last model move will appear once another pre-match SixSense snapshot lands.'
+    ? 'Last move will appear once another SixSense snapshot lands.'
     : Math.abs(latestMoveDelta) < 0.05
-      ? `Last model check kept ${marketSideMeta.shortName} flat, coinciding with ${summarizeInputs(latestMoveInputs)}.`
-      : `${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts on the last SixSense move, coinciding with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'structured inputs that were not retained on this legacy snapshot' : summarizeInputs(latestMoveInputs)}.`;
+      ? `Last move: ${marketSideMeta.shortName} stayed flat with ${summarizeInputs(latestMoveInputs)}.`
+      : `Last move: ${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'legacy attribution unavailable' : summarizeInputs(latestMoveInputs)}.`;
   const currentGapCaption = marketGap === null
     ? 'Tap a gold SixSense point to inspect what changed around each model move.'
     : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Tap a gold SixSense point to inspect what changed around each model move.`;
@@ -377,28 +377,13 @@ function MarketMovementPanel({
             </svg>
             Market movement
           </h2>
-          <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
-            Tracking only {marketSideMeta.shortName}&rsquo;s win probability against the market
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {featuredBooks.length > 0 && (
-            <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
-              {featuredBooks.length} books shown
-            </span>
-          )}
-          {gapStrength && (
-            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${gapStrength.tone}`}>
-              {gapStrength.label}
-            </span>
-          )}
         </div>
       </div>
 
       <div className="mt-4 rounded-[28px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] sm:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
+           <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-100">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: marketSideMeta.primaryColor }} />
                 {marketSideMeta.shortName}
@@ -413,7 +398,7 @@ function MarketMovementPanel({
             <p className="mt-3 text-xl font-black leading-tight text-white sm:text-2xl">
               {primaryInsight}
             </p>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-300">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
               {latestMoveStory}
             </p>
           </div>
