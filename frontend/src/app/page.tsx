@@ -285,14 +285,14 @@ function SixSensePickHeading({
           </span>
           <div
             className="flex flex-col items-end gap-1"
-            aria-label={`${trustSignal.stats.correct} wins from ${trustSignal.stats.total} international picks in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
+            aria-label={`${trustSignal.stats.pct}% international win rate in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
           >
             <div className="flex items-baseline gap-1.5 sm:gap-2">
               <span className="text-xl font-black tabular-nums leading-none sm:text-[22px]" style={{ color: LOGO_AMBER }}>
-                {trustSignal.stats.correct}
+                {trustSignal.stats.pct}%
               </span>
-              <span className="text-base font-black tabular-nums leading-none text-slate-400 sm:text-lg">
-                /{trustSignal.stats.total}
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[11px]">
+                win rate
               </span>
               <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:text-[11px]">
                 {trustSignal.period === 'week' ? '7D' : '30D'}
