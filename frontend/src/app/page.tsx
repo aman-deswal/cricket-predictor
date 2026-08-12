@@ -335,7 +335,7 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
   }, [open]);
 
   const isLeague = trustSignal.scope === 'league';
-  const periodLabel = trustSignal.period === 'week' ? 'last 7 days' : 'last 30 days';
+  const compactPeriodLabel = trustSignal.period === 'week' ? '7 days' : '30 days';
 
   return (
     <div ref={wrapperRef} className="relative shrink-0">
@@ -353,10 +353,10 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
       {open && popoverPosition && typeof document !== 'undefined' && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-40 w-[260px] rounded-2xl border border-white/[0.12] bg-[#0f1620]/98 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.48)] backdrop-blur-xl sm:w-[290px]"
+          className="fixed z-40 w-[280px] rounded-2xl border border-white/[0.14] bg-[#091018] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.56)] sm:w-[312px]"
           style={{ top: popoverPosition.top, right: popoverPosition.right }}
         >
-          <div className="absolute -top-2 right-3 h-4 w-4 rotate-45 border-l border-t border-white/[0.12] bg-[#0f1620]/98" />
+          <div className="absolute -top-2 right-3 h-4 w-4 rotate-45 border-l border-t border-white/[0.14] bg-[#091018]" />
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
               {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
@@ -364,22 +364,22 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
-                  <p className="mt-1 text-sm font-semibold leading-snug text-white">
-                    {trustSignal.stats.pct}% win rate over the {periodLabel}.
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
+                  <p className="mt-1 text-base font-black leading-tight text-white">
+                    {trustSignal.stats.pct}% win rate
                   </p>
                 </div>
                 <button
                   type="button"
                   aria-label="Close trust explainer"
                   onClick={() => setOpen(false)}
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-slate-400 transition-colors hover:text-white"
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.03] text-slate-300 transition-colors hover:text-white"
                 >
                   ×
                 </button>
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
-                SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                {trustSignal.stats.correct} of {trustSignal.stats.total} picks landed over the last {compactPeriodLabel}.
               </p>
               <Link
                 href="/history"
