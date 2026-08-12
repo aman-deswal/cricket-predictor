@@ -21,6 +21,7 @@ interface MarketMovementChartProps {
   ariaLabel: string;
   annotations: MovementAnnotation[];
   insightCaption?: string;
+  heightClassName?: string;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -48,6 +49,7 @@ export function MarketMovementChart({
   ariaLabel,
   annotations,
   insightCaption,
+  heightClassName,
 }: MarketMovementChartProps) {
   const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
@@ -206,7 +208,7 @@ export function MarketMovementChart({
   return (
     <>
       <div
-        className="relative h-40 sm:h-48 lg:h-56"
+        className={`relative ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
         role="img"
         aria-label={ariaLabel}
       >
