@@ -154,19 +154,19 @@ function MatchCenterTeamMark({
 
   return (
     <span
-      className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f1620] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+      className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#0f1620] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
       aria-hidden="true"
     >
       {imageUrl ? (
         <img
           src={imageUrl}
           alt=""
-          className={`h-full w-full ${isInternational ? 'rounded-lg object-cover' : 'object-contain'}`}
+          className={`h-full w-full ${isInternational ? 'rounded-md object-cover' : 'object-contain'}`}
           onError={() => setImageFailed(true)}
         />
       ) : (
         <span
-          className="flex h-full w-full items-center justify-center rounded-lg text-[10px] font-black text-white"
+          className="flex h-full w-full items-center justify-center rounded-md text-[9px] font-black text-white"
           style={{ background: `linear-gradient(145deg, ${meta.primaryColor}, ${meta.secondaryColor})` }}
         >
           {meta.shortName.slice(0, 2)}
@@ -453,7 +453,7 @@ function MatchBoardStrip({
                 key={match.match_id}
                 href={`/predict?id=${encodeURIComponent(match.match_id)}`}
                 data-match-center-tile
-                className="group min-w-[19rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3.5 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[21rem]"
+                className="group min-w-[17.75rem] snap-start rounded-xl border border-slate-600/35 bg-gradient-to-br from-[#141c25] via-[#101720] to-[#0c1218] px-3 py-3 shadow-[0_14px_26px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.03] transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400/45 hover:shadow-[0_18px_36px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.06)] active:translate-y-0 active:shadow-[0_10px_18px_rgba(0,0,0,0.28)] sm:min-w-[18.5rem]"
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-xl bg-white/10" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 rounded-b-xl bg-gradient-to-t from-black/10 to-transparent" />
@@ -491,21 +491,21 @@ function MatchBoardStrip({
                   <div className="space-y-2.5">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                       <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
                           <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
                           <div className="min-w-0">
                             <p
-                              className={`min-w-0 text-[15px] font-black leading-[1.1] ${team1Leads ? 'text-white' : 'text-gray-300'}`}
+                              className={`min-w-0 text-[13px] font-black leading-[1.15] ${team1Leads ? 'text-white' : 'text-gray-300'}`}
                               title={match.team1}
                             >
                               {match.team1}
                             </p>
-                            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                               {team1Meta.shortName}
                             </p>
                           </div>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[2.6rem]">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
                           <span
                             className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
                             title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
@@ -532,21 +532,21 @@ function MatchBoardStrip({
                     </div>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                       <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
                           <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
                           <div className="min-w-0">
                             <p
-                              className={`min-w-0 text-[15px] font-black leading-[1.1] ${team2Leads ? 'text-white' : 'text-gray-300'}`}
+                              className={`min-w-0 text-[13px] font-black leading-[1.15] ${team2Leads ? 'text-white' : 'text-gray-300'}`}
                               title={match.team2}
                             >
                               {match.team2}
                             </p>
-                            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                               {team2Meta.shortName}
                             </p>
                           </div>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[2.6rem]">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
                           <span
                             className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
                             title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
