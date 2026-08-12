@@ -254,19 +254,19 @@ function SixSensePickHeading({ matchDate }: { matchDate: string }) {
           <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
         </h2>
       </SectionHeading>
-      <div className="flex shrink-0 items-center gap-2 text-[13px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[15px]">
+      <div className="flex shrink-0 items-center gap-2 text-slate-300">
         <SixSenseLiveClockIcon />
         {countdown ? (
-          <span className="whitespace-nowrap">
+          <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">
             {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-            <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
+            <span className="text-white">{String(countdown.hours).padStart(2, '0')}</span>
             <span className="text-slate-500">:</span>
-            <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+            <span className="text-white">{String(countdown.mins).padStart(2, '0')}</span>
             <span className="text-slate-500">:</span>
-            <span className="text-white">{String(countdown.secs).padStart(2, '0')}s</span>
+            <span className="text-white">{String(countdown.secs).padStart(2, '0')}</span>
           </span>
         ) : (
-          <span className="whitespace-nowrap">{getMatchDateLabel(matchDate)}</span>
+          <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">{getMatchDateLabel(matchDate)}</span>
         )}
       </div>
     </div>
@@ -759,7 +759,7 @@ function FeaturedHero({
     ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
     : 0;
   const actionableLabel = trustSignal?.scope === 'international'
-    ? `International picks running ${trustSignal.stats.pct}% over ${periodLabel}`
+    ? null
     : prediction && winner
       ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
       : trustSignal
@@ -814,6 +814,21 @@ function FeaturedHero({
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {trustSignal?.scope === 'international' && (
+            <div className="mb-4 flex items-center gap-3">
+              <GlobeIcon className="h-5 w-5 shrink-0 text-amber-500" />
+              <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
+                  {trustSignal.stats.correct}/{trustSignal.stats.total}
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                  {trustSignal.period === 'week' ? '7D' : '30D'}
+                </span>
+              </div>
             </div>
           )}
 
