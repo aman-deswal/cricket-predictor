@@ -481,53 +481,7 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      {featuredBooks.length > 0 && <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {featuredBooks.map((book) => (
-            <button
-              key={`${book.id}-mobile`}
-              type="button"
-              onClick={() => {
-                if (book.marketUrl) openExternalMarket(book.marketUrl);
-              }}
-              className="min-w-[220px] flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[12px] font-black uppercase tracking-[0.14em] text-white">{book.bookmaker}</p>
-                  <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {book.history.length} update{book.history.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                {book.marketUrl && (
-                  <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M6 4h6v6" />
-                    <path d="M10 4L4 10" />
-                    <path d="M4 6v6h6" />
-                  </svg>
-                )}
-              </div>
-              <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team1_odds)}</p>
-                </div>
-                <span className="pb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
-                <div className="text-right">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team2_odds)}</p>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[10px]">
-                <span className="text-slate-400">{trackedTeam} implied</span>
-                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
-                  {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>}
-
-      {featuredBooks.length > 0 && <div className="mt-4 hidden grid-cols-1 gap-2.5 lg:grid xl:grid-cols-3">
+      {featuredBooks.length > 0 && <div className="mt-4 grid grid-cols-3 gap-2">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -535,47 +489,47 @@ function MarketMovementPanel({
               onClick={() => {
                 if (book.marketUrl) openExternalMarket(book.marketUrl);
               }}
-              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
+              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-2.5 py-2.5 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06] sm:px-3"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.12em] text-white">{book.bookmaker}</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-black uppercase tracking-[0.12em] text-white sm:text-[12px]">{book.bookmaker}</p>
+                  <p className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">
                     {book.history.length} update{book.history.length !== 1 ? 's' : ''}
                   </p>
                 </div>
                 {book.marketUrl && (
-                  <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg className="mt-0.5 h-3 w-3 shrink-0 text-slate-300 sm:h-3.5 sm:w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M6 4h6v6" />
                     <path d="M10 4L4 10" />
                     <path d="M4 6v6h6" />
                   </svg>
                 )}
               </div>
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam1).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-sm font-black text-white sm:px-2 sm:text-base">
                     {decimalToAmerican(book.current.team1_odds)}
                   </p>
                 </div>
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam2).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-sm font-black text-white sm:px-2 sm:text-base">
                     {decimalToAmerican(book.current.team2_odds)}
                   </p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[11px]">
-                <span className="font-semibold text-slate-400">
+              <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] sm:text-[10px]">
+                <span className="font-semibold text-slate-400 truncate pr-2">
                   {trackedTeam} implied
                 </span>
                 <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
                   {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
                   {book.delta !== null && (
-                    <span className="ml-2 text-[10px] uppercase tracking-[0.14em]">
-                      {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)} pts
+                    <span className="ml-1 hidden text-[9px] uppercase tracking-[0.14em] sm:inline">
+                      {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)}
                     </span>
                   )}
                 </span>
