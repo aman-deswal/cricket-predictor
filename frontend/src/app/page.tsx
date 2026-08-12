@@ -284,9 +284,15 @@ function SixSensePickHeading({
           <div className="hidden sm:flex">
             <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-1.5 sm:gap-2">
             <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
-              {trustSignal.stats.correct}/{trustSignal.stats.total}
+              {trustSignal.stats.correct}
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-500 sm:text-[11px]">
+              wins
+            </span>
+            <span className="text-sm font-black tabular-nums text-slate-400 sm:text-base">
+              /{trustSignal.stats.total}
             </span>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
               {trustSignal.period === 'week' ? '7D' : '30D'}
