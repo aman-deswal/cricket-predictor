@@ -236,16 +236,40 @@ function AccuracyTeaseGraphic({ correct, total }: { correct: number; total: numb
   );
 }
 
-function SixSensePickHeading({ matchDate }: { matchDate: string }) {
-  const getHeaderCountdown = useCallback(() => getCountdown(matchDate), [matchDate]);
-  const [countdown, setCountdown] = useState(getHeaderCountdown);
+function CountdownDisplay({ matchDate }: { matchDate: string }) {
+  const getCountdownValue = useCallback(() => getCountdown(matchDate), [matchDate]);
+  const [countdown, setCountdown] = useState(getCountdownValue);
 
   useEffect(() => {
-    setCountdown(getHeaderCountdown());
-    const interval = window.setInterval(() => setCountdown(getHeaderCountdown()), 1_000);
+    setCountdown(getCountdownValue());
+    const interval = window.setInterval(() => setCountdown(getCountdownValue()), 1_000);
     return () => window.clearInterval(interval);
-  }, [getHeaderCountdown]);
+  }, [getCountdownValue]);
 
+  return (
+    <div className="flex shrink-0 items-center gap-2 text-slate-300">
+      <SixSenseLiveClockIcon />
+      {countdown ? (
+        <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">
+          {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+          <span className="text-white">{String(countdown.hours).padStart(2, '0')}</span>
+          <span className="text-slate-500">:</span>
+          <span className="text-white">{String(countdown.mins).padStart(2, '0')}</span>
+          <span className="text-slate-500">:</span>
+          <span className="text-white">{String(countdown.secs).padStart(2, '0')}</span>
+        </span>
+      ) : (
+        <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">{getMatchDateLabel(matchDate)}</span>
+      )}
+    </div>
+  );
+}
+
+function SixSensePickHeading({
+  trustSignal,
+}: {
+  trustSignal: HomepageTrustSignal | null;
+}) {
   return (
     <div className="flex items-center justify-between gap-3">
       <SectionHeading icon={<Logo size={40} />} bareIcon className="min-w-0">
@@ -254,21 +278,20 @@ function SixSensePickHeading({ matchDate }: { matchDate: string }) {
           <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
         </h2>
       </SectionHeading>
-      <div className="flex shrink-0 items-center gap-2 text-slate-300">
-        <SixSenseLiveClockIcon />
-        {countdown ? (
-          <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">
-            {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-            <span className="text-white">{String(countdown.hours).padStart(2, '0')}</span>
-            <span className="text-slate-500">:</span>
-            <span className="text-white">{String(countdown.mins).padStart(2, '0')}</span>
-            <span className="text-slate-500">:</span>
-            <span className="text-white">{String(countdown.secs).padStart(2, '0')}</span>
-          </span>
-        ) : (
-          <span className="whitespace-nowrap font-mono text-[16px] font-bold tracking-[0.06em] text-white sm:text-[18px]">{getMatchDateLabel(matchDate)}</span>
-        )}
-      </div>
+      {trustSignal?.scope === 'international' && (
+        <div className="flex shrink-0 items-center gap-3">
+          <GlobeIcon className="h-5 w-5 shrink-0 text-amber-500" />
+          <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
+              {trustSignal.stats.correct}/{trustSignal.stats.total}
+            </span>
+            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+              {trustSignal.period === 'week' ? '7D' : '30D'}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -817,20 +840,9 @@ function FeaturedHero({
             </div>
           )}
 
-          {trustSignal?.scope === 'international' && (
-            <div className="mb-4 flex items-center gap-3">
-              <GlobeIcon className="h-5 w-5 shrink-0 text-amber-500" />
-              <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
-                  {trustSignal.stats.correct}/{trustSignal.stats.total}
-                </span>
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-                  {trustSignal.period === 'week' ? '7D' : '30D'}
-                </span>
-              </div>
-            </div>
-          )}
+          <div className="mb-5 flex items-center justify-center sm:justify-start">
+            <CountdownDisplay matchDate={match.date} />
+          </div>
 
           {/* Row 2: Teams + chart */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-8">
@@ -1025,7 +1037,7 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading matchDate={featuredMatch.date} />
+                <SixSensePickHeading trustSignal={trustMetrics?.primary ?? null} />
               </div>
               <div className="p-3">
                 <FeaturedHero
