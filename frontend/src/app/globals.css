@@ -85,31 +85,31 @@
     position: absolute;
     inset: -75%;
     background: conic-gradient(
-      transparent 0deg 28deg,
-      rgba(148, 163, 184, 0.55) 36deg,
-      rgba(226, 232, 240, 0.85) 41deg,
-      rgba(148, 163, 184, 0.55) 46deg,
-      transparent 54deg 208deg,
-      rgba(148, 163, 184, 0.55) 216deg,
-      rgba(226, 232, 240, 0.85) 221deg,
-      rgba(148, 163, 184, 0.55) 226deg,
+      transparent 0deg 32deg,
+      rgba(148, 163, 184, 0.22) 40deg,
+      rgba(226, 232, 240, 0.42) 46deg,
+      rgba(148, 163, 184, 0.22) 52deg,
+      transparent 60deg 212deg,
+      rgba(148, 163, 184, 0.22) 220deg,
+      rgba(226, 232, 240, 0.42) 226deg,
+      rgba(148, 163, 184, 0.22) 232deg,
       transparent 234deg 360deg
     );
     opacity: 0;
     transform: rotate(0);
-    transition: opacity 300ms ease;
-    animation: cricket-seam-orbit 2.8s linear infinite paused;
+    transition: opacity 500ms ease;
+    animation: cricket-seam-orbit 5.4s linear infinite paused;
   }
 
   .group:hover .featured-cricket-border::before {
-    opacity: 1;
+    opacity: 0.72;
     animation-play-state: running;
   }
 
   @media (hover: none) and (pointer: coarse) {
     .featured-cricket-border::before {
-      opacity: 0.55;
-      animation-duration: 6s;
+      opacity: 0.34;
+      animation-duration: 8.5s;
       animation-play-state: running;
     }
   }
