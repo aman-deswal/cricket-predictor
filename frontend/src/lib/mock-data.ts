@@ -9,6 +9,7 @@ import type {
   PlayerStats,
   Prediction,
   PredictionHistoryItem,
+  PredictionSnapshot,
 } from './supabase';
 import { compareMatchCenterMatches } from './competition';
 
@@ -169,6 +170,72 @@ const demoMatchOddsHistory: MatchOdds[] = demoMatchOdds.flatMap((latest) => [
   { ...latest, team1_odds: latest.team1_odds * 1.02, team2_odds: latest.team2_odds * 0.99, draw_odds: latest.draw_odds ? latest.draw_odds * 1.01 : null, fetched_at: pastHoursIso(36) },
   latest,
 ]);
+
+const demoPredictionSnapshots: PredictionSnapshot[] = demoMatches.flatMap((match) => {
+  const prediction = match.predictions[0];
+  const openingTeam1 = Math.max(0.18, Math.min(0.82, prediction.team1_win_probability - 0.04));
+  const middleTeam1 = Math.max(0.18, Math.min(0.82, prediction.team1_win_probability - 0.015));
+  return [
+    {
+      ...prediction,
+      team1_win_probability: openingTeam1,
+      team2_win_probability: 1 - openingTeam1,
+      edge_score: {},
+      input_state: {},
+      change_events: [{
+        event_at: pastHoursIso(60),
+        category: 'baseline',
+        type: 'initial_snapshot',
+        label: 'Initial pre-match model snapshot',
+        summary: 'The first deterministic pre-match probability was captured.',
+        affected_team: null,
+        affected_input: 'deterministic_core',
+        relationship: 'coincided_input_change',
+        probability_delta: null,
+        source: { name: 'SixSense deterministic pipeline' },
+      }],
+      captured_at: pastHoursIso(60),
+    },
+    {
+      ...prediction,
+      team1_win_probability: middleTeam1,
+      team2_win_probability: 1 - middleTeam1,
+      edge_score: {},
+      input_state: {},
+      change_events: [{
+        event_at: pastHoursIso(36),
+        category: 'form',
+        type: 'recent_form_changed',
+        label: `${match.team1} recent-form inputs changed`,
+        summary: 'The structured recent-form sample refreshed and coincided with this model move.',
+        affected_team: match.team1,
+        affected_input: 'team_form.team1',
+        relationship: 'coincided_input_change',
+        probability_delta: middleTeam1 - openingTeam1,
+        source: { name: 'Cricsheet/statistics cache' },
+      }],
+      captured_at: pastHoursIso(36),
+    },
+    {
+      ...prediction,
+      edge_score: {},
+      input_state: {},
+      change_events: [{
+        event_at: pastHoursIso(12),
+        category: 'market',
+        type: 'market_price_changed',
+        label: `${demoMatchOdds.find((row) => row.match_id === match.match_id)?.bookmaker ?? 'Sportsbook'} market input changed`,
+        summary: 'The refreshed sportsbook prices coincided with this model move; this is correlation, not a proven cause.',
+        affected_team: null,
+        affected_input: 'market_odds',
+        relationship: 'coincided_input_change',
+        probability_delta: prediction.team1_win_probability - middleTeam1,
+        source: { name: demoMatchOdds.find((row) => row.match_id === match.match_id)?.bookmaker ?? 'sportsbook market', reference: 'match_odds' },
+      }],
+      captured_at: pastHoursIso(12),
+    },
+  ];
+});
 
 const miCskSquadPlayers = [
   { id: 'mi-1', name: 'Rohit Sharma', role: 'Bat', is_captain: true },
@@ -681,6 +748,10 @@ export function getMockMatchOdds(matchId: string): MatchOdds[] {
 
 export function getMockMatchOddsHistory(matchId: string): MatchOdds[] {
   return demoMatchOddsHistory.filter((odds) => odds.match_id === matchId);
+}
+
+export function getMockPredictionSnapshots(matchId: string): PredictionSnapshot[] {
+  return demoPredictionSnapshots.filter((snapshot) => snapshot.match_id === matchId);
 }
 
 export function getMockEdgeScore(matchId: string): EdgeScore | null {

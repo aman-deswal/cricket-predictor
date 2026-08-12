@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getPredictionSnapshots, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -14,6 +14,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
+import { buildPreMatchMovement, hasValidTwoSidedOdds, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability } from '@/lib/pre-match-movement';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -102,13 +103,6 @@ function normalizeBookmaker(bookmaker: string): string {
 
 function getTrustedSportsbook(bookmaker: string): { url: string; priority: number } | null {
   return TRUSTED_SPORTSBOOKS[normalizeBookmaker(bookmaker)] ?? null;
-}
-
-function hasValidTwoSidedOdds(odds: MatchOdds): boolean {
-  return Number.isFinite(odds.team1_odds)
-    && odds.team1_odds > 1
-    && Number.isFinite(odds.team2_odds)
-    && odds.team2_odds > 1;
 }
 
 function getBookmakerMarketUrl(bookmaker: string): string | null {
@@ -211,17 +205,7 @@ function PlayerHeadshot({
   );
 }
 
-const MARKET_BOOK_COLORS = ['#22d3ee', '#f59e0b', '#a78bfa'] as const;
-
-function toNormalizedImpliedProbability(snapshot: MatchOdds, trackedTeam: 'team1' | 'team2'): number | null {
-  if (!hasValidTwoSidedOdds(snapshot)) return null;
-  const raw1 = 1 / snapshot.team1_odds;
-  const raw2 = 1 / snapshot.team2_odds;
-  const rawDraw = snapshot.draw_odds && snapshot.draw_odds > 1 ? 1 / snapshot.draw_odds : 0;
-  const total = raw1 + raw2 + rawDraw;
-  if (total <= 0) return null;
-  return ((trackedTeam === 'team1' ? raw1 : raw2) / total) * 100;
-}
+const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
 
 function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
   const bookmakerKey = normalizeBookmaker(current.bookmaker);
@@ -235,9 +219,28 @@ function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
   );
 }
 
+function formatSignedPoints(value: number): string {
+  return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(1)} pts`;
+}
+
+function describeGapStrength(points: number): { label: string; tone: string } {
+  if (points < 1) return { label: 'Aligned', tone: 'text-emerald-200 border-emerald-400/20 bg-emerald-400/10' };
+  if (points < 4) return { label: 'Minor gap', tone: 'text-sky-200 border-sky-400/20 bg-sky-400/10' };
+  if (points < 8) return { label: 'Meaningful gap', tone: 'text-amber-200 border-amber-400/20 bg-amber-400/10' };
+  return { label: 'Sharp disagreement', tone: 'text-rose-200 border-rose-400/20 bg-rose-400/10' };
+}
+
+function summarizeInputs(inputs: string[]): string {
+  if (inputs.length === 0) return 'structured input updates';
+  if (inputs.length === 1) return inputs[0];
+  if (inputs.length === 2) return `${inputs[0]} and ${inputs[1]}`;
+  return `${inputs[0]}, ${inputs[1]}, and other structured inputs`;
+}
+
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
+  predictionHistory,
   displayTeam1,
   displayTeam2,
   trackedTeam,
@@ -246,6 +249,7 @@ function MarketMovementPanel({
 }: {
   sportsbookOdds: MatchOdds[];
   oddsHistory: MatchOdds[];
+  predictionHistory: PredictionSnapshot[];
   displayTeam1: string;
   displayTeam2: string;
   trackedTeam: string;
@@ -274,7 +278,18 @@ function MarketMovementPanel({
     };
   });
 
-  if (featuredBooks.length === 0) {
+  const movement = buildPreMatchMovement(
+    predictionHistory,
+    featuredBooks.map((book) => ({
+      id: book.id,
+      bookmaker: book.bookmaker,
+      color: book.color,
+      history: book.history,
+    })),
+    trackedTeamKey,
+  );
+
+  if (movement.series.length === 0) {
     return (
       <motion.div
         className={`${detailTileClass} mb-4`}
@@ -282,29 +297,13 @@ function MarketMovementPanel({
         transition={{ delay: 0.16 }}
       >
         <ComingSoonTile
-          title="Market board opening soon"
-          body="This panel will light up once trusted sportsbooks publish opening prices."
+          eyebrow="Market movement"
+          title="Movement history is not available yet"
+          body="SixSense and market changes will appear after a pre-match refresh captures a new data point."
         />
       </motion.div>
     );
   }
-
-  const chartRowsByTimestamp = new Map<number, Record<string, number | null>>();
-  featuredBooks.forEach((book) => {
-    book.history.forEach((snapshot) => {
-      const timestamp = new Date(snapshot.fetched_at).getTime();
-      if (Number.isNaN(timestamp)) return;
-      const row = chartRowsByTimestamp.get(timestamp) ?? {};
-      row.timestamp = timestamp;
-      row[book.id] = toNormalizedImpliedProbability(snapshot, trackedTeamKey);
-      chartRowsByTimestamp.set(timestamp, row);
-    });
-  });
-
-  const chartRows = [...chartRowsByTimestamp.values()]
-    .sort((left, right) => Number(left.timestamp) - Number(right.timestamp));
-  const chartValues = chartRows.flatMap((row) => featuredBooks.map((book) => row[book.id]))
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 
   const fallbackLatest = featuredBooks
     .map((book) => book.latestProbability)
@@ -323,23 +322,48 @@ function MarketMovementPanel({
     : null;
 
   const marketSideMeta = getTeamMeta(trackedTeam);
-  const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
-  const opposingMeta = getTeamMeta(opposingTeam);
-
-  let minDomain = 40;
-  let maxDomain = 60;
-  if (chartValues.length > 0) {
-    const rawMin = Math.min(...chartValues);
-    const rawMax = Math.max(...chartValues);
-    const spread = Math.max(rawMax - rawMin, 6);
-    const center = (rawMin + rawMax) / 2;
-    minDomain = Math.max(0, Math.floor(center - spread / 2 - 3));
-    maxDomain = Math.min(100, Math.ceil(center + spread / 2 + 3));
-  }
+  const sortedAnnotations = [...movement.annotations].sort((left, right) => left.timestamp - right.timestamp);
+  const latestAnnotation = sortedAnnotations[sortedAnnotations.length - 1] ?? null;
+  const previousAnnotation = sortedAnnotations.length > 1 ? sortedAnnotations[sortedAnnotations.length - 2] : null;
+  const latestModelProbability = [...movement.chartRows]
+    .reverse()
+    .find((row) => typeof row[SIXSENSE_SERIES_ID] === 'number')?.[SIXSENSE_SERIES_ID] as number | undefined;
+  const marketGap = latestModelProbability !== undefined && consensusLatest !== null
+    ? consensusLatest - latestModelProbability
+    : null;
+  const gapStrength = marketGap === null ? null : describeGapStrength(Math.abs(marketGap));
+  const primaryInsight = marketGap === null
+    ? `Tracking ${marketSideMeta.shortName} against the market`
+    : Math.abs(marketGap) < 0.75
+      ? `${marketSideMeta.shortName}: SixSense and market aligned`
+      : marketGap > 0
+        ? `${marketSideMeta.shortName}: market +${Math.abs(marketGap).toFixed(1)} pts vs SixSense`
+        : `${marketSideMeta.shortName}: SixSense +${Math.abs(marketGap).toFixed(1)} pts vs market`;
+  const latestMoveDelta = latestAnnotation && previousAnnotation
+    ? latestAnnotation.probability - previousAnnotation.probability
+    : null;
+  const latestMoveInputs = latestAnnotation
+    ? [...new Set(latestAnnotation.events
+      .filter((event) => !event.isLegacyFallback)
+      .map((event) => event.affected_input.replaceAll('_', ' ')))]
+    : [];
+  const latestMoveStory = latestMoveDelta === null || !latestAnnotation
+    ? 'Last move will appear once another SixSense snapshot lands.'
+    : Math.abs(latestMoveDelta) < 0.05
+      ? `Last move: ${marketSideMeta.shortName} stayed flat with ${summarizeInputs(latestMoveInputs)}.`
+      : `Last move: ${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'legacy attribution unavailable' : summarizeInputs(latestMoveInputs)}.`;
+  const currentGapCaption = marketGap === null
+    ? 'Tap a gold SixSense point to inspect what changed around each model move.'
+    : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Tap a gold SixSense point to inspect what changed around each model move.`;
+  const gapBadgeLabel = marketGap === null
+    ? 'Gap pending'
+    : marketGap > 0
+      ? `Market +${Math.abs(marketGap).toFixed(1)} pts`
+      : `SixSense +${Math.abs(marketGap).toFixed(1)} pts`;
 
   return (
     <motion.div
-      className={`${detailTileClass} mb-4 border-white/10`}
+      className={`${detailTileClass} mb-4 border-white/[0.06]`}
       {...fadeUp}
       transition={{ delay: 0.16 }}
     >
@@ -349,105 +373,91 @@ function MarketMovementPanel({
             <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 13h12M3 10l2.4-5 2.2 3.1L10.4 3l2.6 7" />
             </svg>
-            Market Movement
+            Market movement
           </h2>
-          <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
-            Tracking {marketSideMeta.shortName} implied win probability across the top 3 trusted books
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
-            {featuredBooks.length} books shown
-          </span>
-          {consensusLatest !== null && (
-            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-              {marketSideMeta.shortName} {consensusLatest.toFixed(0)}%
-              {consensusDelta !== null && (
-                <span className={`ml-2 ${consensusDelta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                  {consensusDelta >= 0 ? '↑' : '↓'} {Math.abs(consensusDelta).toFixed(1)} pts
-                </span>
-              )}
-            </span>
-          )}
         </div>
       </div>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)]">
-        <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-3 sm:px-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: marketSideMeta.primaryColor }} />
-                {marketSideMeta.shortName}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">vs {opposingMeta.shortName}</span>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {chartRows.length > 0 ? `${chartRows.length} snapshots` : 'awaiting history'}
+      <div className="mt-4 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.22)] sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl">
+           <div className="flex flex-wrap items-center gap-2">
+             {gapStrength && (
+               <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone.replace(' border-rose-400/20', '').replace(' border-amber-400/20', '').replace(' border-sky-400/20', '').replace(' border-emerald-400/20', '')}`}>
+                 {gapStrength.label}
+               </span>
+             )}
+           </div>
+           <p className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,4.3vw,1.85rem)] font-black leading-tight text-white">
+             {primaryInsight}
+           </p>
+           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+             {latestMoveStory}
+           </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[24px] bg-[#060b13]/72 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
+              {gapBadgeLabel}
             </span>
           </div>
 
-          {chartRows.length > 0 ? (
+          {movement.chartRows.length > 0 ? (
             <MarketMovementChart
-              chartRows={chartRows}
-              books={featuredBooks}
-              minDomain={minDomain}
-              maxDomain={maxDomain}
+              chartRows={movement.chartRows}
+              series={movement.series}
+              minDomain={movement.minDomain}
+              maxDomain={movement.maxDomain}
+              ariaLabel={`Market movement for ${trackedTeam}. This chart tracks only ${trackedTeam}'s win probability, comparing the SixSense model with normalized bookmaker implied probabilities.`}
+              annotations={movement.annotations}
+              insightCaption={currentGapCaption}
+              heightClassName="h-52 sm:h-60 lg:h-72"
             />
           ) : (
-            <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
-              Market history will plot here after the next sportsbook refresh captures opening movement.
+            <div className="flex h-40 sm:h-48 lg:h-56 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
+              Pre-match history will plot here after the next deterministic or sportsbook refresh.
             </div>
+          )}
+          {(movement.modelPointCount === 0 || movement.marketPointCount === 0) && (
+            <p className="mt-3 text-xs leading-relaxed text-slate-400" role="status">
+              {movement.modelPointCount === 0
+                ? 'SixSense history is not available yet; showing market movement only.'
+                : 'Trusted market history is not available yet; showing SixSense movement only.'}
+            </p>
           )}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {featuredBooks.map((book) => (
-            <button
-              key={`${book.id}-mobile`}
-              type="button"
-              onClick={() => {
-                if (book.marketUrl) openExternalMarket(book.marketUrl);
-              }}
-              className="min-w-[220px] flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[12px] font-black uppercase tracking-[0.14em] text-white">{book.bookmaker}</p>
-                  <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {book.history.length} update{book.history.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                {book.marketUrl && (
-                  <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M6 4h6v6" />
-                    <path d="M10 4L4 10" />
-                    <path d="M4 6v6h6" />
-                  </svg>
-                )}
-              </div>
-              <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team1_odds)}</p>
-                </div>
-                <span className="pb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
-                <div className="text-right">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 font-mono text-xl font-black text-white">{decimalToAmerican(book.current.team2_odds)}</p>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[10px]">
-                <span className="text-slate-400">{trackedTeam} implied</span>
-                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
-                  {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
-                </span>
-              </div>
-            </button>
-          ))}
+        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-3 sm:gap-3">
+          <div className="min-w-0">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
+            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
+              {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market</p>
+            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
+              {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap</p>
+            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+              {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Last move</p>
+            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+              {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
+            </p>
+          </div>
         </div>
+      </div>
 
-        <div className="hidden space-y-2.5 lg:block">
+      {featuredBooks.length > 0 && <div className="mt-4 grid grid-cols-3 gap-2">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -455,55 +465,54 @@ function MarketMovementPanel({
               onClick={() => {
                 if (book.marketUrl) openExternalMarket(book.marketUrl);
               }}
-              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06]"
+              className="w-full rounded-2xl bg-white/[0.035] px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.055] sm:px-3"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.12em] text-white">{book.bookmaker}</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-black uppercase tracking-[0.12em] text-white sm:text-[12px]">{book.bookmaker}</p>
+                  <p className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">
                     {book.history.length} update{book.history.length !== 1 ? 's' : ''}
                   </p>
                 </div>
                 {book.marketUrl && (
-                  <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg className="mt-0.5 h-3 w-3 shrink-0 text-slate-300 sm:h-3.5 sm:w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M6 4h6v6" />
                     <path d="M10 4L4 10" />
                     <path d="M4 6v6h6" />
                   </svg>
                 )}
               </div>
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam1).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.current.team1_odds)}
                   </p>
                 </div>
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">vs</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-base font-black text-white">
+                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam2).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.current.team2_odds)}
                   </p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[11px]">
-                <span className="font-semibold text-slate-400">
+              <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] sm:text-[10px]">
+                <span className="font-semibold text-slate-400 truncate pr-2">
                   {trackedTeam} implied
                 </span>
                 <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
                   {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
                   {book.delta !== null && (
-                    <span className="ml-2 text-[10px] uppercase tracking-[0.14em]">
-                      {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)} pts
+                    <span className="ml-1 hidden text-[9px] uppercase tracking-[0.14em] sm:inline">
+                      {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)}
                     </span>
                   )}
                 </span>
               </div>
             </button>
           ))}
-        </div>
-      </div>
+        </div>}
     </motion.div>
   );
 }
@@ -516,6 +525,7 @@ export function PredictDetails() {
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [odds, setOdds] = useState<MatchOdds[]>([]);
   const [oddsHistory, setOddsHistory] = useState<MatchOdds[]>([]);
+  const [predictionHistory, setPredictionHistory] = useState<PredictionSnapshot[]>([]);
   const [squads, setSquads] = useState<MatchSquad[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [espnData, setEspnData] = useState<ESPNMatchData | null>(null);
@@ -536,9 +546,10 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
+        const [matchData, predictionData, predictionHistoryData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
           getMatch(matchId),
           getPrediction(matchId),
+          getPredictionSnapshots(matchId),
           getMatchEnrichment(matchId),
           getMatchOdds(matchId),
           getMatchOddsHistory(matchId),
@@ -548,6 +559,7 @@ export function PredictDetails() {
         ]);
         setMatch(matchData);
         setPrediction(predictionData);
+        setPredictionHistory(predictionHistoryData);
         setEnrichment(enrichmentData);
         setOdds(oddsData);
         setOddsHistory(oddsHistoryData);
@@ -1170,6 +1182,7 @@ export function PredictDetails() {
       <MarketMovementPanel
         sportsbookOdds={featuredSportsbooks}
         oddsHistory={oddsHistory}
+        predictionHistory={predictionHistory}
         displayTeam1={displayTeam1}
         displayTeam2={displayTeam2}
         trackedTeam={marketTrackedTeam}

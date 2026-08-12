@@ -15,10 +15,12 @@ import {
   getMockMatchEnrichment,
   getMockMatchOdds,
   getMockMatchOddsHistory,
+  getMockPredictionSnapshots,
   getMockMatchSquads,
   getMockPlayerStats,
   getMockPrediction,
-  getMockPredictionHistory,  getMockUpcomingMatches,
+  getMockPredictionHistory,
+  getMockUpcomingMatches,
 } from './mock-data';
 
 const hasSupabaseConfig = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -83,6 +85,39 @@ export interface Prediction {
   model: string;
   ensemble_size: number;
   scored_at?: string;
+}
+
+export interface PredictionSnapshot {
+  match_id: string;
+  team1: string;
+  team2: string;
+  predicted_winner: string;
+  team1_win_probability: number;
+  team2_win_probability: number;
+  confidence: 'low' | 'medium' | 'high';
+  edge_score: Record<string, unknown>;
+  model: string;
+  ensemble_size: number;
+  input_state: Record<string, unknown>;
+  change_events: PredictionChangeEvent[];
+  captured_at: string;
+}
+
+export interface PredictionChangeEvent {
+  event_at: string;
+  category: string;
+  type: string;
+  label: string;
+  summary: string;
+  affected_team: string | null;
+  affected_input: string;
+  relationship: 'coincided_input_change';
+  probability_delta: number | null;
+  source: {
+    name?: string;
+    reference?: string;
+    observed_at?: string;
+  };
 }
 
 export interface PredictionResult {
@@ -604,6 +639,22 @@ export async function getPrediction(matchId: string): Promise<Prediction | null>
 
   if (error) return null;
   return data;
+}
+
+export async function getPredictionSnapshots(matchId: string): Promise<PredictionSnapshot[]> {
+  if (isMockDataEnabled()) {
+    return getMockPredictionSnapshots(matchId);
+  }
+
+  const { data, error } = await supabase
+    .from('prediction_snapshots')
+    .select('match_id, team1, team2, predicted_winner, team1_win_probability, team2_win_probability, confidence, edge_score, model, ensemble_size, input_state, change_events, captured_at')
+    .eq('match_id', matchId)
+    .order('captured_at', { ascending: false })
+    .limit(200);
+
+  if (error) return [];
+  return (data ?? []).reverse();
 }
 
 export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {

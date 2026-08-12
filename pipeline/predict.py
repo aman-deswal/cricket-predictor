@@ -14,11 +14,13 @@ from utils.db import (
     get_client,
     get_h2h_from_cache,
     get_match_enrichment,
+    get_latest_prediction_snapshot,
     get_prediction,
     get_team_form_from_cache,
     get_upcoming_matches,
     get_venue_from_cache,
     store_prediction,
+    store_prediction_snapshot,
     store_match_enrichment,
 )
 from fetch_squads import fetch_and_store_squads
@@ -190,6 +192,7 @@ def build_context(match: dict) -> dict:
     espn_ctx = "No ESPN data available."
     espn_h2h_results: list = []
     espn_series_scoreline = ""
+    h2h_source = "cricsheet"
     espn_event_id = match.get("espn_event_id")
     stored_espn_h2h: list[dict] = []
     try:
@@ -206,6 +209,8 @@ def build_context(match: dict) -> dict:
             espn_series_scoreline = row.get("series_scoreline") or ""
             stored_espn_h2h = _parse_json_array(row.get("head_to_head"))
             espn_h2h_results = _stored_h2h_to_edge_results(stored_espn_h2h)
+            if espn_h2h_results:
+                h2h_source = "espn"
     except Exception as exc:
         logger.warning(f"  Failed to read stored ESPN context: {exc}")
 
@@ -219,6 +224,7 @@ def build_context(match: dict) -> dict:
             live_h2h = ctx.get("h2h_results", [])
             if live_h2h:
                 espn_h2h_results = live_h2h
+                h2h_source = "espn"
         except Exception as exc:
             logger.warning(f"  Failed to get ESPN context: {exc}")
 
@@ -252,6 +258,8 @@ def build_context(match: dict) -> dict:
             odds_data = {
                 "team1_odds": odds_row["team1_odds"],
                 "team2_odds": odds_row["team2_odds"],
+                "bookmaker": odds_row.get("bookmaker"),
+                "fetched_at": odds_row.get("fetched_at"),
             }
             t1_implied = (1.0 / odds_row["team1_odds"] * 100) if odds_row["team1_odds"] else 0
             t2_implied = (1.0 / odds_row["team2_odds"] * 100) if odds_row["team2_odds"] else 0
@@ -301,6 +309,7 @@ def build_context(match: dict) -> dict:
         "odds_context": odds_context,
         "odds_data": odds_data,
         "series_scoreline": espn_series_scoreline,
+        "h2h_source": h2h_source,
         "edge_score": edge,
     }
 
@@ -421,7 +430,227 @@ def build_prediction(match: dict) -> dict:
         "model": "deterministic-core",
         "ensemble_size": 1,
         "edge_score": context.get("edge_score"),
+        "_snapshot_inputs": {
+            "version": 1,
+            "fixture": {
+                "team1": context["team1"],
+                "team2": context["team2"],
+                "match_type": context["match_type"],
+            },
+            "team_form": {
+                "team1": {
+                    "team": context["team1"],
+                    "win_rate": context["team1_win_rate"],
+                    "matches": context["team1_matches"],
+                    "recent_wins": context["team1_wins"],
+                },
+                "team2": {
+                    "team": context["team2"],
+                    "win_rate": context["team2_win_rate"],
+                    "matches": context["team2_matches"],
+                    "recent_wins": context["team2_wins"],
+                },
+            },
+            "head_to_head": {
+                "total": context["h2h_total"],
+                "team1_wins": context["h2h_team1_wins"],
+                "team2_wins": context["h2h_team2_wins"],
+                "source": context["h2h_source"],
+            },
+            "series": {
+                "scoreline": context["series_scoreline"],
+            },
+            "market": context["odds_data"],
+        },
     }
+
+
+def _change_event(
+    category: str,
+    event_type: str,
+    label: str,
+    summary: str,
+    affected_input: str,
+    event_at: str,
+    affected_team: Optional[str] = None,
+    source: Optional[dict] = None,
+) -> dict:
+    return {
+        "event_at": event_at,
+        "category": category,
+        "type": event_type,
+        "label": label,
+        "summary": summary,
+        "affected_team": affected_team,
+        "affected_input": affected_input,
+        "relationship": "coincided_input_change",
+        "source": source or {},
+    }
+
+
+def derive_snapshot_change_events(
+    previous_snapshot: Optional[dict],
+    current_inputs: dict,
+    captured_at: str,
+) -> list[dict]:
+    """Describe observed structured-input changes without claiming causation."""
+    if previous_snapshot is None:
+        return [_change_event(
+            "baseline",
+            "initial_snapshot",
+            "Initial pre-match model snapshot",
+            "The first deterministic pre-match probability was captured.",
+            "deterministic_core",
+            captured_at,
+            source={"name": "SixSense deterministic pipeline"},
+        )]
+
+    previous_inputs = previous_snapshot.get("input_state")
+    if not isinstance(previous_inputs, dict) or not previous_inputs:
+        return [_change_event(
+            "legacy",
+            "attribution_unavailable",
+            "Earlier input details unavailable",
+            "This model move follows a legacy snapshot that did not retain structured input attribution.",
+            "structured_inputs",
+            captured_at,
+        )]
+
+    events: list[dict] = []
+    previous_fixture = previous_inputs.get("fixture") or {}
+    current_fixture = current_inputs.get("fixture") or {}
+    if previous_fixture != current_fixture:
+        events.append(_change_event(
+            "fixture",
+            "fixture_context_changed",
+            "Fixture context corrected",
+            "Team or match-format inputs changed before this model snapshot.",
+            "fixture_context",
+            captured_at,
+            source={"name": "fixture feed"},
+        ))
+
+    previous_form = previous_inputs.get("team_form") or {}
+    current_form = current_inputs.get("team_form") or {}
+    for team_key in ("team1", "team2"):
+        before = previous_form.get(team_key) or {}
+        after = current_form.get(team_key) or {}
+        if before == after:
+            continue
+        team = after.get("team") or current_fixture.get(team_key) or team_key
+        events.append(_change_event(
+            "form",
+            "recent_form_changed",
+            f"{team} recent-form inputs changed",
+            (
+                f"The structured form sample moved from {before.get('recent_wins', 0)}/"
+                f"{before.get('matches', 0)} wins to {after.get('recent_wins', 0)}/"
+                f"{after.get('matches', 0)}; this change coincided with the model move."
+            ),
+            f"team_form.{team_key}",
+            captured_at,
+            affected_team=team,
+            source={"name": "Cricsheet/statistics cache"},
+        ))
+
+    before_h2h = previous_inputs.get("head_to_head") or {}
+    after_h2h = current_inputs.get("head_to_head") or {}
+    if before_h2h != after_h2h:
+        events.append(_change_event(
+            "head_to_head",
+            "head_to_head_changed",
+            "Head-to-head input refreshed",
+            (
+                f"The tracked H2H sample changed from {before_h2h.get('total', 0)} to "
+                f"{after_h2h.get('total', 0)} matches and coincided with this model move."
+            ),
+            "head_to_head",
+            captured_at,
+            source={"name": after_h2h.get("source") or "structured results"},
+        ))
+
+    before_series = previous_inputs.get("series") or {}
+    after_series = current_inputs.get("series") or {}
+    if before_series != after_series:
+        scoreline = after_series.get("scoreline") or "No active scoreline"
+        events.append(_change_event(
+            "series",
+            "series_context_changed",
+            "Series context changed",
+            f"The structured series context now reads “{scoreline}”; this update coincided with the model move.",
+            "series.scoreline",
+            captured_at,
+            source={"name": "ESPN series context"},
+        ))
+
+    before_market = previous_inputs.get("market")
+    after_market = current_inputs.get("market")
+    if before_market != after_market:
+        bookmaker = (after_market or {}).get("bookmaker") or "sportsbook market"
+        observed_at = (after_market or {}).get("fetched_at") or captured_at
+        if after_market:
+            summary = (
+                f"{bookmaker} prices changed to {after_market.get('team1_odds')} / "
+                f"{after_market.get('team2_odds')}; the refreshed market input coincided with the model move."
+            )
+        else:
+            summary = "The previously available sportsbook input was no longer present for this model snapshot."
+        events.append(_change_event(
+            "market",
+            "market_price_changed",
+            f"{bookmaker} market input changed",
+            summary,
+            "market_odds",
+            observed_at,
+            source={
+                "name": bookmaker,
+                "reference": "match_odds",
+                "observed_at": observed_at,
+            },
+        ))
+
+    if not events:
+        events.append(_change_event(
+            "model_inputs",
+            "structured_inputs_changed",
+            "Structured edge inputs changed",
+            "One or more retained deterministic edge inputs changed and coincided with this probability move.",
+            "edge_score",
+            captured_at,
+            source={"name": "SixSense deterministic pipeline"},
+        ))
+    return events
+
+
+def persist_prediction(prediction: dict) -> dict:
+    """Persist the latest contract and append a changed pre-match core snapshot."""
+    edge = prediction.get("edge_score") or {}
+    input_state = prediction.get("_snapshot_inputs") or {}
+    previous_snapshot = get_latest_prediction_snapshot(prediction["match_id"])
+    captured_at = datetime.now(timezone.utc).isoformat()
+    change_events = derive_snapshot_change_events(
+        previous_snapshot,
+        input_state,
+        captured_at,
+    )
+    latest_prediction = {
+        key: value for key, value in prediction.items()
+        if key not in ("edge_score", "_snapshot_inputs")
+    }
+    store_prediction(latest_prediction)
+    if edge:
+        _store_edge_score(prediction["match_id"], edge)
+    appended = store_prediction_snapshot(
+        latest_prediction,
+        edge,
+        input_state,
+        change_events,
+    )
+    logger.info(
+        "  Prediction snapshot %s",
+        "appended" if appended else "unchanged or past kickoff",
+    )
+    return latest_prediction
 
 
 def parse_match_datetime(value: str) -> datetime:
@@ -458,11 +687,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
     for match in matches:
         logger.info(f"Predicting: {match['team1']} vs {match['team2']}")
         try:
-            prediction = build_prediction(match)
-            edge = prediction.pop("edge_score", None)
-            store_prediction(prediction)
-            if edge:
-                _store_edge_score(match["match_id"], edge)
+            prediction = persist_prediction(build_prediction(match))
             logger.info(
                 f"  → {prediction['predicted_winner']} "
                 f"({prediction['team1_win_probability']:.1%} / {prediction['team2_win_probability']:.1%})"

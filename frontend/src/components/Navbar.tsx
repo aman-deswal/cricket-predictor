@@ -67,14 +67,14 @@ export function Navbar() {
     <>
     <nav className="relative sticky top-0 z-50 border-b border-slate-700/35 bg-[#10151b]/95 shadow-lg shadow-black/10 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between sm:h-16">
-          <Link href="/" className="group flex min-h-11 items-center space-x-2 sm:space-x-3">
+        <div className="flex h-16 items-center justify-between sm:h-[4.5rem]">
+          <Link href="/" className="group flex min-h-12 items-center space-x-2 sm:min-h-[3.25rem] sm:space-x-3">
             <div className="group-hover:scale-110 transition-transform">
               <span className="sm:hidden"><Logo size={40} /></span>
               <span className="hidden sm:inline"><Logo size={48} /></span>
             </div>
             <span
-              className="text-xl tracking-tight"
+              className="text-2xl tracking-tight sm:text-[2rem]"
               style={{ fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 900, letterSpacing: '-0.02em' }}
             >
               <span className="bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 bg-clip-text text-transparent">Six</span>
@@ -85,7 +85,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={toggleDemoMode}
-            className={`ml-1 inline-flex min-h-9 items-center rounded-full border px-2.5 text-[9px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
+            className={`ml-1 inline-flex min-h-11 items-center rounded-full border px-3.5 text-[11px] font-black uppercase tracking-[0.16em] transition-colors sm:hidden ${
               demoEnabled
                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                 : 'border-slate-600/30 bg-white/[0.03] text-slate-500'
@@ -97,12 +97,12 @@ export function Navbar() {
           </button>
 
           {/* Desktop nav */}
-          <div className="hidden sm:flex items-center space-x-1">
+          <div className="hidden sm:flex items-center space-x-1.5">
             {NAV_LINKS.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`relative px-3 py-1.5 rounded-lg text-sm font-display transition-all ${
+                className={`relative min-h-[2.75rem] px-3.5 py-2 rounded-xl text-[15px] font-display transition-all ${
                   isActive(href)
                     ? 'text-white bg-white/5'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -121,7 +121,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={toggleDemoMode}
-              className={`ml-2 inline-flex min-h-9 items-center rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
+              className={`ml-2 inline-flex min-h-11 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.16em] transition-colors ${
                 demoEnabled
                   ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'
                   : 'border-slate-600/30 bg-white/[0.03] text-slate-500 hover:border-slate-500/50 hover:text-white'
@@ -137,10 +137,10 @@ export function Navbar() {
       </div>
     </nav>
     <nav
-      className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0c1117]/95 px-2 pt-1.5 shadow-[0_-10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:hidden"
+      className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0c1117]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:hidden"
       aria-label="Primary navigation"
     >
-      <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-3 gap-1.5">
         {NAV_LINKS.map(({ href, label, icon }) => {
           const active = isActive(href);
           return (
@@ -148,7 +148,7 @@ export function Navbar() {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 text-[10px] font-black transition-colors ${
+              className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[13px] font-black transition-colors ${
                 active ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 active:bg-white/[0.06] active:text-white'
               }`}
             >

@@ -121,6 +121,7 @@ flowchart LR
 Core tables used by the current app/pipelines:
 - `matches` — canonical fixture records (`upcoming`/`completed`)
 - `predictions` — winner, probabilities, confidence, reasoning, toss insight
+- `prediction_snapshots` — append-only pre-match deterministic core movement
 - `prediction_results` — correctness + Brier score + scoring timestamp
 - `stats_cache` — team/venue/H2H + calibration data
 - `match_enrichment` — venue confidence, XI candidates, updates, source links, preview
@@ -138,6 +139,7 @@ SQL assets in repo:
 - `supabase/stats_cache.sql`
 - `supabase/migrations/003_espn_match_data.sql`
 - `supabase/migrations/004_franchise_logos.sql`
+- `supabase/migrations/007_prediction_snapshots.sql`
 
 ---
 

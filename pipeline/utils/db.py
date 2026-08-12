@@ -88,6 +88,50 @@ def store_prediction(prediction: dict) -> None:
     client.table("predictions").upsert(prediction, on_conflict="match_id").execute()
 
 
+def get_latest_prediction_snapshot(match_id: str) -> Optional[dict]:
+    """Fetch the latest pre-match snapshot for attribution comparison."""
+    client = get_client()
+    response = (
+        client.table("prediction_snapshots")
+        .select("team1_win_probability,input_state,captured_at")
+        .eq("match_id", match_id)
+        .order("captured_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def store_prediction_snapshot(
+    prediction: dict,
+    edge_score: dict,
+    input_state: dict,
+    change_events: list[dict],
+) -> bool:
+    """Append the deterministic core when it differs from the latest snapshot."""
+    client = get_client()
+    response = client.rpc(
+        "append_prediction_snapshot",
+        {
+            "candidate_match_id": prediction["match_id"],
+            "candidate_team1": prediction["team1"],
+            "candidate_team2": prediction["team2"],
+            "candidate_predicted_winner": prediction["predicted_winner"],
+            "candidate_team1_win_probability": prediction["team1_win_probability"],
+            "candidate_team2_win_probability": prediction["team2_win_probability"],
+            "candidate_confidence": prediction["confidence"],
+            "candidate_edge_score": edge_score,
+            "candidate_model": prediction["model"],
+            "candidate_ensemble_size": prediction["ensemble_size"],
+            "candidate_input_state": input_state,
+            "candidate_change_events": change_events,
+        },
+    ).execute()
+    if isinstance(response.data, list):
+        return bool(response.data[0]) if response.data else False
+    return bool(response.data)
+
+
 def get_prediction(match_id: str) -> Optional[dict]:
     """Fetch one prediction, if present."""
     client = get_client()
