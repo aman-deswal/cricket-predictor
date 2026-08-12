@@ -120,30 +120,30 @@ export function MarketMovementChart({
   return (
     <>
       <div
-        className="h-32 sm:h-36 lg:h-44"
+        className="h-40 sm:h-48 lg:h-56"
         role="img"
         aria-label={ariaLabel}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
-            <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" strokeOpacity={0.7} />
+          <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 2 }}>
+            <CartesianGrid vertical={false} stroke="#243041" strokeOpacity={0.55} />
             <XAxis
               dataKey="timestamp"
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
-              tick={{ fill: '#94a3b8', fontSize: 9 }}
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              minTickGap={24}
+              minTickGap={28}
             />
             <YAxis
               domain={[minDomain, maxDomain]}
-              tickFormatter={(value) => `${value}%`}
-              tick={{ fill: '#94a3b8', fontSize: 9 }}
+              tickFormatter={(value) => `${Math.round(Number(value))}%`}
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              width={34}
+              width={42}
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
             {annotations.map((annotation) => (
@@ -184,8 +184,8 @@ export function MarketMovementChart({
                 type="monotone"
                 dataKey={entry.id}
                 stroke={entry.color}
-                strokeWidth={entry.kind === 'model' ? 3 : 2}
-                strokeDasharray={entry.kind === 'market' ? '6 4' : undefined}
+                strokeWidth={entry.kind === 'model' ? 3.5 : 2.75}
+                strokeOpacity={entry.kind === 'model' ? 1 : 0.88}
                 dot={chartRows.length <= 8 ? renderMarketDot : false}
                 activeDot={{ fill: entry.color, r: 4, strokeWidth: 0 }}
                 connectNulls
@@ -206,11 +206,21 @@ export function MarketMovementChart({
             key={`${entry.id}-legend`}
             className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
           >
-            <span
-              className={`w-4 border-t-2 ${entry.kind === 'market' ? 'border-dashed' : ''}`}
-              style={{ borderColor: entry.color }}
-              aria-hidden="true"
-            />
+            <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
+              <span
+                className="absolute inset-x-0 top-1/2 border-t-2"
+                style={{ borderColor: entry.color, opacity: entry.kind === 'model' ? 1 : 0.88 }}
+              />
+              <span
+                className={`absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                  entry.kind === 'model' ? 'border-2 bg-[#0b1016]' : ''
+                }`}
+                style={{
+                  borderColor: entry.color,
+                  backgroundColor: entry.kind === 'model' ? '#0b1016' : entry.color,
+                }}
+              />
+            </span>
             {entry.label}
           </span>
         ))}
