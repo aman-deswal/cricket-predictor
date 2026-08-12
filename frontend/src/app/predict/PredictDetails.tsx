@@ -290,7 +290,7 @@ function MarketMovementPanel({
         transition={{ delay: 0.16 }}
       >
         <ComingSoonTile
-          eyebrow="Pre-match movement"
+          eyebrow="Market movement"
           title="Movement history is not available yet"
           body="SixSense and market changes will appear after a pre-match refresh captures a new data point."
         />
@@ -330,10 +330,10 @@ function MarketMovementPanel({
             <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 13h12M3 10l2.4-5 2.2 3.1L10.4 3l2.6 7" />
             </svg>
-            Pre-match movement
+            Market movement
           </h2>
           <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
-            SixSense probability vs normalized market-implied probability for {marketSideMeta.shortName}
+            Tracking only {marketSideMeta.shortName}&rsquo;s win probability against the market
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -376,7 +376,7 @@ function MarketMovementPanel({
               series={movement.series}
               minDomain={movement.minDomain}
               maxDomain={movement.maxDomain}
-              ariaLabel={`Pre-match movement for ${trackedTeam}. Solid SixSense model probability is compared with dashed normalized bookmaker implied probabilities.`}
+              ariaLabel={`Market movement for ${trackedTeam}. This chart tracks only ${trackedTeam}'s win probability, comparing the SixSense model with normalized bookmaker implied probabilities.`}
               annotations={movement.annotations}
             />
           ) : (
