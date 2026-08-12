@@ -169,7 +169,7 @@ function PlayerHeadshot({
   );
 }
 
-const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
+const MARKET_BOOK_COLORS = ['#3b82f6', '#8b5cf6', '#14b8a6'] as const;
 
 function getBookHistory(bookmakerKey: string, history: MatchOdds[], current?: MatchOdds | null): MatchOdds[] {
   const deduped = new Map<string, MatchOdds>();
@@ -419,28 +419,28 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.22)] sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-3xl">
-           <div className="flex flex-wrap items-center gap-2">
-             {gapStrength && (
-               <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone.replace(' border-rose-400/20', '').replace(' border-amber-400/20', '').replace(' border-sky-400/20', '').replace(' border-emerald-400/20', '')}`}>
-                 {gapStrength.label}
-               </span>
-             )}
-           </div>
-           <p className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,4.3vw,1.85rem)] font-black leading-tight text-white">
-             {primaryInsight}
-           </p>
-           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-             {latestMoveStory}
-           </p>
+      <div className="mt-4 rounded-[28px] border border-white/[0.06] bg-[#08111b] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.18)] sm:p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.06] pb-4">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {gapStrength && (
+                <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                  {gapStrength.label}
+                </span>
+              )}
+            </div>
+            <p className="mt-3 text-[clamp(1.05rem,2.6vw,1.45rem)] font-semibold leading-tight tracking-[-0.02em] text-white">
+              {primaryInsight}
+            </p>
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-400">
+              {latestMoveStory}
+            </p>
           </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] bg-[#060b13]/72 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
+        <div className="mt-4 rounded-[24px] border border-white/[0.06] bg-[#050c15] px-3 py-3 sm:px-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
+            <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200">
               {gapBadgeLabel}
             </span>
           </div>
@@ -457,7 +457,7 @@ function MarketMovementPanel({
               heightClassName="h-52 sm:h-60 lg:h-72"
             />
           ) : (
-            <div className="flex h-40 sm:h-48 lg:h-56 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
+            <div className="flex h-40 sm:h-48 lg:h-56 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 text-center text-sm text-slate-400">
               Pre-match history will plot here after the next deterministic or sportsbook refresh.
             </div>
           )}
@@ -475,35 +475,35 @@ function MarketMovementPanel({
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-3 sm:gap-3">
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
-            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+            <p className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">SixSense</p>
+            <p className="mt-1 whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.2rem)] font-semibold leading-none text-white">
               {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
             </p>
           </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market</p>
-            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+            <p className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">Market</p>
+            <p className="mt-1 whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.2rem)] font-semibold leading-none text-white">
               {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
             </p>
           </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap</p>
-            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+            <p className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">Gap</p>
+            <p className={`mt-1 whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.2rem)] font-semibold leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
               {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
             </p>
           </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Last move</p>
-            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+            <p className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">Last move</p>
+            <p className={`mt-1 whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.2rem)] font-semibold leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
               {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
             </p>
           </div>
         </div>
       </div>
 
-      {featuredBooks.length > 0 && <div className="mt-4 grid grid-cols-3 gap-2">
+      {featuredBooks.length > 0 && <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -511,12 +511,12 @@ function MarketMovementPanel({
               onClick={() => {
                 if (book.marketUrl) openExternalMarket(book.marketUrl);
               }}
-              className="w-full rounded-2xl bg-white/[0.035] px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.055] sm:px-3"
+              className="w-full rounded-2xl border border-white/[0.06] bg-[#0a121b] px-3 py-3 text-left transition-colors hover:bg-[#0d1722]"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-black uppercase tracking-[0.12em] text-white sm:text-[12px]">{book.bookmaker}</p>
-                  <p className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">
+                  <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-white sm:text-[12px]">{book.bookmaker}</p>
+                  <p className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-slate-500">
                     {book.history.length} update{book.history.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -530,24 +530,24 @@ function MarketMovementPanel({
               </div>
               <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
                 <div>
-                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam1).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-slate-500">{getTeamMeta(displayTeam1).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[0.95rem] font-semibold text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.displayOdds.team1_odds)}
                   </p>
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
+                <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
                 <div className="text-right">
-                  <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam2).shortName}</p>
-                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-slate-500">{getTeamMeta(displayTeam2).shortName}</p>
+                  <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[0.95rem] font-semibold text-white sm:px-2 sm:text-[0.95rem]">
                     {decimalToAmerican(book.displayOdds.team2_odds)}
                   </p>
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] sm:text-[10px]">
-                <span className="font-semibold text-slate-400 truncate pr-2">
+                <span className="font-medium text-slate-400 truncate pr-2">
                   {trackedTeam} implied
                 </span>
-                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
+                <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-mono font-semibold`}>
                   {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
                   {book.delta !== null && (
                     <span className="ml-1 hidden text-[9px] uppercase tracking-[0.14em] sm:inline">

@@ -63,13 +63,10 @@ assert.deepEqual(
 assert.equal(movement.chartRows[2][SIXSENSE_SERIES_ID], 61);
 assert.equal(movement.modelPointCount, 2);
 assert.equal(movement.marketPointCount, 2);
-assert.equal(movement.annotations.length, 2, 'each model snapshot has an inspectable chart marker');
-assert.equal(movement.events.length, 2, 'stored events and legacy attribution fallbacks are shaped');
+assert.equal(movement.annotations.length, 1, 'only snapshots with actual move attribution get chart markers');
+assert.equal(movement.events.length, 1, 'stored events are shaped without inventing extra attribution');
 assert.equal(movement.events[0].label, 'Bet365 market input changed');
 assert.equal(movement.events[0].display_probability_delta, 0.07);
-assert.equal(movement.events[1].type, 'attribution_unavailable');
-assert.equal(movement.events[1].isLegacyFallback, true);
-assert.match(movement.events[1].summary, /did not retain/);
 
 const noVig = toNormalizedImpliedProbability(marketHistory[1], 'team1');
 assert.ok(noVig !== null && noVig > 54 && noVig < 56, 'market probability removes the two-sided overround');
@@ -100,6 +97,23 @@ const syntheticCurrentOnly = buildPreMatchMovement([{
 assert.equal(syntheticCurrentOnly.series.length, 1, 'synthetic current model point still renders the model series');
 assert.equal(syntheticCurrentOnly.annotations.length, 0, 'synthetic current model points do not invent move annotations');
 assert.equal(syntheticCurrentOnly.chartRows[0][SIXSENSE_SERIES_ID], 25);
+
+const unchangedCadence = buildPreMatchMovement([
+  {
+    team1_win_probability: 0.52,
+    team2_win_probability: 0.48,
+    captured_at: '2026-08-11T18:00:00Z',
+  },
+  {
+    team1_win_probability: 0.52,
+    team2_win_probability: 0.48,
+    captured_at: '2026-08-11T19:00:00Z',
+    change_events: [],
+  },
+], [], 'team1');
+assert.equal(unchangedCadence.modelPointCount, 2, 'unchanged snapshots still render multiple model points across time');
+assert.equal(unchangedCadence.annotations.length, 0, 'unchanged snapshots do not invent a move annotation');
+assert.equal(unchangedCadence.events.length, 0, 'unchanged snapshots do not add fallback attribution noise');
 
 const empty = buildPreMatchMovement([], [], 'team1');
 assert.deepEqual(empty.chartRows, []);

@@ -648,7 +648,7 @@ def persist_prediction(prediction: dict) -> dict:
     )
     logger.info(
         "  Prediction snapshot %s",
-        "appended" if appended else "unchanged or past kickoff",
+        "recorded" if appended else "skipped after kickoff",
     )
     return latest_prediction
 

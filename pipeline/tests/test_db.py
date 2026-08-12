@@ -73,7 +73,7 @@ class TestStorePredictionSnapshot(unittest.TestCase):
         )
 
     @patch("utils.db.get_client")
-    def test_returns_false_when_database_deduplicates_unchanged_core(self, mock_get_client):
+    def test_returns_false_when_snapshot_is_rejected_after_kickoff(self, mock_get_client):
         client = MagicMock()
         client.rpc.return_value.execute.return_value = MagicMock(data=False)
         mock_get_client.return_value = client
