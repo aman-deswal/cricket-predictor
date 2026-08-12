@@ -239,7 +239,7 @@ export function MarketMovementChart({
               tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
               tick={{ fill: '#94a3b8', fontSize: 10 }}
               tickLine={false}
-              axisLine={false}
+              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
               minTickGap={28}
             />
             <YAxis
@@ -247,7 +247,7 @@ export function MarketMovementChart({
               tickFormatter={(value) => `${Math.round(Number(value))}%`}
               tick={{ fill: '#94a3b8', fontSize: 10 }}
               tickLine={false}
-              axisLine={false}
+              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
               width={42}
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />

@@ -432,7 +432,7 @@ function MarketMovementPanel({
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2 pt-2 sm:gap-3">
+        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-3 sm:gap-3">
           <div className="min-w-0">
             <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
             <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
