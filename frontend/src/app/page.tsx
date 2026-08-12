@@ -62,7 +62,7 @@ function isMatchLive(match: MatchWithPredictions): boolean {
   return String(match.status).toLowerCase() === 'live';
 }
 
-function getCountdown(date: string): { days: number; hours: number; mins: number } | null {
+function getCountdown(date: string): { days: number; hours: number; mins: number; secs: number } | null {
   const raw = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
   const kickoff = new Date(raw).getTime();
   if (Number.isNaN(kickoff)) return null;
@@ -73,7 +73,8 @@ function getCountdown(date: string): { days: number; hours: number; mins: number
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return { days, hours, mins };
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  return { days, hours, mins, secs };
 }
 
 function decimalToAmerican(d: number): string {
@@ -213,30 +214,32 @@ function SixSensePickHeading({ matchDate }: { matchDate: string }) {
 
   useEffect(() => {
     setCountdown(getHeaderCountdown());
-    const interval = window.setInterval(() => setCountdown(getHeaderCountdown()), 60_000);
+    const interval = window.setInterval(() => setCountdown(getHeaderCountdown()), 1_000);
     return () => window.clearInterval(interval);
   }, [getHeaderCountdown]);
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <SectionHeading icon={<Logo size={40} />} bareIcon>
+    <div className="flex items-center justify-between gap-3">
+      <SectionHeading icon={<Logo size={40} />} bareIcon className="min-w-0">
         <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
           <span className="text-amber-600">SixSense</span>
           <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
         </h2>
       </SectionHeading>
-      <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 sm:self-auto">
+      <div className="flex shrink-0 items-center gap-2 text-[12px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[13px]">
         <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
           <circle cx="8" cy="8" r="6" />
           <path d="M8 4v4l3 2" />
         </svg>
         {countdown ? (
           <span className="whitespace-nowrap">
-            Begins in{' '}
+            <span className="text-slate-400">Begins in </span>
             {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
             <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
-            <span className="text-slate-400"> </span>
+            <span className="text-slate-500">:</span>
             <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+            <span className="text-slate-500">:</span>
+            <span className="text-white">{String(countdown.secs).padStart(2, '0')}s</span>
           </span>
         ) : (
           <span className="whitespace-nowrap">{getMatchDateLabel(matchDate)}</span>
