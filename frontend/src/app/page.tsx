@@ -302,7 +302,7 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect) return;
       setPopoverPosition({
-        top: rect.bottom + 10,
+        top: rect.top - 162,
         right: Math.max(window.innerWidth - rect.right, 12),
       });
     };
@@ -356,7 +356,7 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
           className="fixed z-40 w-[280px] rounded-2xl border border-white/[0.14] bg-[#091018] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.56)] sm:w-[312px]"
           style={{ top: popoverPosition.top, right: popoverPosition.right }}
         >
-          <div className="absolute -top-2 right-3 h-4 w-4 rotate-45 border-l border-t border-white/[0.14] bg-[#091018]" />
+          <div className="absolute -bottom-2 right-3 h-4 w-4 rotate-45 border-b border-r border-white/[0.14] bg-[#091018]" />
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
               {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
