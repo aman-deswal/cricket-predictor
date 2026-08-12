@@ -322,8 +322,6 @@ function MarketMovementPanel({
     : null;
 
   const marketSideMeta = getTeamMeta(trackedTeam);
-  const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
-  const opposingMeta = getTeamMeta(opposingTeam);
   const sortedAnnotations = [...movement.annotations].sort((left, right) => left.timestamp - right.timestamp);
   const latestAnnotation = sortedAnnotations[sortedAnnotations.length - 1] ?? null;
   const previousAnnotation = sortedAnnotations.length > 1 ? sortedAnnotations[sortedAnnotations.length - 2] : null;
@@ -381,12 +379,9 @@ function MarketMovementPanel({
       </div>
 
       <div className="mt-4 rounded-[28px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] sm:p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-3xl">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl">
            <div className="flex flex-wrap items-center gap-2">
-             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-300">
-               {marketSideMeta.shortName} <span className="text-slate-500">vs</span> {opposingMeta.shortName}
-             </span>
              {gapStrength && (
                <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone}`}>
                  {gapStrength.label}
