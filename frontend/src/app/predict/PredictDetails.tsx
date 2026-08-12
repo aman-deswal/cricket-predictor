@@ -237,13 +237,6 @@ function summarizeInputs(inputs: string[]): string {
   return `${inputs[0]}, ${inputs[1]}, and other structured inputs`;
 }
 
-function describeActionableEdge(points: number | null, trackedTeam: string): string {
-  if (points === null) return 'Actionable read appears once both SixSense and market win chances are available.';
-  if (Math.abs(points) < 1) return `Actionable read: no real edge on ${trackedTeam} right now because SixSense and the market are pricing the same win chance.`;
-  if (points > 0) return `Actionable read: the market is pricing ${trackedTeam} higher than SixSense by ${Math.abs(points).toFixed(1)} pts, so ${trackedTeam} may be overpriced unless new information closes the gap.`;
-  return `Actionable read: SixSense is pricing ${trackedTeam} higher than the market by ${Math.abs(points).toFixed(1)} pts, so ${trackedTeam} may offer value if you trust the model inputs.`;
-}
-
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
@@ -367,7 +360,6 @@ function MarketMovementPanel({
     : marketGap > 0
       ? `Market +${Math.abs(marketGap).toFixed(1)} pts`
       : `SixSense +${Math.abs(marketGap).toFixed(1)} pts`;
-  const actionableEdge = describeActionableEdge(marketGap, marketSideMeta.shortName);
 
   return (
     <motion.div
@@ -401,11 +393,6 @@ function MarketMovementPanel({
            </p>
            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
              {latestMoveStory}
-           </p>
-           <p className="mt-2 max-w-3xl text-[12px] leading-relaxed text-slate-400 sm:text-[13px]">
-             <span className="font-bold text-slate-300">% = win chance.</span>{' '}
-             <span className="font-bold text-slate-300">Pts = the gap or movement between win chances.</span>{' '}
-             {actionableEdge}
            </p>
           </div>
         </div>
@@ -447,25 +434,25 @@ function MarketMovementPanel({
 
         <div className="mt-4 grid grid-cols-4 gap-2 pt-2 sm:gap-3">
           <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Model %</p>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
             <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
               {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market %</p>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market</p>
             <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
               {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap pts</p>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap</p>
             <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
               {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Move pts</p>
+            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Last move</p>
             <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
               {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
             </p>
