@@ -238,7 +238,7 @@ BEGIN
     SELECT 1
     FROM matches fixture
     WHERE fixture.match_id::text = candidate_match_id
-      AND fixture.status = 'upcoming'
+      AND COALESCE(fixture.status, '') != 'completed'
       AND fixture.date::timestamptz > clock_timestamp()
   ) THEN
     RETURN FALSE;

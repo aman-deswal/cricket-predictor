@@ -31,6 +31,18 @@ CRICBUZZ_SQUADS_HTML = """
 </script>
 """
 
+CRICBUZZ_UPCOMING_HTML_TITLE_FIRST = """
+<a title="Australia vs Bangladesh, 1st Test - Preview "
+   href="/live-cricket-scores/148316/aus-vs-ban-1st-test-bangladesh-tour-of-australia-2026"
+   class="fixture-link">
+  <span>Australia vs Bangladesh</span>
+</a>
+"""
+
+CRICBUZZ_SQUADS_HTML_NEXT = """
+<script>self.__next_f.push([1,"{\\"team1\\":{\\"team\\":{\\"teamId\\":4,\\"teamName\\":\\"Australia\\",\\"teamSName\\":\\"AUS\\"},\\"players\\":{\\"Squad\\":[{\\"id\\":8095,\\"name\\":\\"Pat Cummins\\",\\"fullName\\":\\"Pat Cummins\\",\\"captain\\":true,\\"keeper\\":false,\\"role\\":\\"Bowler\\",\\"battingStyle\\":\\"Right-hand bat\\",\\"bowlingStyle\\":\\"Right-arm fast\\",\\"imageDetails\\":{\\"imageId\\":352460}}]}},\\"team2\\":{\\"team\\":{\\"teamId\\":6,\\"teamName\\":\\"Bangladesh\\",\\"teamSName\\":\\"BAN\\"},\\"players\\":{\\"Squad\\":[{\\"id\\":56007,\\"name\\":\\"Najmul Hossain Shanto\\",\\"fullName\\":\\"Najmul Hossain Shanto\\",\\"captain\\":true,\\"keeper\\":false,\\"role\\":\\"Batter\\",\\"battingStyle\\":\\"Left-hand bat\\",\\"bowlingStyle\\":\\"Right-arm offbreak\\",\\"imageDetails\\":{\\"imageId\\":845999}}]}}}"])</script>
+"""
+
 
 class TestCricbuzzFallbackParsing(unittest.TestCase):
     def test_extracts_match_links_from_upcoming_page(self):
@@ -42,11 +54,25 @@ class TestCricbuzzFallbackParsing(unittest.TestCase):
         self.assertEqual(links[0]["team1"], "Ireland")
         self.assertEqual(links[0]["team2"], "Afghanistan")
 
+    def test_extracts_match_links_when_title_precedes_href(self):
+        links = _extract_cricbuzz_match_links(CRICBUZZ_UPCOMING_HTML_TITLE_FIRST)
+
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0]["match_id"], "148316")
+        self.assertEqual(links[0]["team1"], "Australia")
+        self.assertEqual(links[0]["team2"], "Bangladesh")
+
     def test_extracts_team_objects_from_squads_page(self):
         teams = _extract_cricbuzz_team_objects(CRICBUZZ_SQUADS_HTML)
 
         self.assertEqual([team["teamName"] for team in teams], ["Ireland", "Afghanistan"])
         self.assertEqual(teams[0]["players"]["Squad"][0]["fullName"], "Paul Stirling")
+
+    def test_extracts_team_objects_from_next_payload(self):
+        teams = _extract_cricbuzz_team_objects(CRICBUZZ_SQUADS_HTML_NEXT)
+
+        self.assertEqual([team["teamName"] for team in teams], ["Australia", "Bangladesh"])
+        self.assertEqual(teams[0]["players"]["Squad"][0]["fullName"], "Pat Cummins")
 
     def test_fetches_normalized_squads_from_cricbuzz_pages(self):
         class MockResponse:

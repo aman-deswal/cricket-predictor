@@ -46,7 +46,11 @@ BOOKMAKERS = (
 )
 MARKETS = "h2h"
 AUTOMATED_CREDIT_CEILING = 450
-REFRESH_INTERVAL = timedelta(hours=8)
+DEFAULT_REFRESH_INTERVAL = timedelta(hours=8)
+HIGH_SIGNAL_REFRESH_WINDOW = timedelta(hours=18)
+HIGH_SIGNAL_REFRESH_INTERVAL = timedelta(hours=3)
+NEAR_KICKOFF_WINDOW = timedelta(hours=6)
+NEAR_KICKOFF_REFRESH_INTERVAL = timedelta(hours=2)
 FIXTURE_MATCH_WINDOW = timedelta(hours=36)
 RELEVANCE_MATCH_WINDOW = timedelta(hours=12)
 
@@ -74,6 +78,39 @@ LEAGUE_ALIASES = {
     ),
     "cricket_psl": ("pakistan super league", "psl"),
 }
+
+TOP_INTERNATIONAL_TEAMS = {
+    "india",
+    "australia",
+    "england",
+    "south africa",
+    "new zealand",
+    "pakistan",
+    "sri lanka",
+    "bangladesh",
+    "west indies",
+    "afghanistan",
+    "zimbabwe",
+    "ireland",
+}
+
+POPULAR_LEAGUES = (
+    "indian premier league",
+    "ipl",
+    "women's premier league",
+    "womens premier league",
+    "wpl",
+    "big bash league",
+    "bbl",
+    "the hundred",
+    "caribbean premier league",
+    "cpl",
+    "pakistan super league",
+    "psl",
+    "sa20",
+    "major league cricket",
+    "mlc",
+)
 
 
 @dataclass(frozen=True)
@@ -226,6 +263,10 @@ def normalize_team(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
 
 
+def _normalize_signal_team(name: str) -> str:
+    return re.sub(r"\s+\((women|men)\)\s*$", "", str(name or "").strip(), flags=re.IGNORECASE).lower()
+
+
 def _normalize_competition(value: str) -> str:
     normalized = value.lower().replace("&", " and ").replace("’", "'")
     return re.sub(r"[^a-z0-9']+", " ", normalized).strip()
@@ -283,13 +324,53 @@ def get_upcoming_local_fixtures(now: Optional[datetime] = None) -> list[dict]:
     response = (
         get_client()
         .table("matches")
-        .select("match_id,name,team1,team2,date,match_type,status")
+        .select("match_id,name,team1,team2,date,match_type,status,venue")
         .eq("status", "upcoming")
         .gte("date", now.isoformat())
         .order("date", desc=False)
         .execute()
     )
     return response.data or []
+
+
+def is_high_signal_fixture(fixture: dict) -> bool:
+    team1 = _normalize_signal_team(fixture.get("team1", ""))
+    team2 = _normalize_signal_team(fixture.get("team2", ""))
+    if team1 in TOP_INTERNATIONAL_TEAMS and team2 in TOP_INTERNATIONAL_TEAMS:
+        return True
+
+    haystack = " ".join(
+        str(part or "")
+        for part in (
+            fixture.get("name"),
+            fixture.get("venue"),
+        )
+    ).lower()
+    return any(alias in haystack for alias in POPULAR_LEAGUES)
+
+
+def refresh_interval_for_fixtures(
+    fixtures: list[dict],
+    now: Optional[datetime] = None,
+) -> timedelta:
+    now = now or datetime.now(timezone.utc)
+    earliest_high_signal: Optional[datetime] = None
+    for fixture in fixtures:
+        kickoff = parse_time(fixture.get("date", ""))
+        if kickoff is None or kickoff <= now or not is_high_signal_fixture(fixture):
+            continue
+        if earliest_high_signal is None or kickoff < earliest_high_signal:
+            earliest_high_signal = kickoff
+
+    if earliest_high_signal is None:
+        return DEFAULT_REFRESH_INTERVAL
+
+    time_to_start = earliest_high_signal - now
+    if time_to_start <= NEAR_KICKOFF_WINDOW:
+        return NEAR_KICKOFF_REFRESH_INTERVAL
+    if time_to_start <= HIGH_SIGNAL_REFRESH_WINDOW:
+        return HIGH_SIGNAL_REFRESH_INTERVAL
+    return DEFAULT_REFRESH_INTERVAL
 
 
 def relevant_fixtures_for_sport(
@@ -355,11 +436,13 @@ def get_refresh_state() -> dict[str, datetime]:
 def is_sport_fresh(
     sport_key: str,
     refresh_state: dict[str, datetime],
+    relevant_fixtures: list[dict],
     now: Optional[datetime] = None,
 ) -> bool:
     now = now or datetime.now(timezone.utc)
     refreshed_at = refresh_state.get(sport_key)
-    return refreshed_at is not None and now - refreshed_at < REFRESH_INTERVAL
+    refresh_interval = refresh_interval_for_fixtures(relevant_fixtures, now)
+    return refreshed_at is not None and now - refreshed_at < refresh_interval
 
 
 def store_refresh_state(
@@ -569,12 +652,14 @@ def main(sport: Optional[str] = None) -> int:
     due_sports = []
     now = datetime.now(timezone.utc)
     for sport_key in ordered_sports:
-        if is_sport_fresh(sport_key, refresh_state, now):
+        refresh_interval = refresh_interval_for_fixtures(relevant[sport_key], now)
+        if is_sport_fresh(sport_key, refresh_state, relevant[sport_key], now):
             refreshed_at = refresh_state[sport_key]
             logger.info(
-                "Skipping %s: fresh until %s",
+                "Skipping %s: fresh until %s (interval=%s)",
                 sport_key,
-                (refreshed_at + REFRESH_INTERVAL).isoformat(),
+                (refreshed_at + refresh_interval).isoformat(),
+                refresh_interval,
             )
         else:
             due_sports.append(sport_key)

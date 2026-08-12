@@ -68,23 +68,28 @@ def _match_teams(team1: str, team2: str, candidate1: str, candidate2: str) -> bo
 def _extract_cricbuzz_match_links(page_html: str) -> list[dict]:
     links: list[dict] = []
     seen: set[str] = set()
-    pattern = re.compile(
-        r'<a href="/live-cricket-scores/(?P<match_id>\d+)/(?P<slug>[^"]+)"[^>]*title="(?P<title>[^"]+)"',
-        re.IGNORECASE,
-    )
-    for match in pattern.finditer(page_html):
-        title = match.group("title")
+    for anchor in re.finditer(r"<a\b(?P<attrs>[^>]*)>", page_html, re.IGNORECASE):
+        attrs = anchor.group("attrs")
+        href_match = re.search(
+            r'href="/live-cricket-scores/(?P<match_id>\d+)/(?P<slug>[^"]+)"',
+            attrs,
+            re.IGNORECASE,
+        )
+        title_match = re.search(r'title="(?P<title>[^"]+)"', attrs, re.IGNORECASE)
+        if not href_match or not title_match:
+            continue
+        title = title_match.group("title").strip()
         matchup = title.split(" - ", 1)[0].split(",", 1)[0].strip()
         if " vs " not in matchup:
             continue
         team1, team2 = [part.strip() for part in matchup.split(" vs ", 1)]
-        match_id = match.group("match_id")
+        match_id = href_match.group("match_id")
         if match_id in seen:
             continue
         seen.add(match_id)
         links.append({
             "match_id": match_id,
-            "slug": match.group("slug"),
+            "slug": href_match.group("slug"),
             "team1": team1,
             "team2": team2,
             "title": title,
@@ -138,16 +143,18 @@ def _normalize_cricbuzz_player(player: dict) -> dict:
 
 def _extract_cricbuzz_team_objects(page_html: str) -> list[dict]:
     normalized_page = page_html.replace('\\"', '"')
+    decoder = json.JSONDecoder()
     team_objects: list[dict] = []
     seen_teams: set[str] = set()
-    pattern = re.compile(
+
+    legacy_pattern = re.compile(
         r'"teamId":(?P<team_id>\d+),"teamName":"(?P<team>[^"]+)","teamSName":"[^"]+",'
         r'(?:\"imageDetails\":\{.*?\},)?'
         r'"profileUrl":"[^"]+"\},"players":\{"Squad":(?P<squad>\[.*?\])'
         r'(?:,"Playing XI":(?P<xi>\[.*?\]))?\}',
         re.S,
     )
-    for match in pattern.finditer(normalized_page):
+    for match in legacy_pattern.finditer(normalized_page):
         team_name = match.group("team")
         if team_name in seen_teams:
             continue
@@ -165,6 +172,48 @@ def _extract_cricbuzz_team_objects(page_html: str) -> list[dict]:
                 "Playing XI": playing_xi,
             },
         })
+
+    def _decode_object(start: int) -> Optional[dict]:
+        try:
+            parsed, _ = decoder.raw_decode(normalized_page[start:])
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    def _coerce_team_object(candidate: dict) -> Optional[dict]:
+        if not isinstance(candidate, dict):
+            return None
+        team_info = candidate.get("team") if isinstance(candidate.get("team"), dict) else candidate
+        players_block = candidate.get("players")
+        if not isinstance(players_block, dict):
+            return None
+        team_name = team_info.get("teamName") or team_info.get("displayName") or ""
+        if not team_name:
+            return None
+        team_id = team_info.get("teamId") or team_info.get("id") or ""
+        return {
+            "teamId": int(team_id) if str(team_id).isdigit() else team_id,
+            "teamName": team_name,
+            "players": {
+                "Squad": players_block.get("Squad") or [],
+                "Playing XI": players_block.get("Playing XI") or [],
+            },
+        }
+
+    start_patterns = (
+        re.compile(r'(?P<start>\{"teamId":\d+,"teamName":"[^"]+","teamSName":"[^"]+")'),
+        re.compile(r'"team[12]":(?P<start>\{"team":\{"teamId":\d+,"teamName":"[^"]+")'),
+    )
+    for pattern in start_patterns:
+        for match in pattern.finditer(normalized_page):
+            team_object = _coerce_team_object(_decode_object(match.start("start")) or {})
+            if not team_object:
+                continue
+            team_name = team_object["teamName"]
+            if team_name in seen_teams:
+                continue
+            seen_teams.add(team_name)
+            team_objects.append(team_object)
     return team_objects
 
 
