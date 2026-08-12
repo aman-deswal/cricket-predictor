@@ -14,7 +14,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
-import { buildPreMatchMovement, hasValidTwoSidedOdds, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability } from '@/lib/pre-match-movement';
+import { buildPreMatchMovement, hasValidTwoSidedOdds, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -207,10 +207,9 @@ function PlayerHeadshot({
 
 const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
 
-function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
-  const bookmakerKey = normalizeBookmaker(current.bookmaker);
+function getBookHistory(bookmakerKey: string, history: MatchOdds[], current?: MatchOdds | null): MatchOdds[] {
   const deduped = new Map<string, MatchOdds>();
-  [...history, current].forEach((snapshot) => {
+  [...history, ...(current ? [current] : [])].forEach((snapshot) => {
     if (normalizeBookmaker(snapshot.bookmaker) !== bookmakerKey || !hasValidTwoSidedOdds(snapshot)) return;
     deduped.set(snapshot.fetched_at, snapshot);
   });
@@ -238,6 +237,7 @@ function summarizeInputs(inputs: string[]): string {
 }
 
 function MarketMovementPanel({
+  prediction,
   sportsbookOdds,
   oddsHistory,
   predictionHistory,
@@ -247,6 +247,7 @@ function MarketMovementPanel({
   trackedTeamKey,
   detailTileClass,
 }: {
+  prediction: Prediction | null;
   sportsbookOdds: MatchOdds[];
   oddsHistory: MatchOdds[];
   predictionHistory: PredictionSnapshot[];
@@ -256,30 +257,86 @@ function MarketMovementPanel({
   trackedTeamKey: 'team1' | 'team2';
   detailTileClass: string;
 }) {
-  const featuredBooks = sportsbookOdds.slice(0, 3).map((current, index) => {
-    const history = getBookHistory(current, oddsHistory);
-    const latestProbability = toNormalizedImpliedProbability(current, trackedTeamKey);
-    const openingProbability = history.length > 0
-      ? toNormalizedImpliedProbability(history[0], trackedTeamKey)
-      : latestProbability;
+  const trustedHistory = oddsHistory
+    .filter((snapshot) => getTrustedSportsbook(snapshot.bookmaker) !== null && hasValidTwoSidedOdds(snapshot));
+  const liveBooksByKey = new Map(
+    sportsbookOdds
+    .filter((snapshot) => getTrustedSportsbook(snapshot.bookmaker) !== null && hasValidTwoSidedOdds(snapshot))
+    .map((snapshot) => [normalizeBookmaker(snapshot.bookmaker), snapshot] as const),
+  );
+  const candidateBookKeys = new Set<string>([
+    ...liveBooksByKey.keys(),
+    ...trustedHistory.map((snapshot) => normalizeBookmaker(snapshot.bookmaker)),
+  ]);
+  const featuredBooks = [...candidateBookKeys]
+    .map((bookmakerKey) => {
+      const current = liveBooksByKey.get(bookmakerKey) ?? null;
+      const history = getBookHistory(bookmakerKey, trustedHistory, current);
+      if (history.length === 0) return null;
+      const latestSnapshot = history[history.length - 1] ?? current;
+      if (!latestSnapshot) return null;
+      const latestProbability = toNormalizedImpliedProbability(latestSnapshot, trackedTeamKey);
+      const openingProbability = history.length > 0
+        ? toNormalizedImpliedProbability(history[0], trackedTeamKey)
+        : latestProbability;
+      const sportsbook = getTrustedSportsbook(latestSnapshot.bookmaker);
+      if (!sportsbook) return null;
 
-    return {
-      id: `${normalizeBookmaker(current.bookmaker)}-${index}`,
-      bookmaker: current.bookmaker,
+      return {
+        bookmakerKey,
+        bookmaker: latestSnapshot.bookmaker,
+        sportsbook,
+        current,
+        displayOdds: current ?? latestSnapshot,
+        history,
+        latestProbability,
+        openingProbability,
+        delta: latestProbability !== null && openingProbability !== null
+          ? latestProbability - openingProbability
+          : null,
+        marketUrl: getBookmakerMarketUrl(latestSnapshot.bookmaker),
+      };
+    })
+    .filter((book): book is NonNullable<typeof book> => book !== null)
+    .sort((left, right) => {
+      const leftHasSeries = left.history.length > 1 ? 1 : 0;
+      const rightHasSeries = right.history.length > 1 ? 1 : 0;
+      if (leftHasSeries !== rightHasSeries) return rightHasSeries - leftHasSeries;
+      if (left.history.length !== right.history.length) return right.history.length - left.history.length;
+      if (Number(Boolean(left.current)) !== Number(Boolean(right.current))) {
+        return Number(Boolean(right.current)) - Number(Boolean(left.current));
+      }
+      return left.sportsbook.priority - right.sportsbook.priority;
+    })
+    .slice(0, 3)
+    .map((book, index) => ({
+      ...book,
+      id: `${book.bookmakerKey}-${index}`,
       color: MARKET_BOOK_COLORS[index % MARKET_BOOK_COLORS.length],
-      current,
-      history,
-      latestProbability,
-      openingProbability,
-      delta: latestProbability !== null && openingProbability !== null
-        ? latestProbability - openingProbability
-        : null,
-      marketUrl: getBookmakerMarketUrl(current.bookmaker),
-    };
-  });
+    }));
+
+  const sortedMarketTimestamps = featuredBooks
+    .flatMap((book) => book.history.map((snapshot) => new Date(snapshot.fetched_at).getTime()))
+    .filter((timestamp) => Number.isFinite(timestamp))
+    .sort((left, right) => left - right);
+  const latestMarketTimestamp = sortedMarketTimestamps[sortedMarketTimestamps.length - 1];
+  const syntheticCurrentTimestamp = latestMarketTimestamp ?? Date.now();
+  const syntheticCurrentPrediction: MovementPredictionSnapshot | null = predictionHistory.length === 0
+    && prediction
+    ? {
+      team1_win_probability: prediction.team1_win_probability,
+      team2_win_probability: prediction.team2_win_probability,
+      captured_at: new Date(syntheticCurrentTimestamp).toISOString(),
+      change_events: [],
+      synthetic_current: true,
+    }
+    : null;
+  const chartPredictionHistory = syntheticCurrentPrediction
+    ? [...predictionHistory, syntheticCurrentPrediction]
+    : predictionHistory;
 
   const movement = buildPreMatchMovement(
-    predictionHistory,
+    chartPredictionHistory,
     featuredBooks.map((book) => ({
       id: book.id,
       bookmaker: book.bookmaker,
@@ -348,13 +405,19 @@ function MarketMovementPanel({
       .map((event) => event.affected_input.replaceAll('_', ' ')))]
     : [];
   const latestMoveStory = latestMoveDelta === null || !latestAnnotation
-    ? 'Last move will appear once another SixSense snapshot lands.'
+    ? syntheticCurrentPrediction
+      ? 'Showing the current SixSense price against the latest market refresh until the first stored model snapshot lands.'
+      : 'Last move will appear once another SixSense snapshot lands.'
     : Math.abs(latestMoveDelta) < 0.05
       ? `Last move: ${marketSideMeta.shortName} stayed flat with ${summarizeInputs(latestMoveInputs)}.`
       : `Last move: ${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'legacy attribution unavailable' : summarizeInputs(latestMoveInputs)}.`;
-  const currentGapCaption = marketGap === null
-    ? 'Tap a gold SixSense point to inspect what changed around each model move.'
-    : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Tap a gold SixSense point to inspect what changed around each model move.`;
+  const currentGapCaption = syntheticCurrentPrediction
+    ? marketGap === null
+      ? 'This chart pins the current SixSense price to the latest market refresh until full model-move history is available.'
+      : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Full model-move history is still building.`
+    : marketGap === null
+      ? 'Tap a gold SixSense point to inspect what changed around each model move.'
+      : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Tap a gold SixSense point to inspect what changed around each model move.`;
   const gapBadgeLabel = marketGap === null
     ? 'Gap pending'
     : marketGap > 0
@@ -427,6 +490,11 @@ function MarketMovementPanel({
                 : 'Trusted market history is not available yet; showing SixSense movement only.'}
             </p>
           )}
+          {syntheticCurrentPrediction && predictionHistory.length === 0 && (
+            <p className="mt-3 text-xs leading-relaxed text-slate-400" role="status">
+              SixSense move history is still building; the chart pins the current model price to the latest market snapshot in the meantime.
+            </p>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-3 sm:gap-3">
@@ -486,14 +554,14 @@ function MarketMovementPanel({
                 <div>
                   <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam1).shortName}</p>
                   <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
-                    {decimalToAmerican(book.current.team1_odds)}
+                    {decimalToAmerican(book.displayOdds.team1_odds)}
                   </p>
                 </div>
                 <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[10px]">vs</span>
                 <div className="text-right">
                   <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-[9px]">{getTeamMeta(displayTeam2).shortName}</p>
                   <p className="mt-1 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.95rem] font-black text-white sm:px-2 sm:text-[0.95rem]">
-                    {decimalToAmerican(book.current.team2_odds)}
+                    {decimalToAmerican(book.displayOdds.team2_odds)}
                   </p>
                 </div>
               </div>
@@ -1180,6 +1248,7 @@ export function PredictDetails() {
       </motion.div>
 
       <MarketMovementPanel
+        prediction={prediction}
         sportsbookOdds={featuredSportsbooks}
         oddsHistory={oddsHistory}
         predictionHistory={predictionHistory}

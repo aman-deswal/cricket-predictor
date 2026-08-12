@@ -91,6 +91,16 @@ assert.equal(
   'stored team-one deltas are inverted when the chart tracks team two',
 );
 
+const syntheticCurrentOnly = buildPreMatchMovement([{
+  team1_win_probability: 0.75,
+  team2_win_probability: 0.25,
+  captured_at: '2026-08-11T19:00:00Z',
+  synthetic_current: true,
+}], [], 'team2');
+assert.equal(syntheticCurrentOnly.series.length, 1, 'synthetic current model point still renders the model series');
+assert.equal(syntheticCurrentOnly.annotations.length, 0, 'synthetic current model points do not invent move annotations');
+assert.equal(syntheticCurrentOnly.chartRows[0][SIXSENSE_SERIES_ID], 25);
+
 const empty = buildPreMatchMovement([], [], 'team1');
 assert.deepEqual(empty.chartRows, []);
 assert.deepEqual(empty.series, []);
