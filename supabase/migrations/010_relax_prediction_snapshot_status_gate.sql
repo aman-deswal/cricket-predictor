@@ -19,7 +19,7 @@ RETURNS BOOLEAN
 LANGUAGE PLPGSQL
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $$
+AS $append_prediction_snapshot$
 DECLARE
     latest prediction_snapshots%ROWTYPE;
     probability_delta DECIMAL;
@@ -134,4 +134,4 @@ BEGIN
 
     RETURN TRUE;
 END;
-$$;
+$append_prediction_snapshot$;
