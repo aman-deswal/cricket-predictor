@@ -281,7 +281,9 @@ function SixSensePickHeading({
       {trustSignal?.scope === 'international' && (
         <div className="flex shrink-0 items-center gap-3">
           <GlobeIcon className="h-5 w-5 shrink-0 text-amber-500" />
-          <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+          <div className="hidden sm:flex">
+            <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+          </div>
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
               {trustSignal.stats.correct}/{trustSignal.stats.total}
