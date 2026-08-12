@@ -238,7 +238,7 @@ BEGIN
     FROM matches fixture
     WHERE fixture.match_id::text = candidate_match_id
       AND fixture.status = 'upcoming'
-      AND fixture.date > clock_timestamp()
+      AND fixture.date::timestamptz > clock_timestamp()
   ) THEN
     RETURN FALSE;
   END IF;

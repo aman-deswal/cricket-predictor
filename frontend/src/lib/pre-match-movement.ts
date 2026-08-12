@@ -3,6 +3,7 @@ export interface MovementPredictionSnapshot {
   team2_win_probability: number;
   captured_at: string;
   change_events?: MovementChangeEvent[] | null;
+  synthetic_current?: boolean;
 }
 
 export interface MovementChangeEvent {
@@ -112,6 +113,10 @@ export function buildPreMatchMovement(
     row[SIXSENSE_SERIES_ID] = probability * 100;
     rowsByTimestamp.set(timestamp, row);
     modelPointCount += 1;
+    if (snapshot.synthetic_current) {
+      previousModelProbability = probability;
+      return;
+    }
     const storedEvents = Array.isArray(snapshot.change_events)
       ? snapshot.change_events
       : [];

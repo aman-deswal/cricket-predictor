@@ -93,6 +93,13 @@ export function MarketMovementChart({
     const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
     return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${values.length} ${values.length === 1 ? 'snapshot' : 'snapshots'}.`;
   });
+  const pointCountsBySeries = new Map(series.map((entry) => [
+    entry.id,
+    chartRows.reduce((count, row) => {
+      const value = row[entry.id];
+      return typeof value === 'number' && Number.isFinite(value) ? count + 1 : count;
+    }, 0),
+  ]));
   const overlappingDotOffsets = new Map<string, number>();
   chartRows.forEach((row) => {
     const timestamp = Number(row.timestamp);
@@ -158,6 +165,7 @@ export function MarketMovementChart({
     const isSelected = annotation?.timestamp === selectedMarker?.annotation.timestamp;
     const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
     const cy = dotProps.cy;
+    const showSinglePointStub = (pointCountsBySeries.get(dotProps.dataKey) ?? 0) === 1;
 
     if (annotation) {
       return (
@@ -183,6 +191,18 @@ export function MarketMovementChart({
           aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
           className="cursor-pointer"
         >
+          {showSinglePointStub && (
+            <line
+              x1={cx - 10}
+              x2={cx + 10}
+              y1={cy}
+              y2={cy}
+              stroke={dotProps.stroke}
+              strokeWidth={3}
+              strokeLinecap="round"
+              opacity={0.92}
+            />
+          )}
           <circle
             cx={cx}
             cy={cy}
@@ -210,15 +230,28 @@ export function MarketMovementChart({
     }
 
     return (
-      <circle
-        key={offsetKey}
-        cx={cx}
-        cy={cy}
-        r={3.25}
-        fill={dotProps.stroke}
-        stroke="#0b1016"
-        strokeWidth={1.5}
-      />
+      <g key={offsetKey}>
+        {showSinglePointStub && (
+          <line
+            x1={cx - 10}
+            x2={cx + 10}
+            y1={cy}
+            y2={cy}
+            stroke={dotProps.stroke}
+            strokeWidth={3}
+            strokeLinecap="round"
+            opacity={0.9}
+          />
+        )}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={3.25}
+          fill={dotProps.stroke}
+          stroke="#0b1016"
+          strokeWidth={1.5}
+        />
+      </g>
     );
   };
 
