@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -54,6 +54,7 @@ export function MarketMovementChart({
   const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
   ), [annotations]);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<{
     annotation: MovementAnnotation;
     x: number;
@@ -66,6 +67,21 @@ export function MarketMovementChart({
       setSelectedMarker(null);
     }
   }, [annotationsByTimestamp, selectedMarker]);
+
+  useEffect(() => {
+    if (!selectedMarker) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (popupRef.current?.contains(target)) return;
+      if (target.closest('[data-annotation-trigger="true"]')) return;
+      setSelectedMarker(null);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [selectedMarker]);
 
   const accessibleSummaries = series.map((entry) => {
     const values = chartRows
@@ -147,6 +163,7 @@ export function MarketMovementChart({
       return (
         <g
           key={offsetKey}
+          data-annotation-trigger="true"
           role="button"
           tabIndex={0}
           onClick={() => setSelectedMarker((current) => (
@@ -272,6 +289,7 @@ export function MarketMovementChart({
         </ResponsiveContainer>
         {selectedMarker && (
           <div
+            ref={popupRef}
             className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
               selectedMarker.y < 88 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
             }`}
