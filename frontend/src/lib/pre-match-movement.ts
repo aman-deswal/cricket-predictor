@@ -191,7 +191,7 @@ export function buildPreMatchMovement(
       ? [{
           id: SIXSENSE_SERIES_ID,
           label: 'SixSense model',
-          color: '#f8fafc',
+          color: '#f59e0b',
           kind: 'model' as const,
         }]
       : []),
