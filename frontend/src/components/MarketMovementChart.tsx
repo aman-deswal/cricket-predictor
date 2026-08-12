@@ -124,6 +124,13 @@ export function MarketMovementChart({
     const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
     return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${entry.pointCount} ${entry.pointCount === 1 ? 'snapshot' : 'snapshots'}.`;
   });
+  const modelStats = seriesStats.find((entry) => entry.kind === 'model') ?? null;
+  const comparisonStats = seriesStats.find((entry) => entry.kind === 'market') ?? null;
+  const chartWindowLabel = chartRows.length > 1
+    ? `${formatMarketTimestamp(Number(chartRows[0]?.timestamp), true)} → ${formatMarketTimestamp(Number(chartRows[chartRows.length - 1]?.timestamp), true)}`
+    : chartRows.length === 1
+      ? formatMarketTimestamp(Number(chartRows[0]?.timestamp), true)
+      : 'Awaiting history';
 
   useEffect(() => {
     if (!selectedMarker) return;
@@ -384,6 +391,34 @@ export function MarketMovementChart({
       >
         <div ref={containerRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0">
+          {modelStats?.latest !== null && modelStats?.latest !== undefined && (
+            <div className="absolute left-3 top-3 z-[1] rounded-2xl bg-[#0b1016]/78 px-3 py-2 backdrop-blur">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                SixSense
+              </p>
+              <div className="mt-1 flex items-end gap-2">
+                <span className="font-mono text-[22px] font-black leading-none text-white">
+                  {modelStats.latest.toFixed(1)}%
+                </span>
+                <span className={`pb-0.5 font-mono text-[11px] font-black ${
+                  modelStats.delta === null || Math.abs(modelStats.delta) < 0.05
+                    ? 'text-slate-400'
+                    : modelStats.delta > 0
+                      ? 'text-emerald-300'
+                      : 'text-rose-300'
+                }`}>
+                  {modelStats.delta === null || Math.abs(modelStats.delta) < 0.05
+                    ? 'Flat'
+                    : `${modelStats.delta > 0 ? '+' : ''}${modelStats.delta.toFixed(1)} pts`}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] text-slate-500">
+                {comparisonStats?.latest !== null && comparisonStats?.latest !== undefined
+                  ? `vs market ${comparisonStats.latest.toFixed(1)}%`
+                  : chartWindowLabel}
+              </p>
+            </div>
+          )}
           <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-500/24" />
           <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0c1218]/30 to-transparent" />
           {hoverState && (

@@ -4,6 +4,7 @@ import { getFranchiseLogoUrl } from './franchise-logos';
 import { getStoredDemoMode } from './demo-mode';
 import { compareMatchCenterMatches } from './competition';
 import { selectFreshestTrustedSportsbookOdds } from './market-odds';
+import { buildMatchMovementPreview, type MatchMovementPreview } from './movement-preview';
 export { getMatchSection } from './competition';
 export type { MatchSection } from './competition';
 import {
@@ -52,6 +53,7 @@ export interface Match {
   bookmaker_odds?: { bookmaker: string; team1_odds: number; team2_odds: number };
   team1_logo_url?: string;
   team2_logo_url?: string;
+  movement_preview?: MatchMovementPreview;
 }
 
 export interface EdgeScoreFactors {
@@ -212,6 +214,7 @@ export type MatchWithPredictions = Match & {
   competition_name?: string;
   team1_logo_url?: string;
   team2_logo_url?: string;
+  movement_preview?: MatchMovementPreview;
 };
 
 interface FranchiseLogoRow {
@@ -368,6 +371,17 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   ]);
 
   if (error) throw error;
+  const matchIds = ((data ?? []) as MatchWithPredictions[]).map((match) => match.match_id);
+  const snapshotCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: snapshotData } = matchIds.length > 0
+    ? await supabase
+      .from('prediction_snapshots')
+      .select('match_id, team1_win_probability, team2_win_probability, captured_at')
+      .in('match_id', matchIds)
+      .gte('captured_at', snapshotCutoff)
+      .order('captured_at', { ascending: true })
+      .limit(1000)
+    : { data: [] as Array<{ match_id: string; team1_win_probability: number; team2_win_probability: number; captured_at: string }> };
 
   // Build venue + H2H lookups (ESPN takes priority)
   const espnVenue = new Map<string, string>();
@@ -496,6 +510,25 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       team2_odds: primary.team2_odds,
     });
   });
+  const snapshotsByMatch = new Map<string, Array<{
+    team1_win_probability: number;
+    team2_win_probability: number;
+    captured_at: string;
+  }>>();
+  (snapshotData ?? []).forEach((snapshot: {
+    match_id: string;
+    team1_win_probability: number;
+    team2_win_probability: number;
+    captured_at: string;
+  }) => {
+    const entries = snapshotsByMatch.get(snapshot.match_id) ?? [];
+    entries.push({
+      team1_win_probability: snapshot.team1_win_probability,
+      team2_win_probability: snapshot.team2_win_probability,
+      captured_at: snapshot.captured_at,
+    });
+    snapshotsByMatch.set(snapshot.match_id, entries);
+  });
 
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
   ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
@@ -562,6 +595,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
         || undefined;
     };
 
+    const primaryPrediction = match.predictions?.[0] ?? null;
     return {
       ...match,
       venue: (!isPlaceholderEvidenceText(match.venue) ? match.venue.trim() : '')
@@ -574,6 +608,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       team1_recent_form: team1Form,
       team2_recent_form: team2Form,
       bookmaker_odds: oddsMap.get(match.match_id),
+      movement_preview: buildMatchMovementPreview(primaryPrediction, snapshotsByMatch.get(match.match_id) ?? []) ?? undefined,
       spotlight_signals: {
         ...enrichmentSignals.get(match.match_id),
         has_espn_context: espnVenue.has(match.match_id) || h2hMatchCount > 0,
