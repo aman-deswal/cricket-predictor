@@ -17,7 +17,7 @@ import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { CricketLoader } from '@/components/CricketLoader';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
-import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon, TrophyIcon } from '@/components/CricketIcons';
+import { BowlIcon, GlobeIcon, GroundsIcon, ShieldIcon, TargetIcon } from '@/components/CricketIcons';
 import { Logo } from '@/components/Logo';
 import {
   getHomepageTrustMetrics,
@@ -228,7 +228,7 @@ function AccuracyTeaseGraphic({ correct, total }: { correct: number; total: numb
       {Array.from({ length: segments }, (_, index) => (
         <span
           key={index}
-          className="h-2 w-2 rounded-full"
+          className="h-1.5 w-3 rounded-full"
           style={{ backgroundColor: index < highlighted ? LOGO_AMBER : 'rgba(148,163,184,0.18)' }}
         />
       ))}
@@ -279,25 +279,28 @@ function SixSensePickHeading({
         </h2>
       </SectionHeading>
       {trustSignal?.scope === 'international' && (
-        <div className="flex shrink-0 items-center gap-3">
-          <GlobeIcon className="h-5 w-5 shrink-0 text-amber-500" />
-          <div className="hidden sm:flex">
-            <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
-          </div>
+        <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500">
+            <GlobeIcon className="h-4 w-4" />
+          </span>
           <div
-            className="flex items-baseline gap-1.5 sm:gap-2"
+            className="flex flex-col items-end gap-1"
             aria-label={`${trustSignal.stats.correct} wins from ${trustSignal.stats.total} international picks in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}
           >
-            <TrophyIcon className="h-4 w-4 shrink-0 text-amber-500" />
-            <span className="text-lg font-black tabular-nums" style={{ color: LOGO_AMBER }}>
-              {trustSignal.stats.correct}
-            </span>
-            <span className="text-sm font-black tabular-nums text-slate-400 sm:text-base">
-              /{trustSignal.stats.total}
-            </span>
-            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-              {trustSignal.period === 'week' ? '7D' : '30D'}
-            </span>
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl font-black tabular-nums leading-none sm:text-[22px]" style={{ color: LOGO_AMBER }}>
+                {trustSignal.stats.correct}
+              </span>
+              <span className="text-base font-black tabular-nums leading-none text-slate-400 sm:text-lg">
+                /{trustSignal.stats.total}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:text-[11px]">
+                {trustSignal.period === 'week' ? '7D' : '30D'}
+              </span>
+            </div>
+            <div className="hidden sm:flex">
+              <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+            </div>
           </div>
         </div>
       )}
