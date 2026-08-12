@@ -701,6 +701,15 @@ function FeaturedHero({
   const getHeroCountdown = useCallback(() => getCountdown(match.date), [match.date]);
   const [countdown, setCountdown] = useState(getHeroCountdown);
   const periodLabel = trustSignal?.period === 'week' ? 'last 7 days' : 'last 30 days';
+  const predictedTeamMeta = winner === match.team2 ? team2Meta : team1Meta;
+  const predictionGap = prediction
+    ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
+    : 0;
+  const actionableLabel = prediction && winner
+    ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
+    : trustSignal
+      ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
+      : null;
 
   useEffect(() => {
     setCountdown(getHeroCountdown());
@@ -741,39 +750,34 @@ function FeaturedHero({
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
-            <span className="order-first inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300 sm:order-none sm:ml-auto sm:w-auto sm:py-0.5">
-              <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="6" />
-                <path d="M8 4v4l3 2" />
-              </svg>
-              {countdown ? (
-                <span className="whitespace-nowrap">
-                  Begins in{' '}
-                  {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-                  <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
-                  <span className="text-slate-400"> </span>
-                  <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
-                </span>
-              ) : (
-                <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
+            <div className="order-first grid w-full grid-cols-2 gap-2 sm:order-none sm:ml-auto sm:w-auto sm:min-w-[25rem]">
+              {actionableLabel && (
+                <div
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-200"
+                  style={{ borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(255,255,255,0.04)' }}
+                >
+                  <span className="truncate" style={{ color: LOGO_AMBER }}>{actionableLabel}</span>
+                </div>
               )}
-            </span>
-          </div>
-
-          {trustSignal && (
-            <div className="mb-4">
-              <Link
-                href="/history"
-                className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-white/[0.08]"
-                style={{ borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(255,255,255,0.03)' }}
-                aria-label={`View ${trustSignal.scopeLabel} ${trustSignal.periodLabel.toLowerCase()} accuracy in history`}
-              >
-                <span style={{ color: LOGO_AMBER }}>{trustSignal.stats.pct}%</span>
-                <span className="text-slate-200">accuracy</span>
-                <span className="text-slate-400">{periodLabel}</span>
-              </Link>
+              <span className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300">
+                <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M8 4v4l3 2" />
+                </svg>
+                {countdown ? (
+                  <span className="whitespace-nowrap">
+                    Begins in{' '}
+                    {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+                    <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
+                    <span className="text-slate-400"> </span>
+                    <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+                  </span>
+                ) : (
+                  <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
+                )}
+              </span>
             </div>
-          )}
+          </div>
 
           {/* Row 2: Teams + chart */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-8">
