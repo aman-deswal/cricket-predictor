@@ -208,6 +208,34 @@ function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
   );
 }
 
+function SixSenseLiveClockIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.25" stroke={LOGO_AMBER} strokeWidth="1.4" opacity="0.95" />
+      <path d="M8 5.2v3.1l2 1.2" stroke={LOGO_AMBER} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2.2 8a5.8 5.8 0 0 1 1.1-3.3" stroke={LOGO_AMBER} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      <path d="M13.8 8a5.8 5.8 0 0 1-1.1 3.3" stroke={LOGO_AMBER} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  );
+}
+
+function AccuracyTeaseGraphic({ correct, total }: { correct: number; total: number }) {
+  const segments = Math.min(Math.max(total, 8), 14);
+  const highlighted = Math.max(1, Math.min(segments, Math.round((correct / Math.max(total, 1)) * segments)));
+
+  return (
+    <div className="flex items-center gap-1" aria-hidden="true">
+      {Array.from({ length: segments }, (_, index) => (
+        <span
+          key={index}
+          className="h-2 w-2 rounded-full"
+          style={{ backgroundColor: index < highlighted ? LOGO_AMBER : 'rgba(148,163,184,0.18)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function SixSensePickHeading({ matchDate }: { matchDate: string }) {
   const getHeaderCountdown = useCallback(() => getCountdown(matchDate), [matchDate]);
   const [countdown, setCountdown] = useState(getHeaderCountdown);
@@ -226,14 +254,10 @@ function SixSensePickHeading({ matchDate }: { matchDate: string }) {
           <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
         </h2>
       </SectionHeading>
-      <div className="flex shrink-0 items-center gap-2 text-[12px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[13px]">
-        <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="8" r="6" />
-          <path d="M8 4v4l3 2" />
-        </svg>
+      <div className="flex shrink-0 items-center gap-2 text-[13px] font-black uppercase tracking-[0.18em] text-slate-300 sm:text-[15px]">
+        <SixSenseLiveClockIcon />
         {countdown ? (
           <span className="whitespace-nowrap">
-            <span className="text-slate-400">Begins in </span>
             {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
             <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
             <span className="text-slate-500">:</span>
@@ -735,7 +759,7 @@ function FeaturedHero({
     ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
     : 0;
   const actionableLabel = trustSignal?.scope === 'international'
-    ? `${trustSignal.stats.pct}% international accuracy ${periodLabel}`
+    ? `International picks running ${trustSignal.stats.pct}% over ${periodLabel}`
     : prediction && winner
       ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
       : trustSignal
@@ -782,9 +806,14 @@ function FeaturedHero({
               <p className="text-sm font-black tracking-[0.01em] text-white sm:text-base">
                 <span style={{ color: LOGO_AMBER }}>{actionableLabel}</span>
               </p>
-              <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                Recent form signal for this spot.
-              </p>
+              {trustSignal && (
+                <div className="mt-2 flex items-center gap-3">
+                  <AccuracyTeaseGraphic correct={trustSignal.stats.correct} total={trustSignal.stats.total} />
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {trustSignal.stats.correct}/{trustSignal.stats.total} right
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
