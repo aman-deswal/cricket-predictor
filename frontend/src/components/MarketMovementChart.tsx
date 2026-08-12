@@ -272,7 +272,7 @@ export function MarketMovementChart({
         </ResponsiveContainer>
         {selectedMarker && (
           <div
-            className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl border border-amber-400/20 bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
+            className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
               selectedMarker.y < 88 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
             }`}
             style={{
@@ -294,7 +294,7 @@ export function MarketMovementChart({
               <button
                 type="button"
                 onClick={() => setSelectedMarker(null)}
-                className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300 hover:border-white/20 hover:text-white"
+                className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300 hover:bg-white/[0.1] hover:text-white"
                 aria-label="Close move details"
               >
                 Close
@@ -304,7 +304,7 @@ export function MarketMovementChart({
               {selectedMarker.annotation.events.map((event, index) => (
                 <li
                   key={`${event.snapshot_at}-${event.type}-${index}`}
-                  className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5"
+                  className="rounded-xl bg-white/[0.04] p-2.5"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
                     <time className="text-slate-400" dateTime={event.event_at}>
@@ -334,7 +334,7 @@ export function MarketMovementChart({
         {series.map((entry) => (
           <span
             key={`${entry.id}-legend`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
+            className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
           >
             <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
               <span

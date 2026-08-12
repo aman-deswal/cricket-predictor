@@ -363,7 +363,7 @@ function MarketMovementPanel({
 
   return (
     <motion.div
-      className={`${detailTileClass} mb-4 border-white/10`}
+      className={`${detailTileClass} mb-4 border-white/[0.06]`}
       {...fadeUp}
       transition={{ delay: 0.16 }}
     >
@@ -378,12 +378,12 @@ function MarketMovementPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-[28px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] sm:p-4">
+      <div className="mt-4 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.22)] sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl">
            <div className="flex flex-wrap items-center gap-2">
              {gapStrength && (
-               <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone}`}>
+               <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone.replace(' border-rose-400/20', '').replace(' border-amber-400/20', '').replace(' border-sky-400/20', '').replace(' border-emerald-400/20', '')}`}>
                  {gapStrength.label}
                </span>
              )}
@@ -397,12 +397,12 @@ function MarketMovementPanel({
           </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] border border-white/[0.08] bg-[#060b13]/85 px-3 py-3 sm:px-4">
+        <div className="mt-4 rounded-[24px] bg-[#060b13]/72 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
               {movement.modelPointCount} model / {movement.marketPointCount} market points
             </span>
-            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
+            <span className="inline-flex items-center rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
               {gapBadgeLabel}
             </span>
           </div>
@@ -432,7 +432,7 @@ function MarketMovementPanel({
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.08] pt-3 sm:gap-3">
+        <div className="mt-4 grid grid-cols-4 gap-2 pt-2 sm:gap-3">
           <div className="min-w-0">
             <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
             <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
@@ -468,7 +468,7 @@ function MarketMovementPanel({
               onClick={() => {
                 if (book.marketUrl) openExternalMarket(book.marketUrl);
               }}
-              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-2.5 py-2.5 text-left transition-colors hover:border-amber-500/25 hover:bg-white/[0.06] sm:px-3"
+              className="w-full rounded-2xl bg-white/[0.035] px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.055] sm:px-3"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
