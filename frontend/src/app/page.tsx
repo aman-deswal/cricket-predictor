@@ -752,33 +752,35 @@ function FeaturedHero({
             <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-slate-200">
               {getCompetitionLabel(match)}
             </span>
-            <div className="order-first grid w-full grid-cols-2 gap-2 sm:order-none sm:ml-auto sm:w-auto sm:min-w-[25rem]">
-              {actionableLabel && (
-                <div
-                  className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-200"
-                  style={{ borderColor: 'rgba(217,119,6,0.28)', backgroundColor: 'rgba(255,255,255,0.04)' }}
-                >
-                  <span className="truncate" style={{ color: LOGO_AMBER }}>{actionableLabel}</span>
-                </div>
-              )}
-              <span className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300">
-                <svg className="h-3 w-3 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="8" cy="8" r="6" />
-                  <path d="M8 4v4l3 2" />
-                </svg>
-                {countdown ? (
-                  <span className="whitespace-nowrap">
-                    Begins in{' '}
-                    {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-                    <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
-                    <span className="text-slate-400"> </span>
-                    <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
-                  </span>
-                ) : (
-                  <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
-                )}
-              </span>
+          </div>
+
+          {actionableLabel && (
+            <div className="mb-4">
+              <p className="text-sm font-black tracking-[0.01em] text-white sm:text-base">
+                <span style={{ color: LOGO_AMBER }}>{actionableLabel}</span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                Recent form signal for this spot.
+              </p>
             </div>
+          )}
+
+          <div className="mb-5 flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <svg className="mr-2 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 4v4l3 2" />
+            </svg>
+            {countdown ? (
+              <span className="whitespace-nowrap">
+                Begins in{' '}
+                {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+                <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
+                <span className="text-slate-400"> </span>
+                <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+              </span>
+            ) : (
+              <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
+            )}
           </div>
 
           {/* Row 2: Teams + chart */}
