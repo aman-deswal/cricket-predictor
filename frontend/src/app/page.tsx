@@ -207,14 +207,42 @@ function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
   );
 }
 
-function SixSensePickHeading() {
+function SixSensePickHeading({ matchDate }: { matchDate: string }) {
+  const getHeaderCountdown = useCallback(() => getCountdown(matchDate), [matchDate]);
+  const [countdown, setCountdown] = useState(getHeaderCountdown);
+
+  useEffect(() => {
+    setCountdown(getHeaderCountdown());
+    const interval = window.setInterval(() => setCountdown(getHeaderCountdown()), 60_000);
+    return () => window.clearInterval(interval);
+  }, [getHeaderCountdown]);
+
   return (
-    <SectionHeading icon={<Logo size={40} />} bareIcon>
-      <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
-        <span className="text-amber-600">SixSense</span>
-        <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
-      </h2>
-    </SectionHeading>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <SectionHeading icon={<Logo size={40} />} bareIcon>
+        <h2 className="text-base font-black uppercase tracking-[0.18em] text-white">
+          <span className="text-amber-600">SixSense</span>
+          <sup className="ml-0.5 text-[0.55em] tracking-normal text-amber-600">™</sup> Pick
+        </h2>
+      </SectionHeading>
+      <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 sm:self-auto">
+        <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 4v4l3 2" />
+        </svg>
+        {countdown ? (
+          <span className="whitespace-nowrap">
+            Begins in{' '}
+            {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
+            <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
+            <span className="text-slate-400"> </span>
+            <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
+          </span>
+        ) : (
+          <span className="whitespace-nowrap">{getMatchDateLabel(matchDate)}</span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -698,8 +726,6 @@ function FeaturedHero({
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
   const hasMarket = hasValidMarketOdds(match);
-  const getHeroCountdown = useCallback(() => getCountdown(match.date), [match.date]);
-  const [countdown, setCountdown] = useState(getHeroCountdown);
   const periodLabel = trustSignal?.period === 'week' ? 'last 7 days' : 'last 30 days';
   const predictedTeamMeta = winner === match.team2 ? team2Meta : team1Meta;
   const predictionGap = prediction
@@ -712,12 +738,6 @@ function FeaturedHero({
       : trustSignal
         ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
         : null;
-
-  useEffect(() => {
-    setCountdown(getHeroCountdown());
-    const interval = window.setInterval(() => setCountdown(getHeroCountdown()), 60_000);
-    return () => window.clearInterval(interval);
-  }, [getHeroCountdown]);
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block">
@@ -764,24 +784,6 @@ function FeaturedHero({
               </p>
             </div>
           )}
-
-          <div className="mb-5 flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <svg className="mr-2 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="8" cy="8" r="6" />
-              <path d="M8 4v4l3 2" />
-            </svg>
-            {countdown ? (
-              <span className="whitespace-nowrap">
-                Begins in{' '}
-                {countdown.days > 0 && <span className="text-white">{countdown.days}d </span>}
-                <span className="text-white">{String(countdown.hours).padStart(2, '0')}h</span>
-                <span className="text-slate-400"> </span>
-                <span className="text-white">{String(countdown.mins).padStart(2, '0')}m</span>
-              </span>
-            ) : (
-              <span className="whitespace-nowrap">{getMatchDateLabel(match.date)}</span>
-            )}
-          </div>
 
           {/* Row 2: Teams + chart */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-8">
@@ -976,7 +978,7 @@ export default function HomePage() {
               className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10"
             >
               <div className="border-b border-white/[0.07] px-4 py-3">
-                <SixSensePickHeading />
+                <SixSensePickHeading matchDate={featuredMatch.date} />
               </div>
               <div className="p-3">
                 <FeaturedHero
