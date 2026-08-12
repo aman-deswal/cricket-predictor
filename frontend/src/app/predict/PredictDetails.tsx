@@ -906,7 +906,7 @@ export function PredictDetails() {
       `}</style>
       <motion.div
         ref={heroRef}
-        className="relative mb-6 overflow-hidden rounded-3xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 p-4 sm:p-8 lg:p-10"
+        className="relative mb-6 overflow-hidden rounded-3xl border border-slate-700/40 bg-gradient-to-br from-[#121922]/95 via-[#0c1218]/95 to-[#121922]/95 p-3.5 sm:p-8 lg:p-10"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -914,7 +914,7 @@ export function PredictDetails() {
         {/* Background glow */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-amber-600/10 blur-3xl rounded-full" />
 
-        <div className="relative grid grid-cols-[minmax(0,1fr)_minmax(7rem,9rem)_minmax(0,1fr)] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-10">
+        <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-10">
           {/* Team 1 */}
           <motion.div
             className="flex-1 text-center"
@@ -1011,14 +1011,14 @@ export function PredictDetails() {
 
           {/* Center: Chart or VS */}
           <motion.div
-            className="flex min-w-0 flex-col items-center px-1 sm:px-2"
+            className="flex min-w-0 flex-col items-center px-0.5 sm:px-2"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
           >
             {prediction ? (
               <div className="flex flex-col items-center gap-2">
-                <div className="h-24 w-24 sm:h-40 sm:w-40 lg:h-48 lg:w-48">
+                <div className="h-20 w-20 sm:h-40 sm:w-40 lg:h-48 lg:w-48">
                   <PredictionChart
                     team1={prediction.team1}
                     team2={prediction.team2}
