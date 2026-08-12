@@ -7,7 +7,6 @@ import { MatchWithPredictions, Prediction } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, isInternationalTeam } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
-import type { MatchMovementPreview } from '@/lib/movement-preview';
 
 interface MatchCardProps {
   match: MatchWithPredictions;
@@ -118,66 +117,6 @@ function getMatchTime(date: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-function MiniTrendSparkline({
-  preview,
-}: {
-  preview: MatchMovementPreview;
-}) {
-  const width = 84;
-  const height = 28;
-  const points = preview.points;
-  if (points.length === 0) return null;
-
-  const values = points.map((point) => point.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(max - min, 2);
-  const color = preview.direction === 'up'
-    ? '#22c55e'
-    : preview.direction === 'down'
-      ? '#ef4444'
-      : '#94a3b8';
-  const coords = points.map((point, index) => {
-    const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * (width - 2) + 1;
-    const y = height - (((point.value - min) / span) * (height - 6) + 3);
-    return { x, y };
-  });
-  const linePath = coords.map((coord, index) => `${index === 0 ? 'M' : 'L'} ${coord.x} ${coord.y}`).join(' ');
-  const latest = coords[coords.length - 1];
-
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.06] bg-black/20 px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">SixSense trend</p>
-        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-200">
-          {preview.points.length} pts
-        </p>
-      </div>
-      <div className="min-w-0 flex-1">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-8 w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true">
-          <path d={linePath} fill="none" stroke={color} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx={latest.x} cy={latest.y} r="2.75" fill={color} />
-          <circle cx={latest.x} cy={latest.y} r="5.5" fill={`${color}22`} />
-        </svg>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="font-mono text-[13px] font-black text-white">{preview.latest.toFixed(1)}%</p>
-        <p className={`mt-0.5 font-mono text-[10px] font-black ${
-          preview.direction === 'up'
-            ? 'text-emerald-300'
-            : preview.direction === 'down'
-              ? 'text-rose-300'
-              : 'text-slate-400'
-        }`}>
-          {preview.change === null || Math.abs(preview.change) < 0.05
-            ? 'Flat'
-            : `${preview.change > 0 ? '+' : ''}${preview.change.toFixed(1)} pts`}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
@@ -269,12 +208,6 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
             {/* Probability bar */}
             {prediction && (
               <ProbBar team1Prob={prediction.team1_win_probability} c1={team1Meta.primaryColor} c2={team2Meta.primaryColor} />
-            )}
-
-            {match.movement_preview && (
-              <div className="mt-3">
-                <MiniTrendSparkline preview={match.movement_preview} />
-              </div>
             )}
 
             <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5">

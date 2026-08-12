@@ -2,20 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AreaSeries,
-  type Coordinate,
-  ColorType,
-  LineSeries,
-  createChart,
-  type IChartApi,
-  type ISeriesApi,
-  type MouseEventParams,
-  type Time,
-  type UTCTimestamp,
-} from 'lightweight-charts';
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import type { MovementAnnotation, MovementSeries } from '@/lib/pre-match-movement';
-
-type ChartLinePoint = { time: UTCTimestamp; value: number };
 
 interface MarketMovementChartProps {
   chartRows: Array<Record<string, number | null>>;
@@ -26,18 +22,6 @@ interface MarketMovementChartProps {
   annotations: MovementAnnotation[];
   insightCaption?: string;
   heightClassName?: string;
-}
-
-interface HoverState {
-  x: Coordinate;
-  y: Coordinate;
-  timestamp: number;
-  values: Array<{
-    id: string;
-    label: string;
-    color: string;
-    value: number;
-  }>;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -57,17 +41,6 @@ function formatPopupEventTime(value: string): string {
   });
 }
 
-function toChartTime(timestamp: number): UTCTimestamp {
-  return Math.floor(timestamp / 1000) as UTCTimestamp;
-}
-
-function isLineValueData(value: unknown): value is ChartLinePoint {
-  return typeof value === 'object'
-    && value !== null
-    && 'value' in value
-    && typeof (value as { value?: unknown }).value === 'number';
-}
-
 export function MarketMovementChart({
   chartRows,
   series,
@@ -78,59 +51,15 @@ export function MarketMovementChart({
   insightCaption,
   heightClassName,
 }: MarketMovementChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const popupRef = useRef<HTMLDivElement | null>(null);
-  const seriesRefs = useRef(new Map<string, ISeriesApi<'Area'> | ISeriesApi<'Line'>>());
-  const [selectedMarker, setSelectedMarker] = useState<{
-    annotation: MovementAnnotation;
-    x: Coordinate;
-    y: Coordinate;
-  } | null>(null);
-  const [hoverState, setHoverState] = useState<HoverState | null>(null);
-  const [annotationCoords, setAnnotationCoords] = useState<Array<{
-    annotation: MovementAnnotation;
-    x: Coordinate;
-    y: Coordinate;
-  }>>([]);
-
-  const seriesStats = useMemo(() => series.map((entry) => {
-    const points = chartRows
-      .map((row) => row[entry.id])
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    const opening = points[0] ?? null;
-    const latest = points[points.length - 1] ?? null;
-    const delta = opening !== null && latest !== null ? latest - opening : null;
-    return {
-      ...entry,
-      pointCount: points.length,
-      opening,
-      latest,
-      delta,
-    };
-  }), [chartRows, series]);
-
   const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
   ), [annotations]);
-
-  const accessibleSummaries = seriesStats.map((entry) => {
-    const opening = entry.opening;
-    const latest = entry.latest;
-    if (opening === null || latest === null) {
-      return `${entry.label}: no usable chart points were available.`;
-    }
-    const delta = latest - opening;
-    const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
-    return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${entry.pointCount} ${entry.pointCount === 1 ? 'snapshot' : 'snapshots'}.`;
-  });
-  const modelStats = seriesStats.find((entry) => entry.kind === 'model') ?? null;
-  const comparisonStats = seriesStats.find((entry) => entry.kind === 'market') ?? null;
-  const chartWindowLabel = chartRows.length > 1
-    ? `${formatMarketTimestamp(Number(chartRows[0]?.timestamp), true)} → ${formatMarketTimestamp(Number(chartRows[chartRows.length - 1]?.timestamp), true)}`
-    : chartRows.length === 1
-      ? formatMarketTimestamp(Number(chartRows[0]?.timestamp), true)
-      : 'Awaiting history';
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const [selectedMarker, setSelectedMarker] = useState<{
+    annotation: MovementAnnotation;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!selectedMarker) return;
@@ -154,233 +83,177 @@ export function MarketMovementChart({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [selectedMarker]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const chart = createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight,
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#94a3b8',
-        fontFamily: 'var(--font-jetbrains-mono, monospace)',
-        attributionLogo: false,
-      },
-      grid: {
-        vertLines: { color: 'rgba(36, 48, 65, 0.12)' },
-        horzLines: { color: 'rgba(36, 48, 65, 0.42)' },
-      },
-      rightPriceScale: {
-        visible: true,
-        borderColor: 'rgba(34, 48, 65, 0.7)',
-        scaleMargins: { top: 0.1, bottom: 0.12 },
-      },
-      leftPriceScale: { visible: false },
-      timeScale: {
-        borderColor: 'rgba(34, 48, 65, 0.7)',
-        timeVisible: true,
-        secondsVisible: false,
-        minBarSpacing: 24,
-        rightOffset: 0.75,
-      },
-      crosshair: {
-        vertLine: {
-          color: 'rgba(148, 163, 184, 0.12)',
-          width: 1,
-          labelBackgroundColor: '#111820',
-        },
-        horzLine: {
-          color: 'rgba(148, 163, 184, 0.08)',
-          width: 1,
-          labelBackgroundColor: '#111820',
-        },
-      },
-      localization: {
-        priceFormatter: (value: number) => `${value.toFixed(1)}%`,
-      },
-      handleScroll: false,
-      handleScale: false,
-    });
-
-    chartRef.current = chart;
-
-    const syncSize = () => {
-      if (!containerRef.current || !chartRef.current) return;
-      chartRef.current.applyOptions({
-        width: containerRef.current.clientWidth,
-        height: containerRef.current.clientHeight,
-      });
-    };
-
-    const resizeObserver = new ResizeObserver(() => syncSize());
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-      chartRef.current = null;
-      seriesRefs.current.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-
-    seriesRefs.current.forEach((seriesApi) => chart.removeSeries(seriesApi));
-    seriesRefs.current.clear();
+  const accessibleSummaries = series.map((entry) => {
+    const values = chartRows
+      .map((row) => row[entry.id])
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const opening = values[0];
+    const latest = values[values.length - 1];
+    const delta = latest - opening;
+    const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
+    return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${values.length} ${values.length === 1 ? 'snapshot' : 'snapshots'}.`;
+  });
+  const pointCountsBySeries = new Map(series.map((entry) => [
+    entry.id,
+    chartRows.reduce((count, row) => {
+      const value = row[entry.id];
+      return typeof value === 'number' && Number.isFinite(value) ? count + 1 : count;
+    }, 0),
+  ]));
+  const overlappingDotOffsets = new Map<string, number>();
+  chartRows.forEach((row) => {
+    const timestamp = Number(row.timestamp);
+    const groups = new Map<string, string[]>();
 
     series.forEach((entry) => {
-      const pointCount = seriesStats.find((candidate) => candidate.id === entry.id)?.pointCount ?? 0;
-      const commonOptions = {
-        priceScaleId: 'right' as const,
-        lastValueVisible: false,
-        priceLineVisible: false,
-        crosshairMarkerVisible: true,
-        pointMarkersVisible: pointCount <= 8,
-      };
-      const plottedSeries = entry.kind === 'model'
-        ? chart.addSeries(AreaSeries, {
-            ...commonOptions,
-            lineColor: entry.color,
-            topColor: 'rgba(245, 158, 11, 0.22)',
-            bottomColor: 'rgba(245, 158, 11, 0.02)',
-            lineWidth: 3,
-            crosshairMarkerRadius: 4,
-            crosshairMarkerBorderColor: entry.color,
-            crosshairMarkerBackgroundColor: '#0b1016',
-            pointMarkersRadius: 4,
-          })
-        : chart.addSeries(LineSeries, {
-            ...commonOptions,
-            color: entry.color,
-            lineWidth: 2,
-            lineStyle: 0,
-            crosshairMarkerRadius: 3,
-            crosshairMarkerBorderColor: entry.color,
-            crosshairMarkerBackgroundColor: '#0b1016',
-            pointMarkersRadius: 3,
-          });
-
-      const data = chartRows
-        .map((row) => {
-          const value = row[entry.id];
-          if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-          return {
-            time: toChartTime(Number(row.timestamp)),
-            value,
-          };
-        })
-        .filter((point): point is ChartLinePoint => point !== null);
-
-      plottedSeries.setData(data);
-      seriesRefs.current.set(entry.id, plottedSeries);
+      const value = row[entry.id];
+      if (typeof value !== 'number' || !Number.isFinite(value)) return;
+      const bucketKey = `${timestamp}:${value.toFixed(1)}`;
+      const entries = groups.get(bucketKey) ?? [];
+      entries.push(entry.id);
+      groups.set(bucketKey, entries);
     });
 
-    chart.priceScale('right').applyOptions({
-      autoScale: false,
-      mode: 0,
-      scaleMargins: { top: 0.1, bottom: 0.12 },
-    });
-    chart.priceScale('right').setVisibleRange({
-      from: minDomain,
-      to: maxDomain,
-    });
-    chart.applyOptions({
-      rightPriceScale: {
-        autoScale: false,
-      },
-    });
-    chart.timeScale().fitContent();
+    groups.forEach((bookIds, bucketKey) => {
+      const offsets = bookIds.length === 1
+        ? [0]
+        : bookIds.length === 2
+          ? [-5, 5]
+          : [-8, 0, 8];
 
-    const modelSeries = seriesRefs.current.get('sixsense-model');
-    const recomputeAnnotationCoords = () => {
-      if (!chartRef.current || !modelSeries) {
-        setAnnotationCoords([]);
-        return;
-      }
-      const coords = annotations
-        .map((annotation) => {
-          const x = chartRef.current?.timeScale().timeToCoordinate(toChartTime(annotation.timestamp));
-          const y = modelSeries.priceToCoordinate(annotation.probability);
-          if (x === null || y === null) return null;
-          return { annotation, x, y };
-        })
-        .filter((item): item is { annotation: MovementAnnotation; x: Coordinate; y: Coordinate } => item !== null);
-      setAnnotationCoords(coords);
-      setSelectedMarker((current) => {
-        if (!current) return current;
-        const next = coords.find((item) => item.annotation.timestamp === current.annotation.timestamp);
-        return next ?? null;
+      bookIds.forEach((bookId, index) => {
+        overlappingDotOffsets.set(`${bucketKey}:${bookId}`, offsets[index] ?? 0);
       });
-    };
-
-    recomputeAnnotationCoords();
-
-    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
-      if (!param.point || param.point.x < 0 || param.point.y < 0 || !param.time) {
-        setHoverState(null);
-        return;
-      }
-      const hoveredValues = series
-        .map((entry) => {
-          const api = seriesRefs.current.get(entry.id);
-          if (!api) return null;
-          const data = param.seriesData.get(api);
-          if (!isLineValueData(data)) return null;
-          return {
-            id: entry.id,
-            label: entry.label,
-            color: entry.color,
-            value: data.value,
-          };
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
-      if (hoveredValues.length === 0) {
-        setHoverState(null);
-        return;
-      }
-
-      setHoverState({
-        x: param.point.x,
-        y: param.point.y,
-        timestamp: Number(param.time) * 1000,
-        values: hoveredValues,
-      });
-    };
-
-    chart.subscribeCrosshairMove(handleCrosshairMove);
-    chart.timeScale().subscribeVisibleLogicalRangeChange(recomputeAnnotationCoords);
-
-    return () => {
-      chart.unsubscribeCrosshairMove(handleCrosshairMove);
-      chart.timeScale().unsubscribeVisibleLogicalRangeChange(recomputeAnnotationCoords);
-    };
-  }, [annotations, chartRows, maxDomain, minDomain, series, seriesStats]);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    chart.priceScale('right').applyOptions({
-      autoScale: false,
-      mode: 0,
-      scaleMargins: { top: 0.1, bottom: 0.12 },
     });
-    chart.applyOptions({
-      localization: {
-        priceFormatter: (value: number) => `${value.toFixed(1)}%`,
-      },
-      overlayPriceScales: {
-        scaleMargins: { top: 0.1, bottom: 0.12 },
-      },
-    });
-    chart.priceScale('right').setVisibleRange({
-      from: minDomain,
-      to: maxDomain,
-    });
-  }, [maxDomain, minDomain]);
+  });
+
+  const renderMarketDot = (dotProps: {
+    cx?: number;
+    cy?: number;
+    payload?: Record<string, number | string | null>;
+    value?: number | string | Array<number | string>;
+    dataKey?: string | number;
+    stroke?: string;
+  }) => {
+    const emptyDot = (
+      <circle
+        key={`empty-${String(dotProps.dataKey)}-${String(dotProps.cx)}-${String(dotProps.cy)}`}
+        cx={0}
+        cy={0}
+        r={0}
+        fill="transparent"
+        stroke="none"
+      />
+    );
+    if (typeof dotProps.cx !== 'number' || typeof dotProps.cy !== 'number' || typeof dotProps.dataKey !== 'string') {
+      return emptyDot;
+    }
+
+    const timestamp = Number(dotProps.payload?.timestamp);
+    const numericValue = typeof dotProps.value === 'number'
+      ? dotProps.value
+      : Array.isArray(dotProps.value) && typeof dotProps.value[0] === 'number'
+        ? dotProps.value[0]
+        : null;
+
+    if (!Number.isFinite(timestamp) || numericValue === null) return emptyDot;
+
+    const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
+    const annotation = dotProps.dataKey === 'sixsense-model'
+      ? annotationsByTimestamp.get(timestamp)
+      : undefined;
+    const isSelected = annotation?.timestamp === selectedMarker?.annotation.timestamp;
+    const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
+    const cy = dotProps.cy;
+    const showSinglePointStub = (pointCountsBySeries.get(dotProps.dataKey) ?? 0) === 1;
+
+    if (annotation) {
+      return (
+        <g
+          key={offsetKey}
+          data-annotation-trigger="true"
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedMarker((current) => (
+            current?.annotation.timestamp === annotation.timestamp
+              ? null
+              : { annotation, x: cx, y: cy }
+          ))}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setSelectedMarker({ annotation, x: cx, y: cy });
+            } else if (event.key === 'Escape') {
+              setSelectedMarker(null);
+            }
+          }}
+          aria-expanded={isSelected}
+          aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
+          className="cursor-pointer"
+        >
+          {showSinglePointStub && (
+            <line
+              x1={cx - 10}
+              x2={cx + 10}
+              y1={cy}
+              y2={cy}
+              stroke={dotProps.stroke}
+              strokeWidth={3}
+              strokeLinecap="round"
+              opacity={0.92}
+            />
+          )}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSelected ? 8.5 : 7}
+            fill="rgba(245, 158, 11, 0.14)"
+            stroke="none"
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSelected ? 5.75 : 5}
+            fill="#0b1016"
+            stroke="#fbbf24"
+            strokeWidth={2.5}
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={2.2}
+            fill="#fbbf24"
+            stroke="none"
+          />
+        </g>
+      );
+    }
+
+    return (
+      <g key={offsetKey}>
+        {showSinglePointStub && (
+          <line
+            x1={cx - 10}
+            x2={cx + 10}
+            y1={cy}
+            y2={cy}
+            stroke={dotProps.stroke}
+            strokeWidth={3}
+            strokeLinecap="round"
+            opacity={0.9}
+          />
+        )}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={3.25}
+          fill={dotProps.stroke}
+          stroke="#0b1016"
+          strokeWidth={1.5}
+        />
+      </g>
+    );
+  };
 
   return (
     <>
@@ -389,82 +262,64 @@ export function MarketMovementChart({
         role="img"
         aria-label={ariaLabel}
       >
-        <div ref={containerRef} className="absolute inset-0" />
-        <div className="pointer-events-none absolute inset-0">
-          {modelStats?.latest !== null && modelStats?.latest !== undefined && (
-            <div className="absolute left-3 top-3 z-[1] rounded-2xl bg-[#0b1016]/78 px-3 py-2 backdrop-blur">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                SixSense
-              </p>
-              <div className="mt-1 flex items-end gap-2">
-                <span className="font-mono text-[22px] font-black leading-none text-white">
-                  {modelStats.latest.toFixed(1)}%
-                </span>
-                <span className={`pb-0.5 font-mono text-[11px] font-black ${
-                  modelStats.delta === null || Math.abs(modelStats.delta) < 0.05
-                    ? 'text-slate-400'
-                    : modelStats.delta > 0
-                      ? 'text-emerald-300'
-                      : 'text-rose-300'
-                }`}>
-                  {modelStats.delta === null || Math.abs(modelStats.delta) < 0.05
-                    ? 'Flat'
-                    : `${modelStats.delta > 0 ? '+' : ''}${modelStats.delta.toFixed(1)} pts`}
-                </span>
-              </div>
-              <p className="mt-1 text-[10px] text-slate-500">
-                {comparisonStats?.latest !== null && comparisonStats?.latest !== undefined
-                  ? `vs market ${comparisonStats.latest.toFixed(1)}%`
-                  : chartWindowLabel}
-              </p>
-            </div>
-          )}
-          <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-500/24" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0c1218]/30 to-transparent" />
-          {hoverState && (
-            <div className="absolute left-2 top-2 rounded-xl border border-white/[0.08] bg-[#111820]/92 px-3 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
-                {formatMarketTimestamp(hoverState.timestamp)}
-              </p>
-              <div className="mt-2 space-y-1.5">
-                {hoverState.values.map((entry) => (
-                  <div key={`${entry.id}-hover`} className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-300">
-                        {entry.label}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[11px] font-black text-white">
-                      {entry.value.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {annotationCoords.map(({ annotation, x, y }) => {
-            const isSelected = annotation.timestamp === selectedMarker?.annotation.timestamp;
-            return (
-              <button
-                key={`${annotation.timestamp}-marker`}
-                type="button"
-                data-annotation-trigger="true"
-                onClick={() => setSelectedMarker((current) => (
-                  current?.annotation.timestamp === annotation.timestamp
-                    ? null
-                    : { annotation, x, y }
-                ))}
-                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-                style={{ left: x, top: y }}
-                aria-expanded={isSelected}
-                aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
-              >
-                <span className="block h-4 w-4 rounded-full border-2 border-amber-400 bg-[#0b1016] shadow-[0_0_0_3px_rgba(245,158,11,0.14)]" />
-              </button>
-            );
-          })}
-        </div>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 2 }}>
+            <CartesianGrid vertical={false} stroke="#243041" strokeOpacity={0.55} />
+            <XAxis
+              dataKey="timestamp"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
+              minTickGap={28}
+            />
+            <YAxis
+              domain={[minDomain, maxDomain]}
+              tickFormatter={(value) => `${Math.round(Number(value))}%`}
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
+              width={42}
+            />
+            <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#111820',
+                border: '1px solid rgba(245,158,11,0.16)',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontFamily: 'var(--font-jetbrains-mono, monospace)',
+              }}
+              labelFormatter={(value) => formatMarketTimestamp(Number(value))}
+              formatter={(value, name) => {
+                const entry = series.find((candidate) => candidate.id === name);
+                const numericValue = typeof value === 'number'
+                  ? value
+                  : Array.isArray(value) && typeof value[0] === 'number'
+                    ? value[0]
+                    : null;
+                if (numericValue === null) return ['—', entry?.label ?? String(name)];
+                return [`${numericValue.toFixed(1)}%`, entry?.label ?? String(name)];
+              }}
+            />
+            {series.map((entry) => (
+              <Line
+                key={entry.id}
+                type="monotone"
+                dataKey={entry.id}
+                stroke={entry.color}
+                strokeWidth={entry.kind === 'model' ? 3.5 : 2.75}
+                strokeOpacity={entry.kind === 'model' ? 1 : 0.88}
+                dot={chartRows.length <= 8 ? renderMarketDot : false}
+                activeDot={{ fill: entry.color, r: 4, strokeWidth: 0 }}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
         {selectedMarker && (
           <div
             ref={popupRef}
@@ -550,9 +405,6 @@ export function MarketMovementChart({
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
         {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
-      </p>
-      <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-        Charting by TradingView Lightweight Charts.
       </p>
     </>
   );

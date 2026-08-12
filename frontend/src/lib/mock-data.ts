@@ -12,7 +12,6 @@ import type {
   PredictionSnapshot,
 } from './supabase';
 import { compareMatchCenterMatches } from './competition';
-import { buildMatchMovementPreview } from './movement-preview';
 
 const now = Date.now();
 
@@ -732,13 +731,7 @@ function buildRollingTrend(results: PredictionHistoryItem[]): Array<{ date: stri
 }
 
 export function getMockUpcomingMatches(): MatchWithPredictions[] {
-  return demoMatches.map((match) => ({
-    ...match,
-    movement_preview: buildMatchMovementPreview(
-      match.predictions?.[0] ?? null,
-      demoPredictionSnapshots.filter((snapshot) => snapshot.match_id === match.match_id),
-    ) ?? undefined,
-  }));
+  return demoMatches;
 }
 
 export function getMockMatch(matchId: string): Match | null {
