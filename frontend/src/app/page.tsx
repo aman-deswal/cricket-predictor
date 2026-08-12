@@ -266,6 +266,98 @@ function CountdownDisplay({ matchDate }: { matchDate: string }) {
   );
 }
 
+function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSignal }) {
+  const [open, setOpen] = useState(false);
+  const [beaconPulse, setBeaconPulse] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const hasPlayedPulseRef = useRef(false);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || hasPlayedPulseRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting || hasPlayedPulseRef.current) return;
+        hasPlayedPulseRef.current = true;
+        setBeaconPulse(true);
+        window.setTimeout(() => setBeaconPulse(false), 5200);
+        observer.disconnect();
+      },
+      { threshold: 0.65 },
+    );
+
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  const isLeague = trustSignal.scope === 'league';
+  const periodLabel = trustSignal.period === 'week' ? 'last 7 days' : 'last 30 days';
+
+  return (
+    <div ref={wrapperRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={`Explain ${trustSignal.scopeLabel.toLowerCase()} win-rate record`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500 shadow-[0_0_18px_rgba(217,119,6,0.22)] transition-all duration-200 hover:scale-105 hover:bg-amber-500/16 ${beaconPulse ? 'animate-trust-icon-beacon' : ''}`}
+      >
+        {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-3 w-[250px] rounded-2xl border border-white/[0.08] bg-[#0f1620]/98 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:w-[280px]">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
+              {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
+              <p className="mt-1 text-sm font-semibold leading-snug text-white">
+                {trustSignal.stats.pct}% win rate over the {periodLabel}.
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
+              </p>
+              <Link
+                href="/history"
+                className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
+                onClick={() => setOpen(false)}
+              >
+                Prediction history <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SixSensePickHeading({
   trustSignal,
 }: {
@@ -281,13 +373,7 @@ function SixSensePickHeading({
       </SectionHeading>
       {trustSignal && (
         <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
-          <Link
-            href="/history"
-            aria-label={`View ${trustSignal.scopeLabel.toLowerCase()} prediction history`}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-500 shadow-[0_0_18px_rgba(217,119,6,0.22)] transition-transform duration-200 hover:scale-105 hover:bg-amber-500/16"
-          >
-            {trustSignal.scope === 'league' ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
-          </Link>
+          <TrustSignalInfoTrigger trustSignal={trustSignal} />
           <div
             className="flex flex-col items-end gap-1"
             aria-label={`${trustSignal.stats.pct}% ${trustSignal.scopeLabel.toLowerCase()} win rate in the last ${trustSignal.period === 'week' ? '7 days' : '30 days'}`}

@@ -71,6 +71,27 @@
     animation: ev-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 
+  @keyframes trust-icon-beacon {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+      box-shadow: 0 0 0 rgba(217, 119, 6, 0.0), 0 0 18px rgba(217, 119, 6, 0.22);
+    }
+    35% {
+      transform: scale(1.08);
+      opacity: 1;
+      box-shadow: 0 0 0 6px rgba(217, 119, 6, 0.0), 0 0 24px rgba(217, 119, 6, 0.36);
+    }
+    55% {
+      transform: scale(0.98);
+      opacity: 0.74;
+      box-shadow: 0 0 0 10px rgba(217, 119, 6, 0.0), 0 0 12px rgba(217, 119, 6, 0.14);
+    }
+  }
+  .animate-trust-icon-beacon {
+    animation: trust-icon-beacon 1.2s ease-in-out 4;
+  }
+
   @keyframes cricket-seam-orbit {
     to { transform: rotate(1turn); }
   }
