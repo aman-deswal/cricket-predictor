@@ -81,8 +81,18 @@ export function MarketMovementChart({
     dataKey?: string | number;
     stroke?: string;
   }) => {
+    const emptyDot = (
+      <circle
+        key={`empty-${String(dotProps.dataKey)}-${String(dotProps.cx)}-${String(dotProps.cy)}`}
+        cx={0}
+        cy={0}
+        r={0}
+        fill="transparent"
+        stroke="none"
+      />
+    );
     if (typeof dotProps.cx !== 'number' || typeof dotProps.cy !== 'number' || typeof dotProps.dataKey !== 'string') {
-      return null;
+      return emptyDot;
     }
 
     const timestamp = Number(dotProps.payload?.timestamp);
@@ -92,7 +102,7 @@ export function MarketMovementChart({
         ? dotProps.value[0]
         : null;
 
-    if (!Number.isFinite(timestamp) || numericValue === null) return null;
+    if (!Number.isFinite(timestamp) || numericValue === null) return emptyDot;
 
     const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
     return (
