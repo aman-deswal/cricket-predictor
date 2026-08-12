@@ -330,26 +330,34 @@ function TrustSignalInfoTrigger({ trustSignal }: { trustSignal: HomepageTrustSig
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-3 w-[250px] rounded-2xl border border-white/[0.08] bg-[#0f1620]/98 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:w-[280px]">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
-              {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
-              <p className="mt-1 text-sm font-semibold leading-snug text-white">
-                {trustSignal.stats.pct}% win rate over the {periodLabel}.
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
-              </p>
-              <Link
-                href="/history"
-                className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
-                onClick={() => setOpen(false)}
-              >
-                Prediction history <span aria-hidden="true">→</span>
-              </Link>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close trust explainer"
+            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+            onClick={() => setOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-[320px] rounded-2xl border border-white/[0.08] bg-[#0f1620]/98 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
+                {isLeague ? <ShieldIcon className="h-4 w-4" /> : <GlobeIcon className="h-4 w-4" />}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{trustSignal.scopeLabel} record</p>
+                <p className="mt-1 text-sm font-semibold leading-snug text-white">
+                  {trustSignal.stats.pct}% win rate over the {periodLabel}.
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  SixSense went {trustSignal.stats.correct} for {trustSignal.stats.total} in this spot, using completed picks from prediction history.
+                </p>
+                <Link
+                  href="/history"
+                  className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-amber-500 transition-colors hover:text-amber-400"
+                  onClick={() => setOpen(false)}
+                >
+                  Prediction history <span aria-hidden="true">→</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
