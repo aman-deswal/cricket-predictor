@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AreaSeries,
   type Coordinate,
   ColorType,
   LineSeries,
   createChart,
   type IChartApi,
   type ISeriesApi,
-  type LineData,
   type MouseEventParams,
   type Time,
   type UTCTimestamp,
@@ -61,7 +61,7 @@ function toChartTime(timestamp: number): UTCTimestamp {
   return Math.floor(timestamp / 1000) as UTCTimestamp;
 }
 
-function isLineValueData(value: unknown): value is LineData<Time> {
+function isLineValueData(value: unknown): value is ChartLinePoint {
   return typeof value === 'object'
     && value !== null
     && 'value' in value
@@ -81,7 +81,7 @@ export function MarketMovementChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
-  const seriesRefs = useRef(new Map<string, ISeriesApi<'Line'>>());
+  const seriesRefs = useRef(new Map<string, ISeriesApi<'Area'> | ISeriesApi<'Line'>>());
   const [selectedMarker, setSelectedMarker] = useState<{
     annotation: MovementAnnotation;
     x: Coordinate;
@@ -161,13 +161,13 @@ export function MarketMovementChart({
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: 'rgba(36, 48, 65, 0.18)' },
-        horzLines: { color: 'rgba(36, 48, 65, 0.55)' },
+        vertLines: { color: 'rgba(36, 48, 65, 0.12)' },
+        horzLines: { color: 'rgba(36, 48, 65, 0.42)' },
       },
       rightPriceScale: {
         visible: true,
         borderColor: 'rgba(34, 48, 65, 0.7)',
-        scaleMargins: { top: 0.14, bottom: 0.12 },
+        scaleMargins: { top: 0.1, bottom: 0.12 },
       },
       leftPriceScale: { visible: false },
       timeScale: {
@@ -179,12 +179,12 @@ export function MarketMovementChart({
       },
       crosshair: {
         vertLine: {
-          color: 'rgba(148, 163, 184, 0.18)',
+          color: 'rgba(148, 163, 184, 0.12)',
           width: 1,
           labelBackgroundColor: '#111820',
         },
         horzLine: {
-          color: 'rgba(148, 163, 184, 0.12)',
+          color: 'rgba(148, 163, 184, 0.08)',
           width: 1,
           labelBackgroundColor: '#111820',
         },
@@ -226,20 +226,35 @@ export function MarketMovementChart({
 
     series.forEach((entry) => {
       const pointCount = seriesStats.find((candidate) => candidate.id === entry.id)?.pointCount ?? 0;
-      const lineSeries = chart.addSeries(LineSeries, {
-        color: entry.color,
-        lineWidth: entry.kind === 'model' ? 3 : 2,
-        lineStyle: 0,
-        lineVisible: true,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: entry.kind === 'model' ? 4 : 3,
-        crosshairMarkerBorderColor: entry.color,
-        crosshairMarkerBackgroundColor: '#0b1016',
+      const commonOptions = {
+        priceScaleId: 'right' as const,
         lastValueVisible: false,
         priceLineVisible: false,
+        crosshairMarkerVisible: true,
         pointMarkersVisible: pointCount <= 8,
-        pointMarkersRadius: entry.kind === 'model' ? 4 : 3,
-      });
+      };
+      const plottedSeries = entry.kind === 'model'
+        ? chart.addSeries(AreaSeries, {
+            ...commonOptions,
+            lineColor: entry.color,
+            topColor: 'rgba(245, 158, 11, 0.22)',
+            bottomColor: 'rgba(245, 158, 11, 0.02)',
+            lineWidth: 3,
+            crosshairMarkerRadius: 4,
+            crosshairMarkerBorderColor: entry.color,
+            crosshairMarkerBackgroundColor: '#0b1016',
+            pointMarkersRadius: 4,
+          })
+        : chart.addSeries(LineSeries, {
+            ...commonOptions,
+            color: entry.color,
+            lineWidth: 2,
+            lineStyle: 0,
+            crosshairMarkerRadius: 3,
+            crosshairMarkerBorderColor: entry.color,
+            crosshairMarkerBackgroundColor: '#0b1016',
+            pointMarkersRadius: 3,
+          });
 
       const data = chartRows
         .map((row) => {
@@ -252,14 +267,18 @@ export function MarketMovementChart({
         })
         .filter((point): point is ChartLinePoint => point !== null);
 
-      lineSeries.setData(data);
-      seriesRefs.current.set(entry.id, lineSeries);
+      plottedSeries.setData(data);
+      seriesRefs.current.set(entry.id, plottedSeries);
     });
 
     chart.priceScale('right').applyOptions({
       autoScale: false,
       mode: 0,
-      scaleMargins: { top: 0.14, bottom: 0.12 },
+      scaleMargins: { top: 0.1, bottom: 0.12 },
+    });
+    chart.priceScale('right').setVisibleRange({
+      from: minDomain,
+      to: maxDomain,
     });
     chart.applyOptions({
       rightPriceScale: {
@@ -340,14 +359,14 @@ export function MarketMovementChart({
     chart.priceScale('right').applyOptions({
       autoScale: false,
       mode: 0,
-      scaleMargins: { top: 0.14, bottom: 0.12 },
+      scaleMargins: { top: 0.1, bottom: 0.12 },
     });
     chart.applyOptions({
       localization: {
         priceFormatter: (value: number) => `${value.toFixed(1)}%`,
       },
       overlayPriceScales: {
-        scaleMargins: { top: 0.14, bottom: 0.12 },
+        scaleMargins: { top: 0.1, bottom: 0.12 },
       },
     });
     chart.priceScale('right').setVisibleRange({
@@ -365,7 +384,8 @@ export function MarketMovementChart({
       >
         <div ref={containerRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-500/30" />
+          <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-500/24" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0c1218]/30 to-transparent" />
           {hoverState && (
             <div className="absolute left-2 top-2 rounded-xl border border-white/[0.08] bg-[#111820]/92 px-3 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
