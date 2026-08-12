@@ -493,19 +493,14 @@ function MatchBoardStrip({
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-2">
                           <MatchCenterTeamMark team={match.team1} logoUrl={match.team1_logo_url} />
-                          <div className="min-w-0">
-                            <p
-                              className={`min-w-0 text-[13px] font-black leading-[1.15] ${team1Leads ? 'text-white' : 'text-gray-300'}`}
-                              title={match.team1}
-                            >
-                              {match.team1}
-                            </p>
-                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                              {team1Meta.shortName}
-                            </p>
-                          </div>
+                          <p
+                            className={`min-w-0 truncate text-[15px] font-black leading-none tracking-[0.02em] ${team1Leads ? 'text-white' : 'text-gray-300'}`}
+                            title={match.team1}
+                          >
+                            {team1Meta.shortName}
+                          </p>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-9">
                           <span
                             className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
                             title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
@@ -534,19 +529,14 @@ function MatchBoardStrip({
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-2">
                           <MatchCenterTeamMark team={match.team2} logoUrl={match.team2_logo_url} />
-                          <div className="min-w-0">
-                            <p
-                              className={`min-w-0 text-[13px] font-black leading-[1.15] ${team2Leads ? 'text-white' : 'text-gray-300'}`}
-                              title={match.team2}
-                            >
-                              {match.team2}
-                            </p>
-                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                              {team2Meta.shortName}
-                            </p>
-                          </div>
+                          <p
+                            className={`min-w-0 truncate text-[15px] font-black leading-none tracking-[0.02em] ${team2Leads ? 'text-white' : 'text-gray-300'}`}
+                            title={match.team2}
+                          >
+                            {team2Meta.shortName}
+                          </p>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-9">
                           <span
                             className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums text-gray-300"
                             title={hasMarket && match.bookmaker_odds ? `${match.bookmaker_odds.bookmaker} American odds` : 'Sportsbook odds unavailable'}
