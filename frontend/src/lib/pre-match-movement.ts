@@ -1,3 +1,5 @@
+import { hasValidTwoSidedOdds } from './market-odds';
+
 export interface MovementPredictionSnapshot {
   team1_win_probability: number;
   team2_win_probability: number;
@@ -71,13 +73,6 @@ export interface PreMatchMovement {
 
 export const SIXSENSE_SERIES_ID = 'sixsense-model';
 
-export function hasValidTwoSidedOdds(snapshot: MovementOddsSnapshot): boolean {
-  return Number.isFinite(snapshot.team1_odds)
-    && snapshot.team1_odds > 1
-    && Number.isFinite(snapshot.team2_odds)
-    && snapshot.team2_odds > 1;
-}
-
 export function toNormalizedImpliedProbability(
   snapshot: MovementOddsSnapshot,
   trackedTeam: 'team1' | 'team2',
@@ -138,29 +133,33 @@ export function buildPreMatchMovement(
               : -event.probability_delta,
           isLegacyFallback: false,
         }))
-      : [{
-          event_at: snapshot.captured_at,
-          category: 'legacy',
-          type: 'attribution_unavailable',
-          label: 'Input attribution unavailable',
-          summary: 'This legacy model snapshot did not retain the structured input changes that coincided with its probability.',
-          affected_team: null,
-          affected_input: 'structured_inputs',
-          relationship: 'coincided_input_change' as const,
-          probability_delta: displayDelta,
-          source: {},
-          snapshot_at: snapshot.captured_at,
-          display_probability_delta: displayDelta,
-          isLegacyFallback: true,
-        }];
+      : displayDelta !== null && Math.abs(displayDelta) >= 0.0005
+        ? [{
+            event_at: snapshot.captured_at,
+            category: 'legacy',
+            type: 'attribution_unavailable',
+            label: 'Input attribution unavailable',
+            summary: 'This legacy model snapshot did not retain the structured input changes that coincided with its probability.',
+            affected_team: null,
+            affected_input: 'structured_inputs',
+            relationship: 'coincided_input_change' as const,
+            probability_delta: displayDelta,
+            source: {},
+            snapshot_at: snapshot.captured_at,
+            display_probability_delta: displayDelta,
+            isLegacyFallback: true,
+          }]
+        : [];
     events.push(...shapedEvents);
-    annotations.push({
-      timestamp,
-      probability: probability * 100,
-      snapshotAt: snapshot.captured_at,
-      eventCount: shapedEvents.length,
-      events: shapedEvents,
-    });
+    if (shapedEvents.length > 0) {
+      annotations.push({
+        timestamp,
+        probability: probability * 100,
+        snapshotAt: snapshot.captured_at,
+        eventCount: shapedEvents.length,
+        events: shapedEvents,
+      });
+    }
     previousModelProbability = probability;
   });
 

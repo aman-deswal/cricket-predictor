@@ -3,6 +3,7 @@ import { getTeamMeta } from './teams';
 import { getFranchiseLogoUrl } from './franchise-logos';
 import { getStoredDemoMode } from './demo-mode';
 import { compareMatchCenterMatches } from './competition';
+import { selectFreshestTrustedSportsbookOdds } from './market-odds';
 export { getMatchSection } from './competition';
 export type { MatchSection } from './competition';
 import {
@@ -362,7 +363,7 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       .select('normalized_team_name, team_name, team_abbr, logo_url, competition_name'),
     supabase
       .from('match_odds')
-      .select('match_id, bookmaker, team1_odds, team2_odds')
+      .select('match_id, bookmaker, team1_odds, team2_odds, fetched_at')
       .order('fetched_at', { ascending: false }),
   ]);
 
@@ -466,12 +467,35 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
       source_link_count: sourceLinkCount,
     });
   });
-  // Build odds lookup — first entry per match (most recent, ordered by fetched_at desc)
-  const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
-  (oddsData ?? []).forEach((o: { match_id: string; bookmaker: string; team1_odds: number; team2_odds: number }) => {
-    if (!oddsMap.has(o.match_id)) oddsMap.set(o.match_id, o);
+  // Build odds lookup from the freshest trusted snapshot cohort per match.
+  const oddsByMatch = new Map<string, Array<{
+    match_id: string;
+    bookmaker: string;
+    team1_odds: number;
+    team2_odds: number;
+    fetched_at: string;
+  }>>();
+  (oddsData ?? []).forEach((o: {
+    match_id: string;
+    bookmaker: string;
+    team1_odds: number;
+    team2_odds: number;
+    fetched_at: string;
+  }) => {
+    const entries = oddsByMatch.get(o.match_id) ?? [];
+    entries.push(o);
+    oddsByMatch.set(o.match_id, entries);
   });
-
+  const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
+  oddsByMatch.forEach((entries, matchId) => {
+    const primary = selectFreshestTrustedSportsbookOdds(entries)[0];
+    if (!primary) return;
+    oddsMap.set(matchId, {
+      bookmaker: primary.bookmaker,
+      team1_odds: primary.team1_odds,
+      team2_odds: primary.team2_odds,
+    });
+  });
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
   ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
     cacheRow.data.forEach((record) => {

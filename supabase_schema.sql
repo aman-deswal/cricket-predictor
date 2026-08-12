@@ -230,6 +230,7 @@ DECLARE
   latest prediction_snapshots%ROWTYPE;
   probability_delta decimal;
   attributed_events jsonb;
+  core_changed boolean;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(candidate_match_id));
 
@@ -284,27 +285,29 @@ BEGIN
   ORDER BY captured_at DESC, id DESC
   LIMIT 1;
 
-  IF latest.id IS NOT NULL
-     AND latest.predicted_winner IS NOT DISTINCT FROM candidate_predicted_winner
-     AND latest.team1_win_probability IS NOT DISTINCT FROM candidate_team1_win_probability
-     AND latest.team2_win_probability IS NOT DISTINCT FROM candidate_team2_win_probability
-     AND latest.confidence IS NOT DISTINCT FROM candidate_confidence
-     AND latest.edge_score IS NOT DISTINCT FROM candidate_edge_score THEN
-    RETURN FALSE;
-  END IF;
+  core_changed := latest.id IS NULL
+    OR latest.predicted_winner IS DISTINCT FROM candidate_predicted_winner
+    OR latest.team1_win_probability IS DISTINCT FROM candidate_team1_win_probability
+    OR latest.team2_win_probability IS DISTINCT FROM candidate_team2_win_probability
+    OR latest.confidence IS DISTINCT FROM candidate_confidence
+    OR latest.edge_score IS DISTINCT FROM candidate_edge_score;
 
   probability_delta := CASE
     WHEN latest.id IS NULL THEN NULL
     ELSE candidate_team1_win_probability - latest.team1_win_probability
   END;
-  SELECT COALESCE(
-    jsonb_agg(
-      event || jsonb_build_object('probability_delta', probability_delta)
-    ),
-    '[]'::jsonb
-  )
-  INTO attributed_events
-  FROM jsonb_array_elements(COALESCE(candidate_change_events, '[]'::jsonb)) event;
+  IF core_changed THEN
+    SELECT COALESCE(
+      jsonb_agg(
+        event || jsonb_build_object('probability_delta', probability_delta)
+      ),
+      '[]'::jsonb
+    )
+    INTO attributed_events
+    FROM jsonb_array_elements(COALESCE(candidate_change_events, '[]'::jsonb)) event;
+  ELSE
+    attributed_events := '[]'::jsonb;
+  END IF;
 
   INSERT INTO prediction_snapshots (
     match_id,

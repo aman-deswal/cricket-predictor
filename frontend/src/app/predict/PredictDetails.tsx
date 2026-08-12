@@ -14,7 +14,8 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
-import { buildPreMatchMovement, hasValidTwoSidedOdds, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
+import { buildPreMatchMovement, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
+import { getBookmakerMarketUrl, getTrustedSportsbook, hasValidTwoSidedOdds, normalizeBookmaker, selectFreshestTrustedSportsbookOdds } from '@/lib/market-odds';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -71,43 +72,6 @@ function truncateAtSentence(text: string, maxChars: number): { text: string; tru
   const lastSpace = slice.lastIndexOf(' ');
   const safeEnd = lastSpace > 0 ? lastSpace : maxChars;
   return { text: `${slice.slice(0, safeEnd).trimEnd()}…`, truncated: true };
-}
-
-const TRUSTED_SPORTSBOOKS: Record<string, { url: string; priority: number }> = {
-  draftkings: { url: 'https://sportsbook.draftkings.com/leagues/cricket', priority: 1 },
-  fanduel: { url: 'https://sportsbook.fanduel.com/navigation/cricket', priority: 2 },
-  betmgm: { url: 'https://sports.betmgm.com/en/sports/cricket-29', priority: 3 },
-  caesars: { url: 'https://www.caesars.com/sportsbook-and-casino/sports', priority: 4 },
-  espnbet: { url: 'https://espnbet.com/sport/cricket', priority: 5 },
-  bet365: { url: 'https://www.bet365.com/', priority: 6 },
-  williamhill: { url: 'https://sports.williamhill.com/betting/en-gb/tags/cricket', priority: 7 },
-  paddypower: { url: 'https://www.paddypower.com/cricket', priority: 8 },
-  betfairsportsbook: { url: 'https://www.betfair.com/sport/cricket', priority: 9 },
-  betfair: { url: 'https://www.betfair.com/sport/cricket', priority: 9 },
-  skybet: { url: 'https://m.skybet.com/cricket', priority: 10 },
-  unibet: { url: 'https://www.unibet.com/betting/sports/filter/cricket', priority: 11 },
-  betway: { url: 'https://betway.com/sport/cricket', priority: 12 },
-  boylesports: { url: 'https://www.boylesports.com/sports/cricket', priority: 13 },
-  matchbook: { url: 'https://www.matchbook.com/events/cricket', priority: 14 },
-  tab: { url: 'https://www.tab.com.au/sports/betting/Cricket', priority: 15 },
-  sportsbet: { url: 'https://www.sportsbet.com.au/betting/cricket', priority: 16 },
-  ladbrokes: { url: 'https://www.ladbrokes.com.au/sports/cricket', priority: 17 },
-  neds: { url: 'https://www.neds.com.au/sports/cricket', priority: 18 },
-  pointsbetau: { url: 'https://pointsbet.com.au/sports/cricket', priority: 19 },
-  pointsbet: { url: 'https://pointsbet.com.au/sports/cricket', priority: 19 },
-};
-
-function normalizeBookmaker(bookmaker: string): string {
-  return bookmaker.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function getTrustedSportsbook(bookmaker: string): { url: string; priority: number } | null {
-  return TRUSTED_SPORTSBOOKS[normalizeBookmaker(bookmaker)] ?? null;
-}
-
-function getBookmakerMarketUrl(bookmaker: string): string | null {
-  const normalized = bookmaker.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return TRUSTED_SPORTSBOOKS[normalized]?.url ?? null;
 }
 
 function openExternalMarket(url: string): void {
@@ -259,21 +223,41 @@ function MarketMovementPanel({
 }) {
   const trustedHistory = oddsHistory
     .filter((snapshot) => getTrustedSportsbook(snapshot.bookmaker) !== null && hasValidTwoSidedOdds(snapshot));
-  const liveBooksByKey = new Map(
-    sportsbookOdds
-    .filter((snapshot) => getTrustedSportsbook(snapshot.bookmaker) !== null && hasValidTwoSidedOdds(snapshot))
-    .map((snapshot) => [normalizeBookmaker(snapshot.bookmaker), snapshot] as const),
-  );
-  const candidateBookKeys = new Set<string>([
-    ...liveBooksByKey.keys(),
-    ...trustedHistory.map((snapshot) => normalizeBookmaker(snapshot.bookmaker)),
-  ]);
-  const featuredBooks = [...candidateBookKeys]
-    .map((bookmakerKey) => {
-      const current = liveBooksByKey.get(bookmakerKey) ?? null;
-      const history = getBookHistory(bookmakerKey, trustedHistory, current);
-      if (history.length === 0) return null;
-      const latestSnapshot = history[history.length - 1] ?? current;
+  const currentFeaturedBooks = sportsbookOdds.slice(0, 3)
+    .map((current, index) => {
+    const bookmakerKey = normalizeBookmaker(current.bookmaker);
+    const history = getBookHistory(bookmakerKey, trustedHistory, current);
+    const latestSnapshot = history[history.length - 1] ?? current;
+    const latestProbability = toNormalizedImpliedProbability(latestSnapshot, trackedTeamKey);
+    const openingProbability = history.length > 0
+      ? toNormalizedImpliedProbability(history[0], trackedTeamKey)
+      : latestProbability;
+    const sportsbook = getTrustedSportsbook(current.bookmaker);
+    if (!sportsbook) return null;
+
+    return {
+      id: `${bookmakerKey}-${index}`,
+      bookmakerKey,
+      bookmaker: current.bookmaker,
+      sportsbook,
+      current,
+      displayOdds: current,
+      history,
+      latestProbability,
+      openingProbability,
+      delta: latestProbability !== null && openingProbability !== null
+        ? latestProbability - openingProbability
+        : null,
+      marketUrl: getBookmakerMarketUrl(current.bookmaker),
+      color: MARKET_BOOK_COLORS[index % MARKET_BOOK_COLORS.length],
+    };
+    })
+    .filter((book): book is NonNullable<typeof book> => book !== null);
+  const fallbackHistoryBooks = currentFeaturedBooks.length === 0
+    ? [...new Set(trustedHistory.map((snapshot) => normalizeBookmaker(snapshot.bookmaker)))]
+    .map((bookmakerKey, index) => {
+      const history = getBookHistory(bookmakerKey, trustedHistory);
+      const latestSnapshot = history[history.length - 1];
       if (!latestSnapshot) return null;
       const latestProbability = toNormalizedImpliedProbability(latestSnapshot, trackedTeamKey);
       const openingProbability = history.length > 0
@@ -281,13 +265,13 @@ function MarketMovementPanel({
         : latestProbability;
       const sportsbook = getTrustedSportsbook(latestSnapshot.bookmaker);
       if (!sportsbook) return null;
-
       return {
+        id: `${bookmakerKey}-${index}`,
         bookmakerKey,
         bookmaker: latestSnapshot.bookmaker,
         sportsbook,
-        current,
-        displayOdds: current ?? latestSnapshot,
+        current: null,
+        displayOdds: latestSnapshot,
         history,
         latestProbability,
         openingProbability,
@@ -295,25 +279,19 @@ function MarketMovementPanel({
           ? latestProbability - openingProbability
           : null,
         marketUrl: getBookmakerMarketUrl(latestSnapshot.bookmaker),
+        color: MARKET_BOOK_COLORS[index % MARKET_BOOK_COLORS.length],
       };
     })
     .filter((book): book is NonNullable<typeof book> => book !== null)
     .sort((left, right) => {
-      const leftHasSeries = left.history.length > 1 ? 1 : 0;
-      const rightHasSeries = right.history.length > 1 ? 1 : 0;
-      if (leftHasSeries !== rightHasSeries) return rightHasSeries - leftHasSeries;
-      if (left.history.length !== right.history.length) return right.history.length - left.history.length;
-      if (Number(Boolean(left.current)) !== Number(Boolean(right.current))) {
-        return Number(Boolean(right.current)) - Number(Boolean(left.current));
-      }
+      const leftTs = new Date(left.history[left.history.length - 1]?.fetched_at ?? '').getTime();
+      const rightTs = new Date(right.history[right.history.length - 1]?.fetched_at ?? '').getTime();
+      if (leftTs !== rightTs) return rightTs - leftTs;
       return left.sportsbook.priority - right.sportsbook.priority;
     })
     .slice(0, 3)
-    .map((book, index) => ({
-      ...book,
-      id: `${book.bookmakerKey}-${index}`,
-      color: MARKET_BOOK_COLORS[index % MARKET_BOOK_COLORS.length],
-    }));
+    : [];
+  const featuredBooks = currentFeaturedBooks.length > 0 ? currentFeaturedBooks : fallbackHistoryBooks;
 
   const sortedMarketTimestamps = featuredBooks
     .flatMap((book) => book.history.map((snapshot) => new Date(snapshot.fetched_at).getTime()))
@@ -760,13 +738,7 @@ export function PredictDetails() {
   const team2H2H = deriveH2HForm(displayTeam2, team2Meta.shortName);
   const team1Form = team1H2H.length > 0 ? team1H2H : (match.team1_recent_form ?? []).slice(-5);
   const team2Form = team2H2H.length > 0 ? team2H2H : (match.team2_recent_form ?? []).slice(-5);
-  const sportsbookOdds = odds
-    .map((odd) => ({ odd, sportsbook: getTrustedSportsbook(odd.bookmaker) }))
-    .filter((entry): entry is { odd: MatchOdds; sportsbook: { url: string; priority: number } } => (
-      entry.sportsbook !== null && hasValidTwoSidedOdds(entry.odd)
-    ))
-    .sort((a, b) => a.sportsbook.priority - b.sportsbook.priority)
-    .map((entry) => entry.odd);
+  const sportsbookOdds = selectFreshestTrustedSportsbookOdds(odds);
   const featuredSportsbooks = sportsbookOdds.slice(0, 3);
   const featuredBookmakerUrl = sportsbookOdds.length > 0
     ? getBookmakerMarketUrl(sportsbookOdds[0].bookmaker)

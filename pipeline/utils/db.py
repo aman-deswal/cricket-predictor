@@ -108,7 +108,7 @@ def store_prediction_snapshot(
     input_state: dict,
     change_events: list[dict],
 ) -> bool:
-    """Append the deterministic core when it differs from the latest snapshot."""
+    """Append one pre-match deterministic-core time-series snapshot."""
     client = get_client()
     response = client.rpc(
         "append_prediction_snapshot",
