@@ -20,6 +20,7 @@ interface MarketMovementChartProps {
   maxDomain: number;
   ariaLabel: string;
   annotations: MovementAnnotation[];
+  insightCaption?: string;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -46,6 +47,7 @@ export function MarketMovementChart({
   maxDomain,
   ariaLabel,
   annotations,
+  insightCaption,
 }: MarketMovementChartProps) {
   const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
@@ -324,7 +326,7 @@ export function MarketMovementChart({
         ))}
       </ul>
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-        Tap a gold SixSense point to inspect the input changes tied to that move.
+        {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
       </p>
       <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
         {series.map((entry) => (

@@ -14,7 +14,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
-import { buildPreMatchMovement, hasValidTwoSidedOdds, toNormalizedImpliedProbability } from '@/lib/pre-match-movement';
+import { buildPreMatchMovement, hasValidTwoSidedOdds, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability } from '@/lib/pre-match-movement';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -219,6 +219,24 @@ function getBookHistory(current: MatchOdds, history: MatchOdds[]): MatchOdds[] {
   );
 }
 
+function formatSignedPoints(value: number): string {
+  return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(1)} pts`;
+}
+
+function describeGapStrength(points: number): { label: string; tone: string } {
+  if (points < 1) return { label: 'Aligned', tone: 'text-emerald-200 border-emerald-400/20 bg-emerald-400/10' };
+  if (points < 4) return { label: 'Minor gap', tone: 'text-sky-200 border-sky-400/20 bg-sky-400/10' };
+  if (points < 8) return { label: 'Meaningful gap', tone: 'text-amber-200 border-amber-400/20 bg-amber-400/10' };
+  return { label: 'Sharp disagreement', tone: 'text-rose-200 border-rose-400/20 bg-rose-400/10' };
+}
+
+function summarizeInputs(inputs: string[]): string {
+  if (inputs.length === 0) return 'structured input updates';
+  if (inputs.length === 1) return inputs[0];
+  if (inputs.length === 2) return `${inputs[0]} and ${inputs[1]}`;
+  return `${inputs[0]}, ${inputs[1]}, and other structured inputs`;
+}
+
 function MarketMovementPanel({
   sportsbookOdds,
   oddsHistory,
@@ -306,6 +324,39 @@ function MarketMovementPanel({
   const marketSideMeta = getTeamMeta(trackedTeam);
   const opposingTeam = trackedTeamKey === 'team1' ? displayTeam2 : displayTeam1;
   const opposingMeta = getTeamMeta(opposingTeam);
+  const sortedAnnotations = [...movement.annotations].sort((left, right) => left.timestamp - right.timestamp);
+  const latestAnnotation = sortedAnnotations[sortedAnnotations.length - 1] ?? null;
+  const previousAnnotation = sortedAnnotations.length > 1 ? sortedAnnotations[sortedAnnotations.length - 2] : null;
+  const latestModelProbability = [...movement.chartRows]
+    .reverse()
+    .find((row) => typeof row[SIXSENSE_SERIES_ID] === 'number')?.[SIXSENSE_SERIES_ID] as number | undefined;
+  const marketGap = latestModelProbability !== undefined && consensusLatest !== null
+    ? consensusLatest - latestModelProbability
+    : null;
+  const gapStrength = marketGap === null ? null : describeGapStrength(Math.abs(marketGap));
+  const primaryInsight = marketGap === null
+    ? `Tracking ${marketSideMeta.shortName} against the market`
+    : Math.abs(marketGap) < 0.75
+      ? `SixSense and the market are broadly aligned on ${marketSideMeta.shortName}`
+      : marketGap > 0
+        ? `Market is ${Math.abs(marketGap).toFixed(1)} pts higher on ${marketSideMeta.shortName} than SixSense`
+        : `SixSense is ${Math.abs(marketGap).toFixed(1)} pts higher on ${marketSideMeta.shortName} than the market`;
+  const latestMoveDelta = latestAnnotation && previousAnnotation
+    ? latestAnnotation.probability - previousAnnotation.probability
+    : null;
+  const latestMoveInputs = latestAnnotation
+    ? [...new Set(latestAnnotation.events
+      .filter((event) => !event.isLegacyFallback)
+      .map((event) => event.affected_input.replaceAll('_', ' ')))]
+    : [];
+  const latestMoveStory = latestMoveDelta === null || !latestAnnotation
+    ? 'Last model move will appear once another pre-match SixSense snapshot lands.'
+    : Math.abs(latestMoveDelta) < 0.05
+      ? `Last model check kept ${marketSideMeta.shortName} flat, coinciding with ${summarizeInputs(latestMoveInputs)}.`
+      : `${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts on the last SixSense move, coinciding with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'structured inputs that were not retained on this legacy snapshot' : summarizeInputs(latestMoveInputs)}.`;
+  const currentGapCaption = marketGap === null
+    ? 'Tap a gold SixSense point to inspect what changed around each model move.'
+    : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Tap a gold SixSense point to inspect what changed around each model move.`;
 
   return (
     <motion.div
@@ -324,6 +375,12 @@ function MarketMovementPanel({
           <p className={`${detailTileMetaClass} mt-1 text-slate-400`}>
             Tracking only {marketSideMeta.shortName}&rsquo;s win probability against the market
           </p>
+          <p className="mt-3 text-lg font-black leading-tight text-white sm:text-xl">
+            {primaryInsight}
+          </p>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-300">
+            {latestMoveStory}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {featuredBooks.length > 0 && (
@@ -331,16 +388,50 @@ function MarketMovementPanel({
               {featuredBooks.length} books shown
             </span>
           )}
-          {consensusLatest !== null && (
-            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-              {marketSideMeta.shortName} {consensusLatest.toFixed(0)}%
-              {consensusDelta !== null && (
-                <span className={`ml-2 ${consensusDelta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                  {consensusDelta >= 0 ? '↑' : '↓'} {Math.abs(consensusDelta).toFixed(1)} pts
-                </span>
-              )}
+          {gapStrength && (
+            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${gapStrength.tone}`}>
+              {gapStrength.label}
             </span>
           )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">SixSense now</p>
+          <p className="mt-1 text-2xl font-black text-white">
+            {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Market now</p>
+          <p className="mt-1 text-2xl font-black text-white">
+            {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Current gap</p>
+          <p className={`mt-1 text-2xl font-black ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+            {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {marketGap === null
+              ? 'Waiting for both lines'
+              : marketGap > 0
+                ? `Market > SixSense on ${marketSideMeta.shortName}`
+                : `SixSense > market on ${marketSideMeta.shortName}`}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Last model move</p>
+          <p className={`mt-1 text-2xl font-black ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+            {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {latestAnnotation
+              ? `${latestAnnotation.eventCount} ${latestAnnotation.eventCount === 1 ? 'event' : 'events'} on the latest snapshot`
+              : 'Waiting for another snapshot'}
+          </p>
         </div>
       </div>
 
@@ -367,6 +458,7 @@ function MarketMovementPanel({
               maxDomain={movement.maxDomain}
               ariaLabel={`Market movement for ${trackedTeam}. This chart tracks only ${trackedTeam}'s win probability, comparing the SixSense model with normalized bookmaker implied probabilities.`}
               annotations={movement.annotations}
+              insightCaption={currentGapCaption}
             />
           ) : (
             <div className="flex h-32 sm:h-36 lg:h-44 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
