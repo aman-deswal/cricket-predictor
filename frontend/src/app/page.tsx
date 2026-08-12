@@ -245,6 +245,8 @@ function SixSenseTrustBadge({
 }) {
   if (!signal) return null;
 
+  const periodLabel = signal.period === 'week' ? 'last 7 days' : 'last 30 days';
+
   return (
     <Link
       href="/history"
@@ -252,17 +254,16 @@ function SixSenseTrustBadge({
       aria-label={`View ${signal.scopeLabel} ${signal.periodLabel.toLowerCase()} accuracy in history`}
     >
       <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-          {signal.shortScopeLabel} / {signal.shortPeriodLabel}
+        <p className="text-sm font-black tabular-nums text-white">
+          {signal.stats.pct}% accuracy <span className="font-semibold text-slate-400">{periodLabel}</span>
         </p>
-        <p className="mt-0.5 text-sm font-black tabular-nums text-white">
-          {signal.stats.pct}% accuracy
-          <span className="ml-2 text-[10px] font-semibold text-slate-500">
-            {signal.stats.correct}/{signal.stats.total}
-          </span>
+        <p className="mt-0.5 text-[10px] font-semibold text-slate-500">
+          {signal.scopeLabel} picks
         </p>
       </div>
-      <AccuracySparkline points={sparkline} />
+      <div className="shrink-0 opacity-90 transition-opacity group-hover:opacity-100">
+        <AccuracySparkline points={sparkline} />
+      </div>
     </Link>
   );
 }
