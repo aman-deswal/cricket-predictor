@@ -88,6 +88,26 @@ def store_prediction(prediction: dict) -> None:
     client.table("predictions").upsert(prediction, on_conflict="match_id").execute()
 
 
+def store_prediction_garnish(
+    match_id: str,
+    *,
+    reasoning: Optional[str] = None,
+    toss_insight: Optional[str] = None,
+) -> bool:
+    """Patch garnish-only prediction fields without mutating deterministic core."""
+    payload = {}
+    if reasoning is not None:
+        payload["reasoning"] = reasoning
+    if toss_insight is not None:
+        payload["toss_insight"] = toss_insight
+    if not payload:
+        return False
+
+    client = get_client()
+    response = client.table("predictions").update(payload).eq("match_id", match_id).execute()
+    return bool(response.data)
+
+
 def get_latest_prediction_snapshot(match_id: str) -> Optional[dict]:
     """Fetch the latest pre-match snapshot for attribution comparison."""
     client = get_client()

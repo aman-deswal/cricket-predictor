@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.db import (
     get_all_predictions,
     get_latest_prediction_snapshot,
+    store_prediction_garnish,
     store_prediction_snapshot,
 )
 
@@ -114,6 +115,36 @@ class TestStorePredictionSnapshot(unittest.TestCase):
 
         self.assertEqual(get_latest_prediction_snapshot("espn-1"), expected)
         query.order.assert_called_once_with("captured_at", desc=True)
+
+
+class TestStorePredictionGarnish(unittest.TestCase):
+    @patch("utils.db.get_client")
+    def test_updates_only_requested_prediction_fields(self, mock_get_client):
+        client = MagicMock()
+        query = client.table.return_value
+        query.update.return_value = query
+        query.eq.return_value = query
+        query.execute.return_value = MagicMock(data=[{"match_id": "espn-1"}])
+        mock_get_client.return_value = client
+
+        updated = store_prediction_garnish(
+            "espn-1",
+            reasoning="Fresh preview.",
+            toss_insight="Prefer chasing.",
+        )
+
+        self.assertTrue(updated)
+        client.table.assert_called_once_with("predictions")
+        query.update.assert_called_once_with({
+            "reasoning": "Fresh preview.",
+            "toss_insight": "Prefer chasing.",
+        })
+        query.eq.assert_called_once_with("match_id", "espn-1")
+
+    @patch("utils.db.get_client")
+    def test_noop_when_no_garnish_fields_provided(self, mock_get_client):
+        self.assertFalse(store_prediction_garnish("espn-1"))
+        mock_get_client.assert_not_called()
 
 
 if __name__ == "__main__":

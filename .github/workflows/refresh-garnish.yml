@@ -1,0 +1,63 @@
+name: Refresh Garnish
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours_ahead:
+        description: Hours ahead to consider for garnish candidates
+        required: false
+        default: "72"
+      stale_minutes:
+        description: Treat garnish older than this many minutes as stale
+        required: false
+        default: "60"
+      limit:
+        description: Maximum number of candidates to refresh
+        required: false
+        default: "8"
+      source_limit:
+        description: Maximum reputable sources per match
+        required: false
+        default: "8"
+
+permissions:
+  contents: read
+  models: read
+
+concurrency:
+  group: optional-match-enrichment
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Refresh prioritized garnish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
+          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
+          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
+          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
+          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
+        run: >
+          python pipeline/refresh_garnish.py
+          --hours-ahead "${{ inputs.hours_ahead }}"
+          --stale-minutes "${{ inputs.stale_minutes }}"
+          --limit "${{ inputs.limit }}"
+          --source-limit "${{ inputs.source_limit }}"
