@@ -78,7 +78,7 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="relative border-t border-slate-700/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 sm:py-6 flex items-center justify-center">
+          <div className="max-w-7xl mx-auto flex items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-600">
               SixSense<sup className="ml-0.5 text-[0.65em]">™</sup>, Reserved 2026
             </p>

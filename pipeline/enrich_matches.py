@@ -12,6 +12,9 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from fetch_headshots import process_squads as resolve_missing_headshots
+from fetch_player_stats import fetch_stats_for_match_squads
+from fetch_squads import fetch_and_store_squads
 from utils.cricsheet import (
     get_head_to_head,
     get_recent_player_pool,
@@ -29,8 +32,6 @@ from utils.db import (
     get_h2h_from_cache,
     get_recent_results,
 )
-from fetch_squads import fetch_and_store_squads
-from fetch_player_stats import fetch_stats_for_match_squads
 from utils.espn import get_espn_enrichment_context, format_espn_context
 from utils.llm import LLMUnavailableError, create_chat_completion, llm_garnish_enabled
 
@@ -783,6 +784,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
     team1_squad, team2_squad = get_match_squad_names(match_id) if match_id else ([], [])
     if match_id and not team1_squad and not team2_squad:
         fetch_and_store_squads(match_ids=[match_id], force=False)
+        resolve_missing_headshots(match_ids=[match_id], force=False)
         fetch_stats_for_match_squads(match_id=match_id, force=False)
 
     # --- Fetch ESPN enrichment context ---
@@ -967,6 +969,7 @@ def main(limit: int, source_limit: int, match_id: Optional[str] = None) -> None:
         for match in matches:
             fetch_and_store_squads(match_ids=[match["match_id"]], force=False)
             fetch_stats_for_match_squads(match_id=match["match_id"], force=False)
+        resolve_missing_headshots(match_ids=[match["match_id"] for match in matches], force=False)
 
     for match in matches:
         logger.info(f"Enriching {match['team1']} vs {match['team2']}")

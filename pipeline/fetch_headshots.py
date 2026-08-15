@@ -121,7 +121,7 @@ def build_cdn_url(image_path: str) -> str:
     return f"{CDN_BASE}{image_path}"
 
 
-def process_squads(force: bool = False) -> None:
+def process_squads(force: bool = False, match_ids: Optional[List[str]] = None) -> None:
     """Process all squads, resolve headshots, and update Supabase."""
     sb = get_client()
 
@@ -130,7 +130,10 @@ def process_squads(force: bool = False) -> None:
 
     # Fetch all squads
     print("\n🏏 Fetching squads from Supabase...")
-    result = sb.table("match_squads").select("id,match_id,team,players").execute()
+    query = sb.table("match_squads").select("id,match_id,team,players")
+    if match_ids:
+        query = query.in_("match_id", match_ids)
+    result = query.execute()
     squads = result.data or []
     print(f"  Found {len(squads)} squad records")
 
@@ -201,9 +204,10 @@ def process_squads(force: bool = False) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Fetch player headshots from ESPN Cricinfo")
     parser.add_argument("--force", action="store_true", help="Re-resolve all players, even those with existing images")
+    parser.add_argument("--match-id", action="append", help="Limit refresh to a specific match_id (repeatable)")
     args = parser.parse_args()
 
-    process_squads(force=args.force)
+    process_squads(force=args.force, match_ids=args.match_id or None)
 
 
 if __name__ == "__main__":

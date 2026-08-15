@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getPredictionSnapshots, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getPredictionSnapshots, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, SquadPlayer, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -167,6 +167,91 @@ function PlayerHeadshot({
       onError={() => setImageFailed(true)}
     />
   );
+}
+
+type KeyBattle = MatchEnrichment['key_players'][number];
+type DisplayKeyBattle = KeyBattle & { batter: string; bowler: string };
+
+function normalizePlayerLookupKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function buildFallbackBattleInsight(batter: SquadPlayer, bowler: SquadPlayer, batterStats?: PlayerStats, bowlerStats?: PlayerStats): string {
+  const batterLast = batter.name.split(' ').slice(-1)[0];
+  const bowlerLast = bowler.name.split(' ').slice(-1)[0];
+  const batterLine = batterStats && (batterStats.batting_runs > 0 || batterStats.batting_innings > 0)
+    ? `${batterLast} has ${batterStats.batting_runs} runs at ${batterStats.batting_avg.toFixed(0)} average and ${batterStats.batting_sr.toFixed(0)} strike rate`
+    : `${batterLast} is one of the more prominent batting options in the projected XI`;
+  const bowlerLine = bowlerStats && (bowlerStats.bowling_wickets > 0 || bowlerStats.bowling_innings > 0)
+    ? `${bowlerLast} brings ${bowlerStats.bowling_wickets} wickets with a ${bowlerStats.bowling_economy.toFixed(1)} economy`
+    : `${bowlerLast} profiles as a likely wicket-taking option from the opposing attack`;
+  return `${batterLine}, while ${bowlerLine}. This shapes one of the clearest squad-based matchups in the game.`;
+}
+
+function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[]): DisplayKeyBattle[] {
+  if (squads.length < 2) return [];
+
+  const statsByPlayer = new Map<string, PlayerStats>();
+  playerStats.forEach((stat) => {
+    statsByPlayer.set(normalizePlayerLookupKey(stat.player_name), stat);
+  });
+
+  const rankPlayers = (players: SquadPlayer[], mode: 'batter' | 'bowler') => {
+    const enriched = players.map((player) => ({
+      player,
+      stats: statsByPlayer.get(normalizePlayerLookupKey(player.name)),
+    }));
+    return enriched.sort((left, right) => {
+      const leftRole = left.player.role ?? '';
+      const rightRole = right.player.role ?? '';
+      if (mode === 'batter') {
+        const leftScore = (left.stats?.batting_runs ?? 0) * 1000 + (left.stats?.batting_avg ?? 0) * 10 + (left.stats?.batting_sr ?? 0);
+        const rightScore = (right.stats?.batting_runs ?? 0) * 1000 + (right.stats?.batting_avg ?? 0) * 10 + (right.stats?.batting_sr ?? 0);
+        const leftRoleBoost = /bat|all|wk/i.test(leftRole) || left.player.is_keeper ? 1 : 0;
+        const rightRoleBoost = /bat|all|wk/i.test(rightRole) || right.player.is_keeper ? 1 : 0;
+        return rightScore - leftScore || rightRoleBoost - leftRoleBoost || left.player.name.localeCompare(right.player.name);
+      }
+
+      const leftEconomy = left.stats?.bowling_economy && left.stats.bowling_economy > 0 ? left.stats.bowling_economy : 99;
+      const rightEconomy = right.stats?.bowling_economy && right.stats.bowling_economy > 0 ? right.stats.bowling_economy : 99;
+      const leftScore = (left.stats?.bowling_wickets ?? 0) * 1000 + (left.stats?.bowling_innings ?? 0) * 10 - leftEconomy;
+      const rightScore = (right.stats?.bowling_wickets ?? 0) * 1000 + (right.stats?.bowling_innings ?? 0) * 10 - rightEconomy;
+      const leftRoleBoost = /bowl|all/i.test(leftRole) || Boolean(left.player.bowling_style) ? 1 : 0;
+      const rightRoleBoost = /bowl|all/i.test(rightRole) || Boolean(right.player.bowling_style) ? 1 : 0;
+      return rightScore - leftScore || rightRoleBoost - leftRoleBoost || left.player.name.localeCompare(right.player.name);
+    });
+  };
+
+  const [team1, team2] = squads;
+  const team1Batters = rankPlayers(team1.players ?? [], 'batter');
+  const team1Bowlers = rankPlayers(team1.players ?? [], 'bowler');
+  const team2Batters = rankPlayers(team2.players ?? [], 'batter');
+  const team2Bowlers = rankPlayers(team2.players ?? [], 'bowler');
+
+  const pairings = [
+    { batter: team1Batters[0], bowler: team2Bowlers[0], batterTeam: team1.team, bowlerTeam: team2.team },
+    { batter: team2Batters[0], bowler: team1Bowlers[0], batterTeam: team2.team, bowlerTeam: team1.team },
+    { batter: team1Batters[1], bowler: team2Bowlers[0], batterTeam: team1.team, bowlerTeam: team2.team },
+    { batter: team2Batters[1], bowler: team1Bowlers[0], batterTeam: team2.team, bowlerTeam: team1.team },
+  ];
+
+  const seen = new Set<string>();
+  const battles: DisplayKeyBattle[] = [];
+  pairings.forEach(({ batter: batterEntry, bowler: bowlerEntry, batterTeam, bowlerTeam }) => {
+    if (!batterEntry?.player || !bowlerEntry?.player) return;
+    const key = `${batterEntry.player.name}::${bowlerEntry.player.name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    battles.push({
+      batter: batterEntry.player.name,
+      batter_team: batterTeam,
+      bowler: bowlerEntry.player.name,
+      bowler_team: bowlerTeam,
+      insight: buildFallbackBattleInsight(batterEntry.player, bowlerEntry.player, batterEntry.stats, bowlerEntry.stats),
+    });
+  });
+
+  return battles.slice(0, 4);
 }
 
 const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
@@ -821,6 +906,13 @@ export function PredictDetails() {
       }
     });
   });
+  const enrichmentKeyBattles = (enrichment?.key_players ?? []).filter(
+    (battle): battle is DisplayKeyBattle => Boolean(battle?.batter && battle?.bowler)
+  );
+  const fallbackKeyBattles = enrichmentKeyBattles.length === 0 ? buildFallbackKeyBattles(squads, playerStats) : [];
+  const keyBattles = enrichmentKeyBattles.length > 0 ? enrichmentKeyBattles : fallbackKeyBattles;
+  const keyBattlesAreFallback = enrichmentKeyBattles.length === 0 && fallbackKeyBattles.length > 0;
+  const shouldShowKeyBattlesPlaceholder = keyBattles.length === 0 && (squads.length > 0 || hasSquadOrXi);
 
   // Resolve team colors once — ensure visual distinction (same logic as donut chart)
   const colorDist = (c1: string, c2: string) => {
@@ -1413,7 +1505,7 @@ export function PredictDetails() {
       })()}
 
       {/* Key Battles — flip cards */}
-      {enrichment?.key_players?.length ? (
+      {keyBattles.length > 0 ? (
         <motion.div
           className={`${detailTileClass} mb-4`}
           {...fadeUp}
@@ -1426,13 +1518,19 @@ export function PredictDetails() {
               </svg>
               Key Battles
             </h2>
-            <span className={`${detailTileMetaClass} font-semibold text-slate-400 tracking-wide`}>
-              {enrichment.key_players.length} duel{enrichment.key_players.length !== 1 ? 's' : ''}
-            </span>
+            <div className="flex items-center gap-2">
+              {keyBattlesAreFallback && (
+                <span className={`${detailTileMetaClass} rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 font-semibold tracking-wide text-sky-200`}>
+                  squad-derived
+                </span>
+              )}
+              <span className={`${detailTileMetaClass} font-semibold text-slate-400 tracking-wide`}>
+                {keyBattles.length} duel{keyBattles.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
           <div className="space-y-2">
-            {enrichment.key_players.map((battle, i) => {
-              if (!battle.batter || !battle.bowler) return null;
+            {keyBattles.map((battle, i) => {
               const batterStats = playerStats.find(s => s.player_name === battle.batter);
               const bowlerStats = playerStats.find(s => s.player_name === battle.bowler);
               const bMeta = getTeamMeta(battle.batter_team ?? '');
@@ -1713,6 +1811,24 @@ export function PredictDetails() {
               );
             })}
           </div>
+        </motion.div>
+      ) : shouldShowKeyBattlesPlaceholder ? (
+        <motion.div
+          className={`${detailTileClass} mb-4`}
+          {...fadeUp}
+          transition={{ delay: 0.28 }}
+        >
+          <h2 className={`${detailTileTitleClass} mb-3`}>
+            <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.5 9.5L3 21M3 3l18 18M21 3L3 21" /><path d="M9.5 14.5L21 3" />
+            </svg>
+            Key Battles
+          </h2>
+          <ComingSoonTile
+            eyebrow="Matchups calibrating"
+            title="Squads are in, but duel cards are still warming up"
+            body="We have squad data for this fixture, but not enough structured batter-vs-bowler evidence yet to render battle cards with confidence."
+          />
         </motion.div>
       ) : null}
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from fetch_headshots import process_squads as resolve_missing_headshots
 from utils.db import get_client
 from fetch_squads import MatchSquadFetchResult, fetch_and_store_squads
 from fetch_player_stats import fetch_stats_for_match_squads
@@ -191,10 +192,15 @@ def main(
         f"Refreshing squads for {len(refresh_plan)} matches "
         f"({force_count} confirmed-XI checks, {len(refresh_plan) - force_count} greedy squad retries)..."
     )
+    refreshed_match_ids: list[str] = []
     for plan in refresh_plan:
         result = _refresh_match_with_retry(plan.match_id, plan.force)
         if result.status == "stored":
+            refreshed_match_ids.append(plan.match_id)
             fetch_stats_for_match_squads(match_id=plan.match_id, force=False)
+
+    if refreshed_match_ids:
+        resolve_missing_headshots(match_ids=refreshed_match_ids, force=False)
 
 
 if __name__ == "__main__":

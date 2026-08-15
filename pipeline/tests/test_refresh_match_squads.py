@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import unittest
 
 from fetch_squads import MatchSquadFetchResult, _is_confirmed_lineup
-from refresh_match_squads import MatchRefreshPlan, _build_refresh_plan, _refresh_match_with_retry
+from refresh_match_squads import MatchRefreshPlan, _build_refresh_plan, _refresh_match_with_retry, main
 
 
 class TestRefreshMatchSquads(unittest.TestCase):
@@ -121,6 +121,33 @@ class TestRefreshRetry(unittest.TestCase):
 
         self.assertEqual(result.status, "unavailable")
         self.assertEqual(mock_fetch.call_count, 1)
+
+
+class TestRefreshMain(unittest.TestCase):
+    @patch("refresh_match_squads.resolve_missing_headshots")
+    @patch("refresh_match_squads.fetch_stats_for_match_squads")
+    @patch("refresh_match_squads._refresh_match_with_retry")
+    @patch("refresh_match_squads.select_match_refresh_plan")
+    def test_refreshes_headshots_only_for_matches_that_were_stored(
+        self,
+        mock_select_plan,
+        mock_refresh,
+        mock_fetch_stats,
+        mock_resolve_headshots,
+    ):
+        mock_select_plan.return_value = [
+            MatchRefreshPlan(match_id="m1", force=False),
+            MatchRefreshPlan(match_id="m2", force=True),
+        ]
+        mock_refresh.side_effect = [
+            MatchSquadFetchResult(match_id="m1", status="stored", stored_team_count=2),
+            MatchSquadFetchResult(match_id="m2", status="unavailable"),
+        ]
+
+        main()
+
+        mock_fetch_stats.assert_called_once_with(match_id="m1", force=False)
+        mock_resolve_headshots.assert_called_once_with(match_ids=["m1"], force=False)
 
 
 class TestConfirmedLineupDetection(unittest.TestCase):

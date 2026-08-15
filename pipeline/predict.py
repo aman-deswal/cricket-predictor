@@ -9,7 +9,11 @@ from math import exp
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from fetch_headshots import process_squads as resolve_missing_headshots
+from enrich_matches import enrich_match
+from fetch_player_stats import fetch_stats_for_match_squads
 from utils.cricsheet import get_head_to_head, get_team_recent_form, get_venue_stats
+from fetch_squads import fetch_and_store_squads
 from utils.db import (
     get_client,
     get_h2h_from_cache,
@@ -23,11 +27,8 @@ from utils.db import (
     store_prediction_snapshot,
     store_match_enrichment,
 )
-from fetch_squads import fetch_and_store_squads
-from fetch_player_stats import fetch_stats_for_match_squads
 from utils.espn import get_espn_enrichment_context, format_espn_context
 from utils.edge_score import compute_edge_score, format_edge_for_prompt
-from enrich_matches import enrich_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -682,6 +683,7 @@ def main(limit: Optional[int] = None, match_id: Optional[str] = None, force: boo
         for match in matches:
             fetch_and_store_squads(match_ids=[match["match_id"]], force=force)
             fetch_stats_for_match_squads(match_id=match["match_id"], force=False)
+        resolve_missing_headshots(match_ids=[match["match_id"] for match in matches], force=False)
 
     stored = 0
     for match in matches:
