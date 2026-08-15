@@ -42,6 +42,50 @@ def _is_placeholder_image_url(url: str) -> bool:
     return any(token in lowered for token in PLACEHOLDER_IMAGE_TOKENS)
 
 
+def _normalize_player_lookup_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def _merge_existing_player_images(players: list[dict], existing_players: list[dict]) -> list[dict]:
+    existing_images_by_id: dict[str, str] = {}
+    existing_images_by_name: dict[str, str] = {}
+    for existing_player in existing_players:
+        image_url = str(existing_player.get("image_url", "") or "").strip()
+        if _is_placeholder_image_url(image_url):
+            continue
+
+        player_id = str(existing_player.get("id", "") or "").strip()
+        if player_id:
+            existing_images_by_id[player_id] = image_url
+
+        player_name = str(existing_player.get("name", "") or "").strip()
+        if player_name:
+            existing_images_by_name[_normalize_player_lookup_key(player_name)] = image_url
+
+    merged_players: list[dict] = []
+    for player in players:
+        incoming_image = str(player.get("image_url", "") or "").strip()
+        if incoming_image and not _is_placeholder_image_url(incoming_image):
+            merged_players.append(player)
+            continue
+
+        preserved_image = ""
+        player_id = str(player.get("id", "") or "").strip()
+        if player_id:
+            preserved_image = existing_images_by_id.get(player_id, "")
+
+        if not preserved_image:
+            player_name = str(player.get("name", "") or "").strip()
+            if player_name:
+                preserved_image = existing_images_by_name.get(_normalize_player_lookup_key(player_name), "")
+
+        merged_player = dict(player)
+        merged_player["image_url"] = preserved_image
+        merged_players.append(merged_player)
+
+    return merged_players
+
+
 def _is_confirmed_lineup(players: list[dict], _source: str) -> bool:
     """Treat a roster as confirmed only when it looks like a playing XI."""
     return len(players) == 11
@@ -399,16 +443,30 @@ def store_squad(match_id: str, team_name: str, players: list[dict],
                 is_confirmed: bool = False, source: str = "cricapi_fantasy") -> bool:
     """Store squad in Supabase match_squads table."""
     client = get_client()
-    squad_data = {
-        "match_id": match_id,
-        "team": team_name,
-        "players": players,
-        "is_confirmed": is_confirmed,
-        "source": source,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-    }
 
     try:
+        existing_response = (
+            client.table("match_squads")
+            .select("players")
+            .eq("match_id", match_id)
+            .eq("team", team_name)
+            .limit(1)
+            .execute()
+        )
+        existing_players = []
+        if existing_response.data:
+            existing_players = existing_response.data[0].get("players") or []
+            if isinstance(existing_players, str):
+                existing_players = json.loads(existing_players)
+
+        squad_data = {
+            "match_id": match_id,
+            "team": team_name,
+            "players": _merge_existing_player_images(players, existing_players),
+            "is_confirmed": is_confirmed,
+            "source": source,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
         client.table("match_squads").upsert(
             squad_data, on_conflict="match_id,team"
         ).execute()

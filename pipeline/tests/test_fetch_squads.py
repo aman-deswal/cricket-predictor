@@ -6,8 +6,15 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import unittest
+from unittest.mock import MagicMock, patch
 
-from fetch_squads import _extract_cricbuzz_match_links, _extract_cricbuzz_team_objects, fetch_squad_from_cricbuzz
+from fetch_squads import (
+    _extract_cricbuzz_match_links,
+    _extract_cricbuzz_team_objects,
+    _merge_existing_player_images,
+    fetch_squad_from_cricbuzz,
+    store_squad,
+)
 
 
 CRICBUZZ_UPCOMING_HTML = """
@@ -99,6 +106,53 @@ class TestCricbuzzFallbackParsing(unittest.TestCase):
         self.assertTrue(squads[0]["players"][0]["is_captain"])
         self.assertTrue(squads[0]["players"][1]["is_keeper"])
         self.assertFalse(squads[0]["is_confirmed"])
+
+
+class TestPlayerImagePreservation(unittest.TestCase):
+    def test_merge_preserves_existing_valid_headshot_when_refresh_is_blank(self):
+        merged = _merge_existing_player_images(
+            [{"id": "42", "name": "KL Rahul", "image_url": ""}],
+            [{"id": "42", "name": "KL Rahul", "image_url": "https://cdn.example/rahul.png"}],
+        )
+
+        self.assertEqual(merged[0]["image_url"], "https://cdn.example/rahul.png")
+
+    def test_merge_falls_back_to_name_match_when_provider_id_changes(self):
+        merged = _merge_existing_player_images(
+            [{"id": "new-42", "name": "K L Rahul", "image_url": ""}],
+            [{"id": "42", "name": "KL Rahul", "image_url": "https://cdn.example/rahul.png"}],
+        )
+
+        self.assertEqual(merged[0]["image_url"], "https://cdn.example/rahul.png")
+
+    @patch("fetch_squads.get_client")
+    def test_store_squad_preserves_existing_headshots_during_upsert(self, mock_get_client):
+        client = MagicMock()
+        select_query = MagicMock()
+        select_query.eq.return_value = select_query
+        select_query.limit.return_value = select_query
+        select_query.execute.return_value = MagicMock(
+            data=[{"players": [{"id": "42", "name": "KL Rahul", "image_url": "https://cdn.example/rahul.png"}]}]
+        )
+
+        upsert_query = MagicMock()
+        match_squads_table = MagicMock()
+        match_squads_table.select.return_value = select_query
+        match_squads_table.upsert.return_value = upsert_query
+        client.table.return_value = match_squads_table
+        mock_get_client.return_value = client
+
+        stored = store_squad(
+            "match-1",
+            "India",
+            [{"id": "42", "name": "KL Rahul", "image_url": ""}],
+            is_confirmed=True,
+            source="espn",
+        )
+
+        self.assertTrue(stored)
+        stored_payload = match_squads_table.upsert.call_args[0][0]
+        self.assertEqual(stored_payload["players"][0]["image_url"], "https://cdn.example/rahul.png")
 
 
 if __name__ == "__main__":
