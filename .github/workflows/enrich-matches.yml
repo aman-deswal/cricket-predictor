@@ -46,75 +46,7 @@ jobs:
           LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          python - <<'PY'
-          import json
-          import sys
-
-          sys.path.insert(0, "pipeline")
-
-          from utils.db import get_client
-
-          match_ids = [
-              "espn-1528554",
-              "espn-1547987",
-              "espn-1547096",
-              "espn-1545667",
-              "espn-1545666",
-              "cricbuzz-ea958f3d3e9c46ad",
-              "espn-1548225",
-              "espn-1534186",
-          ]
-
-          client = get_client()
-
-          prediction_rows = (
-              client.table("predictions")
-              .select("match_id,team1,team2,predicted_winner,team1_win_probability,team2_win_probability,confidence,reasoning,toss_insight")
-              .in_("match_id", match_ids)
-              .execute()
-              .data
-              or []
-          )
-          enrich_rows = (
-              client.table("match_enrichment")
-              .select("match_id,expert_preview,player_updates,source_links,confidence,generated_at,toss_insight")
-              .in_("match_id", match_ids)
-              .execute()
-              .data
-              or []
-          )
-
-          prediction_map = {row["match_id"]: row for row in prediction_rows}
-          enrich_map = {row["match_id"]: row for row in enrich_rows}
-
-          report = []
-          for match_id in match_ids:
-              pred = prediction_map.get(match_id, {})
-              enrich = enrich_map.get(match_id, {})
-              report.append(
-                  {
-                      "match_id": match_id,
-                      "team1": pred.get("team1"),
-                      "team2": pred.get("team2"),
-                      "predicted_winner": pred.get("predicted_winner"),
-                      "team1_win_probability": pred.get("team1_win_probability"),
-                      "team2_win_probability": pred.get("team2_win_probability"),
-                      "confidence": pred.get("confidence"),
-                      "predictions_reasoning": pred.get("reasoning"),
-                      "predictions_toss_insight": pred.get("toss_insight"),
-                      "match_enrichment_expert_preview": enrich.get("expert_preview"),
-                      "match_enrichment_toss_insight": enrich.get("toss_insight"),
-                      "match_enrichment_player_updates": enrich.get("player_updates"),
-                      "match_enrichment_source_links": enrich.get("source_links"),
-                      "match_enrichment_confidence": enrich.get("confidence"),
-                      "match_enrichment_generated_at": enrich.get("generated_at"),
-                  }
-              )
-
-          print("LIVE_GARNISH_REPORT_START")
-          print(json.dumps(report, indent=2, ensure_ascii=True))
-          print("LIVE_GARNISH_REPORT_END")
-          PY
+            python pipeline/refresh_garnish.py
           else
             python pipeline/enrich_matches.py
           fi
