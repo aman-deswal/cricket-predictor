@@ -31,6 +31,7 @@ from utils.db import (
     get_team_form_from_cache,
     get_h2h_from_cache,
     get_recent_results,
+    get_venue_from_cache,
 )
 from utils.espn import get_espn_enrichment_context, format_espn_context
 from utils.llm import LLMUnavailableError, create_chat_completion, llm_garnish_enabled
@@ -99,6 +100,25 @@ POPULAR_LEAGUES = (
     "lpl",
     "bangladesh premier league",
     "bpl",
+)
+UPDATE_SIGNAL_KEYWORDS = (
+    "injur",
+    "ruled out",
+    "unavailable",
+    "rest",
+    "fit",
+    "fitness",
+    "return",
+    "comeback",
+    "retire",
+    "retirement",
+    "farewell",
+    "captain",
+    "captaincy",
+    "debut",
+    "milestone",
+    "100th",
+    "record",
 )
 
 ENRICHMENT_PROMPT = """You are a careful cricket research assistant. Use only the source snippets and ESPN data below.
@@ -259,7 +279,19 @@ def team_terms(team: str) -> list[str]:
 
 
 def mentions_team(team: str, text: str) -> bool:
-    return any(term in text for term in team_terms(team))
+    normalized = normalize_team(team).lower().strip()
+    haystack = text.lower()
+    if not normalized:
+        return False
+    if normalized in haystack:
+        return True
+
+    words = [word for word in re.split(r"\W+", normalized) if len(word) >= 4]
+    if not words:
+        return False
+    if len(words) == 1:
+        return words[0] in haystack
+    return all(word in haystack for word in words)
 
 
 def is_allowed_source(source_name: str, url: str) -> bool:
@@ -341,6 +373,225 @@ def source_name_from_url(url: str) -> str:
     if "espncricinfo.com" in domain:
         return "ESPNcricinfo"
     return domain or "Unknown"
+
+
+def clean_venue_name(value: Optional[str]) -> str:
+    return re.sub(r"\s*,\s*,+", ", ", re.sub(r"\s+", " ", value or "")).strip(" ,")
+
+
+def format_match_type_label(match_type: Optional[str]) -> str:
+    normalized = str(match_type or "").strip()
+    return normalized.upper() if normalized else ""
+
+
+def format_form_summary(team: str, form: dict, match_type: Optional[str]) -> str:
+    sample = int(form.get("matches_played", 0) or 0)
+    wins = int(form.get("recent_wins", 0) or 0)
+    format_label = format_match_type_label(match_type)
+    suffix = f" {format_label}" if format_label else ""
+    if sample <= 0:
+        return f"{team} do not have a reliable recent tracked{suffix} sample yet"
+    return f"{team} have won {wins} of their last {sample}{suffix} matches"
+
+
+def infer_update_status(text: str) -> str:
+    lowered = text.lower()
+    if "injur" in lowered or "ruled out" in lowered or "unavailable" in lowered:
+        return "Injury or availability concern noted in recent coverage."
+    if "retire" in lowered or "farewell" in lowered:
+        return "Retirement or farewell context was highlighted in recent coverage."
+    if "captain" in lowered or "captaincy" in lowered:
+        return "Captaincy context was highlighted in recent coverage."
+    if "debut" in lowered or "milestone" in lowered or "100th" in lowered or "record" in lowered:
+        return "Milestone context was highlighted in recent coverage."
+    if "return" in lowered or "comeback" in lowered or "fit" in lowered or "fitness" in lowered:
+        return "Fitness or return-to-action context was highlighted in recent coverage."
+    return "Recent coverage highlighted a player status update."
+
+
+def extract_espn_player_updates(
+    espn_ctx: Optional[dict],
+    *,
+    team1: str,
+    team2: str,
+    team1_squad: list[str],
+    team2_squad: list[str],
+) -> list[dict]:
+    if not espn_ctx:
+        return []
+
+    updates: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    squad_entries = [(name, team1) for name in team1_squad] + [(name, team2) for name in team2_squad]
+
+    for article in espn_ctx.get("news", []):
+        article_text = f"{article.get('headline', '')} {article.get('story', '')}".strip()
+        lowered = article_text.lower()
+        if not any(keyword in lowered for keyword in UPDATE_SIGNAL_KEYWORDS):
+            continue
+
+        matched = False
+        for player_name, player_team in squad_entries:
+            if not text_mentions(player_name, lowered):
+                continue
+            key = (player_name.casefold(), player_team.casefold())
+            if key in seen:
+                matched = True
+                continue
+            seen.add(key)
+            updates.append({
+                "player": player_name,
+                "team": player_team,
+                "status": infer_update_status(article_text),
+                "confidence": "reported",
+                "source_index": None,
+            })
+            matched = True
+            if len(updates) >= 4:
+                return updates
+
+        if not matched:
+            for candidate_team in (team1, team2):
+                if mentions_team(candidate_team, lowered):
+                    key = ("", candidate_team.casefold())
+                    if key in seen:
+                        break
+                    seen.add(key)
+                    updates.append({
+                        "player": "",
+                        "team": candidate_team,
+                        "status": infer_update_status(article_text),
+                        "confidence": "reported",
+                        "source_index": None,
+                    })
+                    break
+        if len(updates) >= 4:
+            return updates
+    return updates
+
+
+def build_data_backed_preview(
+    *,
+    match: dict,
+    team1_form: dict,
+    team2_form: dict,
+    h2h: dict,
+    espn_ctx: Optional[dict],
+    player_updates: list[dict],
+) -> str:
+    team1 = match.get("team1", "")
+    team2 = match.get("team2", "")
+    match_type = match.get("match_type", "")
+    sentences: list[str] = [
+        f"Using structured match context: {format_form_summary(team1, team1_form, match_type)}, while {format_form_summary(team2, team2_form, match_type)}."
+    ]
+
+    h2h_total = int(h2h.get("total_matches", 0) or 0)
+    if h2h_total > 0:
+        sentences.append(
+            f"The tracked head-to-head stands at {team1} {int(h2h.get('team1_wins', 0) or 0)} wins to {team2} {int(h2h.get('team2_wins', 0) or 0)} across {h2h_total} meetings."
+        )
+
+    standings_rows = []
+    if espn_ctx:
+        standings_rows = [
+            row for row in espn_ctx.get("standings", [])
+            if row.get("team") in {team1, team2}
+        ]
+    if standings_rows:
+        standings_bits = []
+        for row in standings_rows[:2]:
+            bit = f"{row['team']} are listed W={row.get('wins') or '?'} L={row.get('losses') or '?'}"
+            if row.get("points"):
+                bit += f" with {row['points']} points"
+            standings_bits.append(bit)
+        sentences.append("ESPN table context has " + "; ".join(standings_bits) + ".")
+
+    if player_updates:
+        notable = next((update for update in player_updates if update.get("status")), None)
+        if notable:
+            subject = notable.get("player") or notable.get("team") or "Recent coverage"
+            sentences.append(f"{subject}: {notable['status']}")
+    elif espn_ctx and espn_ctx.get("news"):
+        headline = next(
+            (
+                item.get("headline", "").strip()
+                for item in espn_ctx["news"]
+                if item.get("headline") and (
+                    mentions_team(team1, item.get("headline", "").lower())
+                    or mentions_team(team2, item.get("headline", "").lower())
+                )
+            ),
+            "",
+        )
+        if headline:
+            sentences.append(f'ESPN preview context notes: "{headline}."')
+
+    if not player_updates:
+        sentences.append("No source-backed XI or availability update is available yet.")
+
+    return " ".join(sentences[:4])
+
+
+def build_data_backed_toss_insight(match: dict, team1_form: dict, team2_form: dict) -> Optional[str]:
+    venue_name = clean_venue_name(match.get("venue") or "")
+    venue_stats = get_venue_from_cache(venue_name, get_cricsheet_type(match.get("match_type", ""))) if venue_name else {}
+    bat_first_rate = float(venue_stats.get("toss_bat_first_win_rate", 0.5) or 0.5)
+    match_type = format_match_type_label(match.get("match_type", "")) or "cricket"
+    team1 = match.get("team1", "")
+    team2 = match.get("team2", "")
+    predicted_team = team1 if float(team1_form.get("win_rate", 0.5) or 0.5) >= float(team2_form.get("win_rate", 0.5) or 0.5) else team2
+    venue_label = venue_name or "this venue"
+
+    if bat_first_rate >= 0.56:
+        return (
+            f"Toss edge leans batting first at {venue_label}: teams setting a total have won about {bat_first_rate:.0%} "
+            f"of tracked {match_type} matches here, so {predicted_team} should prefer to bat if they win the toss."
+        )
+    if bat_first_rate <= 0.44:
+        return (
+            f"Toss edge leans chasing at {venue_label}: sides batting second have won about {(1 - bat_first_rate):.0%} "
+            f"of tracked {match_type} matches here, so {predicted_team} should look to bowl first if they win the toss."
+        )
+    edge_pct = abs(round((bat_first_rate - 0.5) * 100))
+    return (
+        f"Toss looks close to neutral at {venue_label}, with only about a {edge_pct}% swing away from a 50/50 split; "
+        f"{predicted_team} should choose based more on conditions on the day than a fixed bat-or-bowl rule."
+    )
+
+
+def build_source_links(sources: list[dict], espn_ctx: Optional[dict], limit: int) -> list[dict]:
+    links: list[dict] = []
+    seen: set[str] = set()
+
+    def add_link(
+        title: Optional[str],
+        url: Optional[str],
+        source: Optional[str],
+        published_at: Optional[str],
+    ) -> None:
+        key = (url or title or "").strip()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        links.append({
+            "title": title,
+            "url": url,
+            "source": source,
+            "published_at": published_at,
+        })
+
+    for source in sources:
+        add_link(source.get("title"), source.get("url"), source.get("source"), source.get("published_at"))
+        if len(links) >= limit:
+            return links
+
+    for article in (espn_ctx or {}).get("news", []):
+        add_link(article.get("headline"), article.get("url"), "ESPNcricinfo", article.get("published_at"))
+        if len(links) >= limit:
+            return links
+
+    return links
 
 
 def is_candidate_article_url(url: str, allowed_domain: str) -> bool:
@@ -579,10 +830,12 @@ def get_cricsheet_type(match_type: str) -> str:
     return match_type.lower()
 
 
-def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ctx: str = "") -> dict:
+def build_data_backed_details(match: dict, espn_ctx: Optional[dict] = None, recent_results_ctx: str = "") -> dict:
     team1 = match.get("team1", "")
     team2 = match.get("team2", "")
     cricsheet_type = get_cricsheet_type(match.get("match_type", ""))
+    match_id = match.get("match_id", "")
+    team1_squad, team2_squad = get_match_squad_names(match_id) if match_id else ([], [])
 
     # Try Supabase stats_cache first, then local Cricsheet CSVs
     team1_form = get_team_form_from_cache(team1, cricsheet_type)
@@ -617,15 +870,23 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
     has_stats = team1_form.get("matches_played", 0) > 0 or team2_form.get("matches_played", 0) > 0
 
     if not has_stats:
+        player_updates = extract_espn_player_updates(
+            espn_ctx,
+            team1=team1,
+            team2=team2,
+            team1_squad=team1_squad,
+            team2_squad=team2_squad,
+        )
         return {
             "venue_name": None,
             "venue_confidence": "unknown",
             "possible_xi": {"team1": [], "team2": []},
-            "player_updates": [],
+            "player_updates": player_updates,
             "expert_preview": (
                 "No recent reputable source-backed updates or local historical data were found for this fixture yet. "
                 "Venue, XI, and injury details should be treated as unavailable until a reliable source is found."
             ),
+            "toss_insight": None,
             "confidence": "low",
         }
 
@@ -648,10 +909,17 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
         "team1_squad": ", ".join(team1_squad) if team1_squad else "not available",
         "team2_squad": ", ".join(team2_squad) if team2_squad else "not available",
     }
+    data_backed_updates = extract_espn_player_updates(
+        espn_ctx,
+        team1=team1,
+        team2=team2,
+        team1_squad=team1_squad,
+        team2_squad=team2_squad,
+    )
 
     if llm_garnish_enabled():
         try:
-            fallback = call_model_fallback(match, stats, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
+            fallback = call_model_fallback(match, stats, espn_ctx=format_espn_context(espn_ctx or {}), recent_results_ctx=recent_results_ctx)
             venue_name = fallback.get("venue_name")
             venue_confidence = fallback.get("venue_confidence", "unknown")
             preview = fallback.get("expert_preview", "")
@@ -662,6 +930,8 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
                 team2_player_pool,
             )
             player_updates = fallback.get("player_updates", [])
+            if not player_updates:
+                player_updates = data_backed_updates
             key_players = fallback.get("key_battles", fallback.get("key_players", []))
             # Filter battles to only include players from confirmed squads
             if team1_squad or team2_squad:
@@ -693,23 +963,23 @@ def build_data_backed_details(match: dict, espn_ctx: str = "", recent_results_ct
                 f"with {team1} winning {h2h.get('team1_wins', 0)} and {team2} winning {h2h.get('team2_wins', 0)}. "
                 f"No source-backed XI or injury update is available yet."
             )
+            if not player_updates:
+                player_updates = data_backed_updates
             confidence = "low"
     else:
         venue_name = None
         venue_confidence = "unknown"
-        toss_insight = None
+        toss_insight = build_data_backed_toss_insight(match, team1_form, team2_form)
         possible_xi = {"team1": [], "team2": []}
-        player_updates = []
+        player_updates = data_backed_updates
         key_players = []
-        preview = (
-            f"No recent reputable article-backed updates were generated for this fixture. "
-            f"Using structured stats only: {team1} have won "
-            f"{team1_form.get('recent_wins', 0)} of their last {team1_form.get('matches_played', 0)} "
-            f"{match.get('match_type', '').upper()} matches, while {team2} have won "
-            f"{team2_form.get('recent_wins', 0)} of their last {team2_form.get('matches_played', 0)}. "
-            f"Their historical head-to-head has {h2h.get('total_matches', 0)} matches, "
-            f"with {team1} winning {h2h.get('team1_wins', 0)} and {team2} winning {h2h.get('team2_wins', 0)}. "
-            f"No source-backed XI or injury update is available yet."
+        preview = build_data_backed_preview(
+            match=match,
+            team1_form=team1_form,
+            team2_form=team2_form,
+            h2h=h2h,
+            espn_ctx=espn_ctx,
+            player_updates=player_updates,
         )
         confidence = "low"
 
@@ -788,6 +1058,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         fetch_stats_for_match_squads(match_id=match_id, force=False)
 
     # --- Fetch ESPN enrichment context ---
+    espn_ctx: dict = {}
     espn_ctx_text = ""
     espn_event_id = _get_espn_event_id(match_id, match=match)
     espn_league_id = _get_espn_league_id(match_id)
@@ -844,9 +1115,9 @@ def enrich_match(match: dict, source_limit: int) -> dict:
             )
         except LLMUnavailableError:
             logger.warning("  All configured LLM routes unavailable — using data-backed enrichment instead")
-            details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
+            details = build_data_backed_details(match, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
     else:
-        details = build_data_backed_details(match, espn_ctx=espn_ctx_text, recent_results_ctx=recent_results_ctx)
+        details = build_data_backed_details(match, espn_ctx=espn_ctx, recent_results_ctx=recent_results_ctx)
 
     # Overlay ESPN-verified venue if available (never trust AI for venues)
     espn_venue = _get_espn_venue(match_id)
@@ -874,7 +1145,7 @@ def enrich_match(match: dict, source_limit: int) -> dict:
         "player_updates": details.get("player_updates", []),
         "key_players": enriched_battles,
         "expert_preview": details.get("expert_preview", ""),
-        "source_links": sources,
+        "source_links": build_source_links(sources, espn_ctx, source_limit),
         "confidence": details.get("confidence", "low"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
