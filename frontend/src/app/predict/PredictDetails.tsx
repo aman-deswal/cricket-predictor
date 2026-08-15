@@ -185,10 +185,10 @@ function normalizePlayerLookupKey(value: string): string {
 function buildPlayerStatsLookup(playerStats: PlayerStats[]): Map<string, PlayerStats> {
   const lookup = new Map<string, PlayerStats>();
   playerStats.forEach((stat) => {
-   const nameKey = normalizePlayerLookupKey(stat.player_name);
-   const teamKey = normalizeTeamIdentity(stat.team ?? '');
-   if (!lookup.has(nameKey)) lookup.set(nameKey, stat);
-   if (teamKey) lookup.set(`${nameKey}::${teamKey}`, stat);
+    const nameKey = normalizePlayerLookupKey(stat.player_name);
+    const teamKey = normalizeTeamIdentity(stat.team ?? '');
+    if (!lookup.has(nameKey)) lookup.set(nameKey, stat);
+    if (teamKey) lookup.set(`${nameKey}::${teamKey}`, stat);
   });
   return lookup;
 }
@@ -214,7 +214,7 @@ function buildFallbackBattleInsight(
   const batterLast = batter.name.split(' ').slice(-1)[0];
   const bowlerLast = bowler.name.split(' ').slice(-1)[0];
   if (!batterStats || !bowlerStats) {
-   return `${batterLast} versus ${bowlerLast} is on the radar, but we do not have enough structured evidence yet to frame it as a stronger duel.`;
+    return `${batterLast} versus ${bowlerLast} is on the radar, but we do not have enough structured evidence yet to frame it as a stronger duel.`;
   }
 
   const highTempoBatter = batterStats.batting_sr >= 135;
@@ -222,15 +222,15 @@ function buildFallbackBattleInsight(
   const controlBowler = bowlerStats.bowling_economy > 0 && bowlerStats.bowling_economy <= 7.2;
   const strikeBowler = bowlerStats.bowling_wickets >= 40;
   const wicketsPerInnings = bowlerStats.bowling_innings > 0
-   ? bowlerStats.bowling_wickets / bowlerStats.bowling_innings
-   : 0;
+    ? bowlerStats.bowling_wickets / bowlerStats.bowling_innings
+    : 0;
 
   if (highTempoBatter && controlBowler) {
-   return `${batterLast}'s format profile carries a ${batterStats.batting_sr.toFixed(0)} strike rate, while ${bowlerLast} has kept teams to ${bowlerStats.bowling_economy.toFixed(1)} economy. This is ${batterTeam}'s tempo threat against ${bowlerTeam}'s control bowler.`;
+    return `${batterLast}'s format profile carries a ${batterStats.batting_sr.toFixed(0)} strike rate, while ${bowlerLast} has kept teams to ${bowlerStats.bowling_economy.toFixed(1)} economy. This is ${batterTeam}'s tempo threat against ${bowlerTeam}'s control bowler.`;
   }
 
   if (highVolumeBatter && strikeBowler) {
-   return `${batterLast} has built a strong format profile with ${batterStats.batting_fifties} fifties and a ${batterStats.batting_avg.toFixed(0)} average, while ${bowlerLast} strikes at ${wicketsPerInnings.toFixed(1)} wickets per bowling innings. That makes it ${batterTeam}'s established batting option against ${bowlerTeam}'s main strike threat.`;
+    return `${batterLast} has built a strong format profile with ${batterStats.batting_fifties} fifties and a ${batterStats.batting_avg.toFixed(0)} average, while ${bowlerLast} strikes at ${wicketsPerInnings.toFixed(1)} wickets per bowling innings. That makes it ${batterTeam}'s established batting option against ${bowlerTeam}'s main strike threat.`;
   }
 
   return `${batterLast}'s format profile sits at ${batterStats.batting_avg.toFixed(0)} average and ${batterStats.batting_sr.toFixed(0)} strike rate, while ${bowlerLast} combines ${bowlerStats.bowling_economy.toFixed(1)} economy with ${wicketsPerInnings.toFixed(1)} wickets per bowling innings. It is a cleaner stats-backed duel between ${batterTeam}'s batting core and ${bowlerTeam}'s wicket-taking option.`;
@@ -242,9 +242,9 @@ function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[
   const statsByPlayer = buildPlayerStatsLookup(playerStats);
 
   const rankPlayers = (players: SquadPlayer[], teamName: string, mode: 'batter' | 'bowler') => {
-   const enriched: RankedBattlePlayer[] = [];
+    const enriched: RankedBattlePlayer[] = [];
 
-   for (const player of players) {
+    for (const player of players) {
      const entry: RankedBattlePlayer = {
        player,
        stats: getPlayerStatsForTeam(statsByPlayer, player.name, teamName),
@@ -276,9 +276,9 @@ function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[
          - economyPenalty;
      }
      enriched.push(entry);
-   }
+    }
 
-   return enriched
+    return enriched
      .filter((entry) => (
        mode === 'batter'
          ? entry.evidence >= 3 && (entry.stats?.batting_innings ?? 0) > 0
@@ -294,35 +294,35 @@ function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[
   const team2Bowlers = rankPlayers(team2.players ?? [], team2.team, 'bowler');
 
   const pairings = [
-   ...team1Batters.slice(0, 3).flatMap((batter) => team2Bowlers.slice(0, 3).map((bowler) => ({
+    ...team1Batters.slice(0, 3).flatMap((batter) => team2Bowlers.slice(0, 3).map((bowler) => ({
      batter,
      bowler,
      batterTeam: team1.team,
      bowlerTeam: team2.team,
      score: batter.score + bowler.score,
-   }))),
-   ...team2Batters.slice(0, 3).flatMap((batter) => team1Bowlers.slice(0, 3).map((bowler) => ({
+    }))),
+    ...team2Batters.slice(0, 3).flatMap((batter) => team1Bowlers.slice(0, 3).map((bowler) => ({
      batter,
      bowler,
      batterTeam: team2.team,
      bowlerTeam: team1.team,
      score: batter.score + bowler.score,
-   }))),
+    }))),
   ].sort((left, right) => right.score - left.score);
 
   const seen = new Set<string>();
   const usedPlayers = new Set<string>();
   const battles: DisplayKeyBattle[] = [];
   pairings.forEach(({ batter: batterEntry, bowler: bowlerEntry, batterTeam, bowlerTeam }) => {
-   if (!batterEntry?.player || !bowlerEntry?.player) return;
-   if (!batterEntry.stats || !bowlerEntry.stats) return;
-   const key = `${batterEntry.player.name}::${bowlerEntry.player.name}`;
-   if (seen.has(key)) return;
-   if (usedPlayers.has(batterEntry.player.name) || usedPlayers.has(bowlerEntry.player.name)) return;
-   seen.add(key);
-   usedPlayers.add(batterEntry.player.name);
-   usedPlayers.add(bowlerEntry.player.name);
-   battles.push({
+    if (!batterEntry?.player || !bowlerEntry?.player) return;
+    if (!batterEntry.stats || !bowlerEntry.stats) return;
+    const key = `${batterEntry.player.name}::${bowlerEntry.player.name}`;
+    if (seen.has(key)) return;
+    if (usedPlayers.has(batterEntry.player.name) || usedPlayers.has(bowlerEntry.player.name)) return;
+    seen.add(key);
+    usedPlayers.add(batterEntry.player.name);
+    usedPlayers.add(bowlerEntry.player.name);
+    battles.push({
      batter: batterEntry.player.name,
      batter_team: batterTeam,
      bowler: bowlerEntry.player.name,
@@ -335,7 +335,7 @@ function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[
        batterEntry.stats,
        bowlerEntry.stats,
      ),
-   });
+    });
   });
 
   return battles.slice(0, 3);
