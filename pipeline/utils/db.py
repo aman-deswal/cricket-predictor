@@ -88,6 +88,16 @@ def store_prediction(prediction: dict) -> None:
     client.table("predictions").upsert(prediction, on_conflict="match_id").execute()
 
 
+def update_prediction_garnish(match_id: str, reasoning: str, toss_insight: Optional[str]) -> None:
+    """Update only the non-deterministic garnish fields on a stored prediction."""
+    client = get_client()
+    payload = {
+        "reasoning": reasoning,
+        "toss_insight": toss_insight,
+    }
+    client.table("predictions").update(payload).eq("match_id", match_id).execute()
+
+
 def get_latest_prediction_snapshot(match_id: str) -> Optional[dict]:
     """Fetch the latest pre-match snapshot for attribution comparison."""
     client = get_client()
@@ -165,6 +175,12 @@ def store_match_enrichment(enrichment: dict) -> None:
         # If newer columns don't exist yet, retry without them
         fallback = {k: v for k, v in enrichment.items() if k not in ("key_players", "toss_insight")}
         client.table("match_enrichment").upsert(fallback, on_conflict="match_id").execute()
+
+
+def store_match_garnish(garnish: dict) -> None:
+    """Upsert only the narrative garnish fields production reads for match enrichment."""
+    client = get_client()
+    client.table("match_enrichment").upsert(garnish, on_conflict="match_id").execute()
 
 
 def get_pending_results() -> list[dict]:
