@@ -32,23 +32,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Select garnish candidates
+      - name: Print live garnish rows
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python pipeline/select_garnish_candidates.py --format text
-
-      - name: Refresh garnish only
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          ENABLE_LLM_GARNISH: ${{ vars.ENABLE_LLM_GARNISH || 'false' }}
-          LLM_PROFILE: ${{ vars.LLM_PROFILE || 'balanced' }}
-          LLM_PROFILE_MAP: ${{ vars.LLM_PROFILE_MAP || '' }}
-          LLM_ROUTE_MAP: ${{ vars.LLM_ROUTE_MAP || '' }}
-          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS || '' }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || '' }}
-          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://models.github.ai/inference' }}
-        run: python pipeline/refresh_garnish.py
+        run: >-
+          python pipeline/report_garnish_snapshot.py
+          --match-id espn-1545664
+          --match-id espn-1545665
+          --match-id espn-1528554
+          --match-id espn-1547987
+          --match-id espn-1547096
+          --match-id espn-1545667
+          --match-id espn-1545666
+          --match-id cricbuzz-ea958f3d3e9c46ad
