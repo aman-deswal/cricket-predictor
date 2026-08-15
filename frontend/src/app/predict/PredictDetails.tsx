@@ -171,87 +171,174 @@ function PlayerHeadshot({
 
 type KeyBattle = MatchEnrichment['key_players'][number];
 type DisplayKeyBattle = KeyBattle & { batter: string; bowler: string };
+type RankedBattlePlayer = {
+  player: SquadPlayer;
+  stats?: PlayerStats;
+  score: number;
+  evidence: number;
+};
 
 function normalizePlayerLookupKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-function buildFallbackBattleInsight(batter: SquadPlayer, bowler: SquadPlayer, batterStats?: PlayerStats, bowlerStats?: PlayerStats): string {
+function buildPlayerStatsLookup(playerStats: PlayerStats[]): Map<string, PlayerStats> {
+  const lookup = new Map<string, PlayerStats>();
+  playerStats.forEach((stat) => {
+    const nameKey = normalizePlayerLookupKey(stat.player_name);
+    const teamKey = normalizeTeamIdentity(stat.team ?? '');
+    if (!lookup.has(nameKey)) lookup.set(nameKey, stat);
+    if (teamKey) lookup.set(`${nameKey}::${teamKey}`, stat);
+  });
+  return lookup;
+}
+
+function getPlayerStatsForTeam(
+  lookup: Map<string, PlayerStats>,
+  playerName: string,
+  teamName?: string | null,
+): PlayerStats | undefined {
+  const playerKey = normalizePlayerLookupKey(playerName);
+  const teamKey = normalizeTeamIdentity(teamName ?? '');
+  return lookup.get(`${playerKey}::${teamKey}`) ?? lookup.get(playerKey);
+}
+
+function buildFallbackBattleInsight(
+  batter: SquadPlayer,
+  bowler: SquadPlayer,
+  batterTeam: string,
+  bowlerTeam: string,
+  batterStats?: PlayerStats,
+  bowlerStats?: PlayerStats,
+): string {
   const batterLast = batter.name.split(' ').slice(-1)[0];
   const bowlerLast = bowler.name.split(' ').slice(-1)[0];
-  const batterLine = batterStats && (batterStats.batting_runs > 0 || batterStats.batting_innings > 0)
-    ? `${batterLast} has ${batterStats.batting_runs} runs at ${batterStats.batting_avg.toFixed(0)} average and ${batterStats.batting_sr.toFixed(0)} strike rate`
-    : `${batterLast} is one of the more prominent batting options in the projected XI`;
-  const bowlerLine = bowlerStats && (bowlerStats.bowling_wickets > 0 || bowlerStats.bowling_innings > 0)
-    ? `${bowlerLast} brings ${bowlerStats.bowling_wickets} wickets with a ${bowlerStats.bowling_economy.toFixed(1)} economy`
-    : `${bowlerLast} profiles as a likely wicket-taking option from the opposing attack`;
-  return `${batterLine}, while ${bowlerLine}. This shapes one of the clearest squad-based matchups in the game.`;
+  if (!batterStats || !bowlerStats) {
+    return `${batterLast} versus ${bowlerLast} is on the radar, but we do not have enough structured evidence yet to frame it as a stronger duel.`;
+  }
+
+  const highTempoBatter = batterStats.batting_sr >= 135;
+  const highVolumeBatter = batterStats.batting_fifties >= 8 || batterStats.batting_hundreds >= 1;
+  const controlBowler = bowlerStats.bowling_economy > 0 && bowlerStats.bowling_economy <= 7.2;
+  const strikeBowler = bowlerStats.bowling_wickets >= 40;
+  const wicketsPerInnings = bowlerStats.bowling_innings > 0
+    ? bowlerStats.bowling_wickets / bowlerStats.bowling_innings
+    : 0;
+
+  if (highTempoBatter && controlBowler) {
+    return `${batterLast}'s format profile carries a ${batterStats.batting_sr.toFixed(0)} strike rate, while ${bowlerLast} has kept teams to ${bowlerStats.bowling_economy.toFixed(1)} economy. This is ${batterTeam}'s tempo threat against ${bowlerTeam}'s control bowler.`;
+  }
+
+  if (highVolumeBatter && strikeBowler) {
+    return `${batterLast} has built a strong format profile with ${batterStats.batting_fifties} fifties and a ${batterStats.batting_avg.toFixed(0)} average, while ${bowlerLast} strikes at ${wicketsPerInnings.toFixed(1)} wickets per bowling innings. That makes it ${batterTeam}'s established batting option against ${bowlerTeam}'s main strike threat.`;
+  }
+
+  return `${batterLast}'s format profile sits at ${batterStats.batting_avg.toFixed(0)} average and ${batterStats.batting_sr.toFixed(0)} strike rate, while ${bowlerLast} combines ${bowlerStats.bowling_economy.toFixed(1)} economy with ${wicketsPerInnings.toFixed(1)} wickets per bowling innings. It is a cleaner stats-backed duel between ${batterTeam}'s batting core and ${bowlerTeam}'s wicket-taking option.`;
 }
 
 function buildFallbackKeyBattles(squads: MatchSquad[], playerStats: PlayerStats[]): DisplayKeyBattle[] {
   if (squads.length < 2) return [];
 
-  const statsByPlayer = new Map<string, PlayerStats>();
-  playerStats.forEach((stat) => {
-    statsByPlayer.set(normalizePlayerLookupKey(stat.player_name), stat);
-  });
+  const statsByPlayer = buildPlayerStatsLookup(playerStats);
 
-  const rankPlayers = (players: SquadPlayer[], mode: 'batter' | 'bowler') => {
-    const enriched = players.map((player) => ({
-      player,
-      stats: statsByPlayer.get(normalizePlayerLookupKey(player.name)),
-    }));
-    return enriched.sort((left, right) => {
-      const leftRole = left.player.role ?? '';
-      const rightRole = right.player.role ?? '';
-      if (mode === 'batter') {
-        const leftScore = (left.stats?.batting_runs ?? 0) * 1000 + (left.stats?.batting_avg ?? 0) * 10 + (left.stats?.batting_sr ?? 0);
-        const rightScore = (right.stats?.batting_runs ?? 0) * 1000 + (right.stats?.batting_avg ?? 0) * 10 + (right.stats?.batting_sr ?? 0);
-        const leftRoleBoost = /bat|all|wk/i.test(leftRole) || left.player.is_keeper ? 1 : 0;
-        const rightRoleBoost = /bat|all|wk/i.test(rightRole) || right.player.is_keeper ? 1 : 0;
-        return rightScore - leftScore || rightRoleBoost - leftRoleBoost || left.player.name.localeCompare(right.player.name);
-      }
+  const rankPlayers = (players: SquadPlayer[], teamName: string, mode: 'batter' | 'bowler') => {
+    const enriched: RankedBattlePlayer[] = [];
 
-      const leftEconomy = left.stats?.bowling_economy && left.stats.bowling_economy > 0 ? left.stats.bowling_economy : 99;
-      const rightEconomy = right.stats?.bowling_economy && right.stats.bowling_economy > 0 ? right.stats.bowling_economy : 99;
-      const leftScore = (left.stats?.bowling_wickets ?? 0) * 1000 + (left.stats?.bowling_innings ?? 0) * 10 - leftEconomy;
-      const rightScore = (right.stats?.bowling_wickets ?? 0) * 1000 + (right.stats?.bowling_innings ?? 0) * 10 - rightEconomy;
-      const leftRoleBoost = /bowl|all/i.test(leftRole) || Boolean(left.player.bowling_style) ? 1 : 0;
-      const rightRoleBoost = /bowl|all/i.test(rightRole) || Boolean(right.player.bowling_style) ? 1 : 0;
-      return rightScore - leftScore || rightRoleBoost - leftRoleBoost || left.player.name.localeCompare(right.player.name);
-    });
+    for (const player of players) {
+     const entry: RankedBattlePlayer = {
+       player,
+       stats: getPlayerStatsForTeam(statsByPlayer, player.name, teamName),
+       score: 0,
+       evidence: 0,
+     };
+     entry.stats = getPlayerStatsForTeam(statsByPlayer, entry.player.name, teamName);
+     const role = entry.player.role ?? '';
+     if (mode === 'batter') {
+       const battingSample = entry.stats?.batting_innings ?? 0;
+       const roleBoost = /bat|all|wk/i.test(role) || entry.player.is_keeper ? 1 : 0;
+       entry.evidence = (battingSample > 0 ? 2 : 0) + (entry.stats?.batting_runs ? 1 : 0) + roleBoost;
+       entry.score = (entry.stats?.batting_runs ?? 0) * 1000
+         + (entry.stats?.batting_avg ?? 0) * 25
+         + (entry.stats?.batting_sr ?? 0) * 5
+         + (entry.stats?.batting_fifties ?? 0) * 250
+         + (entry.stats?.batting_hundreds ?? 0) * 500
+         + roleBoost * 100;
+     } else {
+       const bowlingSample = entry.stats?.bowling_innings ?? 0;
+       const roleBoost = /bowl|all/i.test(role) || Boolean(entry.player.bowling_style) ? 1 : 0;
+       entry.evidence = (bowlingSample > 0 ? 2 : 0) + ((entry.stats?.bowling_wickets ?? 0) > 0 ? 1 : 0) + roleBoost;
+       const economyPenalty = entry.stats?.bowling_economy && entry.stats.bowling_economy > 0
+         ? entry.stats.bowling_economy * 25
+         : 0;
+       entry.score = (entry.stats?.bowling_wickets ?? 0) * 1400
+         + (entry.stats?.bowling_innings ?? 0) * 80
+         + roleBoost * 100
+         - economyPenalty;
+     }
+     enriched.push(entry);
+    }
+
+    return enriched
+     .filter((entry) => (
+       mode === 'batter'
+         ? entry.evidence >= 3 && (entry.stats?.batting_innings ?? 0) > 0
+         : entry.evidence >= 3 && (entry.stats?.bowling_innings ?? 0) > 0
+     ))
+     .sort((left, right) => right.score - left.score || left.player.name.localeCompare(right.player.name));
   };
 
   const [team1, team2] = squads;
-  const team1Batters = rankPlayers(team1.players ?? [], 'batter');
-  const team1Bowlers = rankPlayers(team1.players ?? [], 'bowler');
-  const team2Batters = rankPlayers(team2.players ?? [], 'batter');
-  const team2Bowlers = rankPlayers(team2.players ?? [], 'bowler');
+  const team1Batters = rankPlayers(team1.players ?? [], team1.team, 'batter');
+  const team1Bowlers = rankPlayers(team1.players ?? [], team1.team, 'bowler');
+  const team2Batters = rankPlayers(team2.players ?? [], team2.team, 'batter');
+  const team2Bowlers = rankPlayers(team2.players ?? [], team2.team, 'bowler');
 
   const pairings = [
-    { batter: team1Batters[0], bowler: team2Bowlers[0], batterTeam: team1.team, bowlerTeam: team2.team },
-    { batter: team2Batters[0], bowler: team1Bowlers[0], batterTeam: team2.team, bowlerTeam: team1.team },
-    { batter: team1Batters[1], bowler: team2Bowlers[0], batterTeam: team1.team, bowlerTeam: team2.team },
-    { batter: team2Batters[1], bowler: team1Bowlers[0], batterTeam: team2.team, bowlerTeam: team1.team },
-  ];
+    ...team1Batters.slice(0, 3).flatMap((batter) => team2Bowlers.slice(0, 3).map((bowler) => ({
+     batter,
+     bowler,
+     batterTeam: team1.team,
+     bowlerTeam: team2.team,
+     score: batter.score + bowler.score,
+    }))),
+    ...team2Batters.slice(0, 3).flatMap((batter) => team1Bowlers.slice(0, 3).map((bowler) => ({
+     batter,
+     bowler,
+     batterTeam: team2.team,
+     bowlerTeam: team1.team,
+     score: batter.score + bowler.score,
+    }))),
+  ].sort((left, right) => right.score - left.score);
 
   const seen = new Set<string>();
+  const usedPlayers = new Set<string>();
   const battles: DisplayKeyBattle[] = [];
   pairings.forEach(({ batter: batterEntry, bowler: bowlerEntry, batterTeam, bowlerTeam }) => {
     if (!batterEntry?.player || !bowlerEntry?.player) return;
+    if (!batterEntry.stats || !bowlerEntry.stats) return;
     const key = `${batterEntry.player.name}::${bowlerEntry.player.name}`;
     if (seen.has(key)) return;
+    if (usedPlayers.has(batterEntry.player.name) || usedPlayers.has(bowlerEntry.player.name)) return;
     seen.add(key);
+    usedPlayers.add(batterEntry.player.name);
+    usedPlayers.add(bowlerEntry.player.name);
     battles.push({
-      batter: batterEntry.player.name,
-      batter_team: batterTeam,
-      bowler: bowlerEntry.player.name,
-      bowler_team: bowlerTeam,
-      insight: buildFallbackBattleInsight(batterEntry.player, bowlerEntry.player, batterEntry.stats, bowlerEntry.stats),
+     batter: batterEntry.player.name,
+     batter_team: batterTeam,
+     bowler: bowlerEntry.player.name,
+     bowler_team: bowlerTeam,
+     insight: buildFallbackBattleInsight(
+       batterEntry.player,
+       bowlerEntry.player,
+       batterTeam,
+       bowlerTeam,
+       batterEntry.stats,
+       bowlerEntry.stats,
+     ),
     });
   });
 
-  return battles.slice(0, 4);
+  return battles.slice(0, 3);
 }
 
 const MARKET_BOOK_COLORS = ['#22d3ee', '#a78bfa', '#34d399'] as const;
@@ -909,9 +996,11 @@ export function PredictDetails() {
   const enrichmentKeyBattles = (enrichment?.key_players ?? []).filter(
     (battle): battle is DisplayKeyBattle => Boolean(battle?.batter && battle?.bowler)
   );
+  const playerStatsLookup = buildPlayerStatsLookup(playerStats);
   const fallbackKeyBattles = enrichmentKeyBattles.length === 0 ? buildFallbackKeyBattles(squads, playerStats) : [];
   const keyBattles = enrichmentKeyBattles.length > 0 ? enrichmentKeyBattles : fallbackKeyBattles;
   const keyBattlesAreFallback = enrichmentKeyBattles.length === 0 && fallbackKeyBattles.length > 0;
+  const fallbackKeyBattlesLabel = playerStats.length > 0 ? 'stats-derived' : 'squad-derived';
   const shouldShowKeyBattlesPlaceholder = keyBattles.length === 0 && (squads.length > 0 || hasSquadOrXi);
 
   // Resolve team colors once — ensure visual distinction (same logic as donut chart)
@@ -1521,7 +1610,7 @@ export function PredictDetails() {
             <div className="flex items-center gap-2">
               {keyBattlesAreFallback && (
                 <span className={`${detailTileMetaClass} rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 font-semibold tracking-wide text-sky-200`}>
-                  squad-derived
+                  {fallbackKeyBattlesLabel}
                 </span>
               )}
               <span className={`${detailTileMetaClass} font-semibold text-slate-400 tracking-wide`}>
@@ -1531,8 +1620,8 @@ export function PredictDetails() {
           </div>
           <div className="space-y-2">
             {keyBattles.map((battle, i) => {
-              const batterStats = playerStats.find(s => s.player_name === battle.batter);
-              const bowlerStats = playerStats.find(s => s.player_name === battle.bowler);
+              const batterStats = getPlayerStatsForTeam(playerStatsLookup, battle.batter, battle.batter_team);
+              const bowlerStats = getPlayerStatsForTeam(playerStatsLookup, battle.bowler, battle.bowler_team);
               const bMeta = getTeamMeta(battle.batter_team ?? '');
               const wMeta = getTeamMeta(battle.bowler_team ?? '');
               const batterLast = battle.batter.split(' ').slice(-1)[0];

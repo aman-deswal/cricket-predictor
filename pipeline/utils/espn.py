@@ -954,6 +954,12 @@ def get_espn_enrichment_context(event_id: str, league_id: str = DEFAULT_LEAGUE) 
             context["news"].append({
                 "headline": headline,
                 "story": story_clean,
+                "url": (
+                    article.get("links", {}).get("web", {}).get("href")
+                    or article.get("link")
+                    or article.get("url")
+                ),
+                "published_at": article.get("published") or article.get("lastModified"),
             })
 
     # Main article (match report/preview)
@@ -965,6 +971,12 @@ def get_espn_enrichment_context(event_id: str, league_id: str = DEFAULT_LEAGUE) 
         context["news"].insert(0, {
             "headline": main_article["headline"],
             "story": story_clean,
+            "url": (
+                main_article.get("links", {}).get("web", {}).get("href")
+                or main_article.get("link")
+                or main_article.get("url")
+            ),
+            "published_at": main_article.get("published") or main_article.get("lastModified"),
         })
 
     # Standings
