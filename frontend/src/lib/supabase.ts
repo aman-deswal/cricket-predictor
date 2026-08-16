@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getTeamMeta } from './teams';
 import { getFranchiseLogoUrl } from './franchise-logos';
 import { getStoredDemoMode } from './demo-mode';
-import { compareMatchCenterMatches } from './competition';
-import { selectFreshestTrustedSportsbookOdds } from './market-odds';
+import { compareMatchCenterMatches, hasValidMarketOdds } from './competition';
+import { normalizeBookmaker, selectFreshestTrustedSportsbookOdds } from './market-odds';
 import { buildAccuracyTrend } from './prediction-history';
 export { getMatchSection } from './competition';
 export type { MatchSection } from './competition';
@@ -337,6 +337,373 @@ function isPlaceholderEvidenceText(value: unknown): boolean {
     || /unavailable until a reliable source is found/i.test(text);
 }
 
+function hasKnownVenue(value: string | undefined): boolean {
+  const venue = value?.trim();
+  return Boolean(
+    venue
+    && !/^(tbd|tbc|unknown|unavailable|none|n\/a|coming soon|venue tbd|venue tbc)$/i.test(venue),
+  );
+}
+
+const LOGICAL_FIXTURE_WINDOW_MS = 2 * 60 * 60 * 1000;
+const TEAM_IDENTITY_ALIASES: Record<string, string> = {
+  'antigua and barbuda falcons': 'antigua and barbuda falcons',
+  'antigua barbuda falcons': 'antigua and barbuda falcons',
+  'barbados royals': 'barbados royals',
+  'barbados tridents': 'barbados royals',
+  'saint lucia kings': 'st lucia kings',
+  'st lucia kings': 'st lucia kings',
+  'st lucia stars': 'st lucia kings',
+  'st lucia zouks': 'st lucia kings',
+  'st kitts and nevis patriots': 'st kitts and nevis patriots',
+  'st kitts nevis patriots': 'st kitts and nevis patriots',
+};
+
+type RawEnrichmentRow = {
+  match_id: string;
+  venue_name: string | null;
+  confidence: 'high' | 'medium' | 'low' | null;
+  expert_preview: string | null;
+  toss_insight?: string | null;
+  player_updates: unknown[] | string | null;
+  key_players: unknown[] | string | null;
+  possible_xi: { team1?: unknown[]; team2?: unknown[] } | string | null;
+  source_links: unknown[] | string | null;
+};
+
+type RawEspnMatchDataRow = {
+  match_id: string;
+  espn_event_id?: string | null;
+  venue_name: string | null;
+  venue_city?: string | null;
+  venue_country?: string | null;
+  venue_capacity?: number | null;
+  venue_grass?: boolean | null;
+  venue_image_url?: string | null;
+  toss_winner?: string | null;
+  toss_decision?: string | null;
+  match_number?: string | null;
+  match_days?: string | null;
+  hours_of_play?: string | null;
+  series_note: string | null;
+  series_scoreline?: string | null;
+  series_leaders?: unknown[] | string | null;
+  officials?: unknown[] | string | null;
+  rosters: ESPNRoster[] | string | null;
+  head_to_head: unknown[] | string | null;
+  standings?: unknown[] | string | null;
+  scorecards?: unknown[] | string | null;
+  fetched_at?: string | null;
+};
+
+type RawOddsRow = {
+  match_id: string;
+  bookmaker: string;
+  team1_odds: number;
+  team2_odds: number;
+  draw_odds?: number | null;
+  market?: string;
+  fetched_at: string;
+};
+
+type SurfaceBuildContext = {
+  espnVenue: Map<string, string>;
+  espnH2H: Map<string, ESPNH2HGame[]>;
+  espnCompetition: Map<string, string>;
+  espnRosters: Map<string, ESPNRoster[]>;
+  franchiseLogosByName: Map<string, string>;
+  franchiseLogosByAbbr: Map<string, string>;
+  franchiseLogosByCompetitionAbbr: Map<string, string>;
+  enrichmentVenue: Map<string, string>;
+  enrichmentSignals: Map<string, MatchSpotlightSignals>;
+  oddsByMatch: Map<string, RawOddsRow[]>;
+  recentFormByTeam: Map<string, Array<'W' | 'L'>>;
+};
+
+export interface UnifiedMatchDetails {
+  match: Match | null;
+  prediction: Prediction | null;
+  predictionHistory: PredictionSnapshot[];
+  enrichment: MatchEnrichment | null;
+  odds: MatchOdds[];
+  oddsHistory: MatchOdds[];
+  squads: MatchSquad[];
+  espnMatchData: ESPNMatchData | null;
+  edgeScore: EdgeScore | null;
+  linkedMatchIds: string[];
+}
+
+function parseJsonField<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function firstPresentString(values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function normalizeLogicalFixtureTeam(team: string): string {
+  const normalized = team
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/’/g, '\'')
+    .replace(/\s*\((men|women)\)\s*/g, ' $1 ')
+    .replace(/\bsaint\b/g, 'st')
+    .replace(/\bst\.\b/g, 'st')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return TEAM_IDENTITY_ALIASES[normalized] ?? normalized;
+}
+
+function parseLogicalFixtureTimestamp(value: string): number | null {
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+type FixtureIdentity = Pick<Match, 'match_id' | 'team1' | 'team2' | 'date'>;
+
+export function matchesRepresentSameLogicalFixture(left: FixtureIdentity, right: FixtureIdentity): boolean {
+  const leftTeams = [normalizeLogicalFixtureTeam(left.team1), normalizeLogicalFixtureTeam(left.team2)].sort();
+  const rightTeams = [normalizeLogicalFixtureTeam(right.team1), normalizeLogicalFixtureTeam(right.team2)].sort();
+  if (leftTeams[0] !== rightTeams[0] || leftTeams[1] !== rightTeams[1]) return false;
+
+  const leftTime = parseLogicalFixtureTimestamp(left.date);
+  const rightTime = parseLogicalFixtureTimestamp(right.date);
+  if (leftTime === null || rightTime === null) return left.date === right.date;
+  return Math.abs(leftTime - rightTime) <= LOGICAL_FIXTURE_WINDOW_MS;
+}
+
+function getSourcePriority(matchId: string): number {
+  if (matchId.startsWith('espn-')) return 3;
+  if (matchId.startsWith('cricbuzz-')) return 2;
+  return 1;
+}
+
+function getStatusPriority(status: string): number {
+  if (status === 'live') return 3;
+  if (status === 'upcoming') return 2;
+  if (status === 'completed') return 1;
+  return 0;
+}
+
+function getPrimaryPredictionFromMatch(match: Pick<MatchWithPredictions, 'predictions'>): Prediction | null {
+  return match.predictions[0] ?? null;
+}
+
+function getLogicalFixtureCoverageScore(match: MatchWithPredictions): number {
+  const prediction = getPrimaryPredictionFromMatch(match);
+  const signals = match.spotlight_signals;
+  return (
+    getStatusPriority(match.status) * 10_000
+    + Number(hasValidMarketOdds(match)) * 2_000
+    + Number(prediction !== null) * 1_500
+    + Number(Boolean(signals?.has_espn_context)) * 600
+    + Number(Boolean(signals?.has_expert_preview)) * 500
+    + (signals?.source_link_count ?? 0) * 50
+    + (signals?.possible_xi_player_count ?? 0) * 20
+    + (signals?.key_player_count ?? 0) * 15
+    + (signals?.player_update_count ?? 0) * 15
+    + ((match.team1_recent_form?.length ?? 0) + (match.team2_recent_form?.length ?? 0)) * 5
+    + Number(hasKnownVenue(match.venue)) * 40
+    + getSourcePriority(match.match_id)
+  );
+}
+
+function compareLogicalFixtureCandidates(left: MatchWithPredictions, right: MatchWithPredictions): number {
+  return getLogicalFixtureCoverageScore(right) - getLogicalFixtureCoverageScore(left)
+    || getMatchTimestamp(left) - getMatchTimestamp(right)
+    || right.match_id.localeCompare(left.match_id);
+}
+
+function mergeLogicalSpotlightSignals(matches: MatchWithPredictions[]): MatchSpotlightSignals | undefined {
+  if (!matches.length) return undefined;
+
+  return matches.reduce<MatchSpotlightSignals>((merged, match) => {
+    const signals = match.spotlight_signals;
+    if (!signals) return merged;
+
+    const confidenceRank = { high: 3, medium: 2, low: 1 } as const;
+    const currentConfidence = merged.enrichment_confidence;
+    const incomingConfidence = signals.enrichment_confidence;
+    if (
+      incomingConfidence
+      && (!currentConfidence || confidenceRank[incomingConfidence] > confidenceRank[currentConfidence])
+    ) {
+      merged.enrichment_confidence = incomingConfidence;
+    }
+
+    merged.has_expert_preview = merged.has_expert_preview || signals.has_expert_preview;
+    merged.has_espn_context = merged.has_espn_context || signals.has_espn_context;
+    merged.h2h_match_count = Math.max(merged.h2h_match_count ?? 0, signals.h2h_match_count ?? 0);
+    merged.key_player_count = Math.max(merged.key_player_count ?? 0, signals.key_player_count ?? 0);
+    merged.player_update_count = Math.max(merged.player_update_count ?? 0, signals.player_update_count ?? 0);
+    merged.possible_xi_player_count = Math.max(
+      merged.possible_xi_player_count ?? 0,
+      signals.possible_xi_player_count ?? 0,
+    );
+    merged.source_link_count = Math.max(merged.source_link_count ?? 0, signals.source_link_count ?? 0);
+    return merged;
+  }, {});
+}
+
+export function mergeLogicalSurfaceMatches(matches: MatchWithPredictions[]): MatchWithPredictions[] {
+  const groups: MatchWithPredictions[][] = [];
+
+  for (const match of matches) {
+    const group = groups.find((candidateGroup) => candidateGroup.some((candidate) => (
+      matchesRepresentSameLogicalFixture(candidate, match)
+    )));
+    if (group) {
+      group.push(match);
+    } else {
+      groups.push([match]);
+    }
+  }
+
+  return groups.map((group) => {
+    const ordered = [...group].sort(compareLogicalFixtureCandidates);
+    const primary = ordered[0];
+    const predictions = ordered
+      .flatMap((match) => match.predictions)
+      .filter((prediction, index, items) => (
+        items.findIndex((candidate) => candidate.match_id === prediction.match_id) === index
+      ));
+    const venue = ordered.map((match) => match.venue).find((candidate) => hasKnownVenue(candidate)) ?? primary.venue;
+    const competitionName = ordered
+      .map((match) => match.competition_name?.trim())
+      .find((candidate): candidate is string => Boolean(candidate));
+    const team1Form = [...ordered]
+      .sort((left, right) => (right.team1_recent_form?.length ?? 0) - (left.team1_recent_form?.length ?? 0))[0]
+      ?.team1_recent_form ?? primary.team1_recent_form;
+    const team2Form = [...ordered]
+      .sort((left, right) => (right.team2_recent_form?.length ?? 0) - (left.team2_recent_form?.length ?? 0))[0]
+      ?.team2_recent_form ?? primary.team2_recent_form;
+    const marketBackedMatch = ordered.find((match) => hasValidMarketOdds(match));
+
+    return {
+      ...primary,
+      predictions,
+      venue,
+      competition_name: competitionName ?? primary.competition_name,
+      team1_logo_url: ordered.map((match) => match.team1_logo_url).find(Boolean) ?? primary.team1_logo_url,
+      team2_logo_url: ordered.map((match) => match.team2_logo_url).find(Boolean) ?? primary.team2_logo_url,
+      team1_recent_form: team1Form,
+      team2_recent_form: team2Form,
+      bookmaker_odds: marketBackedMatch?.bookmaker_odds ?? primary.bookmaker_odds,
+      spotlight_signals: mergeLogicalSpotlightSignals(ordered),
+    };
+  });
+}
+
+function buildSurfaceMatch(
+  match: MatchWithPredictions,
+  context: SurfaceBuildContext,
+  relatedMatchIds: string[] = [match.match_id],
+): MatchWithPredictions {
+  const statsMatchType = getStatsMatchType(match.match_type);
+  let team1Form = context.recentFormByTeam.get(
+    getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType),
+  ) ?? [];
+  let team2Form = context.recentFormByTeam.get(
+    getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType),
+  ) ?? [];
+
+  const h2hGames = relatedMatchIds
+    .map((matchId) => context.espnH2H.get(matchId) ?? [])
+    .find((games) => games.length > 0) ?? [];
+  const h2hMatchCount = h2hGames.length;
+  if (h2hGames.length > 0) {
+    const team1Meta = getTeamMeta(match.team1);
+    const team2Meta = getTeamMeta(match.team2);
+    const deriveForm = (shortName: string): Array<'W' | 'L'> => (
+      h2hGames
+        .slice(0, 5)
+        .reverse()
+        .map((game) => {
+          const team = game.teams?.find((candidate) => candidate.abbreviation === shortName);
+          return team?.winner ? 'W' as const : 'L' as const;
+        })
+    );
+    const derivedTeam1 = deriveForm(team1Meta.shortName);
+    const derivedTeam2 = deriveForm(team2Meta.shortName);
+    if (derivedTeam1.length > 0) team1Form = derivedTeam1;
+    if (derivedTeam2.length > 0) team2Form = derivedTeam2;
+  }
+
+  const competitionName = relatedMatchIds
+    .map((matchId) => context.espnCompetition.get(matchId)?.trim())
+    .find((candidate): candidate is string => Boolean(candidate));
+  const rosters = relatedMatchIds.flatMap((matchId) => context.espnRosters.get(matchId) ?? []);
+  const findTeamLogo = (teamName: string): string | undefined => {
+    const teamMeta = getTeamMeta(teamName);
+    const normalizedName = normalizeLogoTeamName(teamName);
+    const normalizedTeamMeta = normalizeLogoTeamName(teamMeta.name);
+    const normalizedCompetition = normalizeLogoTeamName(competitionName ?? '');
+    const rosterLogo = rosters.find((roster) => {
+      const rosterName = normalizeLogoTeamName(roster.team_name ?? '');
+      const rosterAbbr = roster.team_abbr?.toUpperCase();
+      return rosterName === normalizedName
+        || rosterName === normalizedTeamMeta
+        || (rosterAbbr ? rosterAbbr === teamMeta.shortName.toUpperCase() : false);
+    })?.team_logo;
+
+    return getFranchiseLogoUrl(teamName)
+      || rosterLogo
+      || context.franchiseLogosByName.get(normalizedName)
+      || context.franchiseLogosByName.get(normalizedTeamMeta)
+      || (normalizedCompetition
+        ? context.franchiseLogosByCompetitionAbbr.get(
+          `${normalizedCompetition}::${teamMeta.shortName.toUpperCase()}`,
+        )
+        : undefined)
+      || context.franchiseLogosByAbbr.get(teamMeta.shortName.toUpperCase())
+      || undefined;
+  };
+
+  const bookmakerOddsRows = relatedMatchIds.flatMap((matchId) => context.oddsByMatch.get(matchId) ?? []);
+  const bookmakerOdds = selectFreshestTrustedSportsbookOdds(bookmakerOddsRows)[0];
+  const spotlightSignals = mergeLogicalSpotlightSignals(relatedMatchIds.map((matchId) => ({
+    ...match,
+    match_id: matchId,
+    spotlight_signals: {
+      ...context.enrichmentSignals.get(matchId),
+      has_espn_context: context.espnVenue.has(matchId) || ((context.espnH2H.get(matchId)?.length ?? 0) > 0),
+      h2h_match_count: context.espnH2H.get(matchId)?.length ?? 0,
+    },
+  } as MatchWithPredictions)));
+
+  return {
+    ...match,
+    venue: [match.venue, ...relatedMatchIds.map((matchId) => context.espnVenue.get(matchId)), ...relatedMatchIds.map((matchId) => context.enrichmentVenue.get(matchId))]
+      .find((candidate): candidate is string => hasKnownVenue(candidate)) ?? '',
+    competition_name: competitionName ?? match.competition_name,
+    team1_logo_url: findTeamLogo(match.team1),
+    team2_logo_url: findTeamLogo(match.team2),
+    team1_recent_form: team1Form,
+    team2_recent_form: team2Form,
+    bookmaker_odds: bookmakerOdds
+      ? {
+        bookmaker: bookmakerOdds.bookmaker,
+        team1_odds: bookmakerOdds.team1_odds,
+        team2_odds: bookmakerOdds.team2_odds,
+      }
+      : undefined,
+    spotlight_signals: spotlightSignals ?? {
+      has_espn_context: h2hMatchCount > 0 || relatedMatchIds.some((matchId) => context.espnVenue.has(matchId)),
+      h2h_match_count: h2hMatchCount,
+    },
+  };
+}
+
 export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
   if (isMockDataEnabled()) {
     return getMockUpcomingMatches();
@@ -370,26 +737,18 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
 
   if (error) throw error;
 
-  // Build venue + H2H lookups (ESPN takes priority)
   const espnVenue = new Map<string, string>();
-  const espnH2H = new Map<string, string>();
+  const espnH2H = new Map<string, ESPNH2HGame[]>();
   const espnCompetition = new Map<string, string>();
   const espnRosters = new Map<string, ESPNRoster[]>();
-  (espnData ?? []).forEach((e: {
-    match_id: string;
-    venue_name: string | null;
-    head_to_head: string | null;
-    series_note: string | null;
-    rosters: ESPNRoster[] | string | null;
-  }) => {
+  (espnData ?? []).forEach((e: RawEspnMatchDataRow) => {
     if (!isPlaceholderEvidenceText(e.venue_name)) espnVenue.set(e.match_id, e.venue_name!.trim());
-    if (e.head_to_head) espnH2H.set(e.match_id, typeof e.head_to_head === 'string' ? e.head_to_head : JSON.stringify(e.head_to_head));
+    const headToHead = parseJsonField<ESPNH2HGame[]>(e.head_to_head, []);
+    if (headToHead.length > 0) espnH2H.set(e.match_id, headToHead);
     if (e.series_note) espnCompetition.set(e.match_id, e.series_note);
     if (e.rosters) {
-      try {
-        const rosters = typeof e.rosters === 'string' ? JSON.parse(e.rosters) : e.rosters;
-        if (Array.isArray(rosters)) espnRosters.set(e.match_id, rosters);
-      } catch {}
+      const rosters = parseJsonField<ESPNRoster[]>(e.rosters, []);
+      if (Array.isArray(rosters)) espnRosters.set(e.match_id, rosters);
     }
   });
   const franchiseLogosByName = new Map<string, string>();
@@ -420,38 +779,33 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     && value.trim().length > 1
     && !isPlaceholderEvidenceText(value)
   );
-  (enrichmentData ?? []).forEach((e: {
-    match_id: string;
-    venue_name: string | null;
-    confidence: 'high' | 'medium' | 'low' | null;
-    expert_preview: string | null;
-    player_updates: unknown[] | null;
-    key_players: unknown[] | null;
-    possible_xi: { team1?: unknown[]; team2?: unknown[] } | null;
-    source_links: unknown[] | null;
-  }) => {
+  (enrichmentData ?? []).forEach((e: RawEnrichmentRow) => {
     if (!isPlaceholderEvidenceText(e.venue_name)) enrichmentVenue.set(e.match_id, e.venue_name!.trim());
-    const keyPlayerCount = Array.isArray(e.key_players)
-      ? e.key_players.filter((entry) => {
+    const keyPlayers = parseJsonField<unknown[]>(e.key_players, []);
+    const playerUpdates = parseJsonField<unknown[]>(e.player_updates, []);
+    const possibleXi = parseJsonField<{ team1?: unknown[]; team2?: unknown[] }>(e.possible_xi, { team1: [], team2: [] });
+    const sourceLinks = parseJsonField<unknown[]>(e.source_links, []);
+    const keyPlayerCount = Array.isArray(keyPlayers)
+      ? keyPlayers.filter((entry) => {
           if (!entry || typeof entry !== 'object') return false;
           const player = entry as { name?: unknown; batter?: unknown; bowler?: unknown };
           return hasNamedEvidence(player.name)
             || (hasNamedEvidence(player.batter) && hasNamedEvidence(player.bowler));
         }).length
       : 0;
-    const playerUpdateCount = Array.isArray(e.player_updates)
-      ? e.player_updates.filter((entry) => {
+    const playerUpdateCount = Array.isArray(playerUpdates)
+      ? playerUpdates.filter((entry) => {
           if (!entry || typeof entry !== 'object') return false;
           const update = entry as { player?: unknown; status?: unknown };
           return hasNamedEvidence(update.player) && !isPlaceholderEvidenceText(update.status);
         }).length
       : 0;
     const possibleXiPlayerCount = [
-      ...(Array.isArray(e.possible_xi?.team1) ? e.possible_xi.team1 : []),
-      ...(Array.isArray(e.possible_xi?.team2) ? e.possible_xi.team2 : []),
+      ...(Array.isArray(possibleXi?.team1) ? possibleXi.team1 : []),
+      ...(Array.isArray(possibleXi?.team2) ? possibleXi.team2 : []),
     ].filter(hasNamedEvidence).length;
-    const sourceLinkCount = Array.isArray(e.source_links)
-      ? e.source_links.filter((entry) => {
+    const sourceLinkCount = Array.isArray(sourceLinks)
+      ? sourceLinks.filter((entry) => {
           if (!entry || typeof entry !== 'object') return false;
           const source = entry as { url?: unknown; source?: unknown };
           return typeof source.url === 'string'
@@ -469,33 +823,11 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     });
   });
   // Build odds lookup from the freshest trusted snapshot cohort per match.
-  const oddsByMatch = new Map<string, Array<{
-    match_id: string;
-    bookmaker: string;
-    team1_odds: number;
-    team2_odds: number;
-    fetched_at: string;
-  }>>();
-  (oddsData ?? []).forEach((o: {
-    match_id: string;
-    bookmaker: string;
-    team1_odds: number;
-    team2_odds: number;
-    fetched_at: string;
-  }) => {
+  const oddsByMatch = new Map<string, RawOddsRow[]>();
+  (oddsData ?? []).forEach((o: RawOddsRow) => {
     const entries = oddsByMatch.get(o.match_id) ?? [];
     entries.push(o);
     oddsByMatch.set(o.match_id, entries);
-  });
-  const oddsMap = new Map<string, { bookmaker: string; team1_odds: number; team2_odds: number }>();
-  oddsByMatch.forEach((entries, matchId) => {
-    const primary = selectFreshestTrustedSportsbookOdds(entries)[0];
-    if (!primary) return;
-    oddsMap.set(matchId, {
-      bookmaker: primary.bookmaker,
-      team1_odds: primary.team1_odds,
-      team2_odds: primary.team2_odds,
-    });
   });
   const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
   ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
@@ -509,80 +841,415 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     });
   });
 
-  const matchesWithForm = ((data ?? []) as MatchWithPredictions[]).map((match) => {
-    const statsMatchType = getStatsMatchType(match.match_type);
-    let team1Form = recentFormByTeam.get(getTeamStatsKey(match.team1, inferTeamGender(match.team1), statsMatchType)) ?? [];
-    let team2Form = recentFormByTeam.get(getTeamStatsKey(match.team2, inferTeamGender(match.team2), statsMatchType)) ?? [];
+  const context: SurfaceBuildContext = {
+    espnVenue,
+    espnH2H,
+    espnCompetition,
+    espnRosters,
+    franchiseLogosByName,
+    franchiseLogosByAbbr,
+    franchiseLogosByCompetitionAbbr,
+    enrichmentVenue,
+    enrichmentSignals,
+    oddsByMatch,
+    recentFormByTeam,
+  };
 
-    // Override with ESPN H2H form if available (more accurate/recent)
-    const h2hRaw = espnH2H.get(match.match_id);
-    let h2hMatchCount = 0;
-    if (h2hRaw) {
-      try {
-        const h2hGames = typeof h2hRaw === 'string' ? JSON.parse(h2hRaw) : h2hRaw;
-        if (Array.isArray(h2hGames) && h2hGames.length > 0) {
-          h2hMatchCount = h2hGames.length;
-          const team1Meta = getTeamMeta(match.team1);
-          const team2Meta = getTeamMeta(match.team2);
-          const deriveForm = (shortName: string): Array<'W' | 'L'> => {
-            return h2hGames
-              .slice(0, 5)
-              .reverse()
-              .map((g: { teams?: Array<{ abbreviation?: string; winner?: boolean }> }) => {
-                const t = g.teams?.find(t => t.abbreviation === shortName);
-                return t?.winner ? 'W' as const : 'L' as const;
-              });
-          };
-          const f1 = deriveForm(team1Meta.shortName);
-          const f2 = deriveForm(team2Meta.shortName);
-          if (f1.length > 0) team1Form = f1;
-          if (f2.length > 0) team2Form = f2;
-        }
-      } catch {}
-    }
-    const rosters = espnRosters.get(match.match_id) ?? [];
-    const findTeamLogo = (teamName: string): string | undefined => {
-      const teamMeta = getTeamMeta(teamName);
-      const normalizedName = normalizeLogoTeamName(teamName);
-      const competitionName = normalizeLogoTeamName(espnCompetition.get(match.match_id) ?? '');
-      const rosterLogo = rosters.find((roster) => {
-        const rosterName = normalizeLogoTeamName(roster.team_name ?? '');
-        const rosterAbbr = roster.team_abbr?.toUpperCase();
-        return rosterName === normalizedName
-          || rosterName === normalizeLogoTeamName(teamMeta.name)
-          || (rosterAbbr ? rosterAbbr === teamMeta.shortName.toUpperCase() : false);
-      })?.team_logo;
+  const matchesWithForm = ((data ?? []) as MatchWithPredictions[]).map((match) => buildSurfaceMatch(match, context));
+  const mergedMatches = mergeLogicalSurfaceMatches(matchesWithForm);
+  return sortMatchesByPriority(mergedMatches.filter((match) => isLiveMatch(match) || isFutureMatch(match, now)));
+}
 
-      return getFranchiseLogoUrl(teamName)
-        || rosterLogo
-        || franchiseLogosByName.get(normalizedName)
-        || franchiseLogosByName.get(normalizeLogoTeamName(teamMeta.name))
-        || (competitionName && franchiseLogosByCompetitionAbbr.get(`${competitionName}::${teamMeta.shortName.toUpperCase()}`))
-        || franchiseLogosByAbbr.get(teamMeta.shortName.toUpperCase())
-        || undefined;
-    };
+function normalizeEnrichmentRow(row: RawEnrichmentRow): MatchEnrichment {
+  return {
+    match_id: row.match_id,
+    venue_name: row.venue_name,
+    venue_confidence: 'unknown',
+    possible_xi: parseJsonField(row.possible_xi, { team1: [], team2: [] }),
+    player_updates: parseJsonField(row.player_updates, []),
+    key_players: parseJsonField(row.key_players, []),
+    expert_preview: row.expert_preview ?? null,
+    toss_insight: row.toss_insight ?? null,
+    source_links: parseJsonField(row.source_links, []),
+    confidence: row.confidence ?? 'low',
+    generated_at: '',
+  };
+}
 
-    return {
-      ...match,
-      venue: (!isPlaceholderEvidenceText(match.venue) ? match.venue.trim() : '')
-        || espnVenue.get(match.match_id)
-        || enrichmentVenue.get(match.match_id)
-        || '',
-      competition_name: espnCompetition.get(match.match_id),
-      team1_logo_url: findTeamLogo(match.team1),
-      team2_logo_url: findTeamLogo(match.team2),
-      team1_recent_form: team1Form,
-      team2_recent_form: team2Form,
-      bookmaker_odds: oddsMap.get(match.match_id),
-      spotlight_signals: {
-        ...enrichmentSignals.get(match.match_id),
-        has_espn_context: espnVenue.has(match.match_id) || h2hMatchCount > 0,
-        h2h_match_count: h2hMatchCount,
-      },
-    };
+function uniqueStrings(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  values.forEach((value) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    merged.push(trimmed);
+  });
+  return merged;
+}
+
+function mergeEnrichmentRows(rows: MatchEnrichment[]): MatchEnrichment | null {
+  if (!rows.length) return null;
+
+  const ordered = [...rows].sort((left, right) => {
+    const confidenceRank = { high: 3, medium: 2, low: 1 } as const;
+    return confidenceRank[right.confidence] - confidenceRank[left.confidence]
+      || Number(!isPlaceholderEvidenceText(right.expert_preview)) - Number(!isPlaceholderEvidenceText(left.expert_preview))
+      || Number((right.source_links?.length ?? 0) > 0) - Number((left.source_links?.length ?? 0) > 0);
+  });
+  const primary = ordered[0];
+  const playerUpdates = new Map<string, MatchEnrichment['player_updates'][number]>();
+  const keyPlayers = new Map<string, MatchEnrichment['key_players'][number]>();
+  const sourceLinks = new Map<string, MatchEnrichment['source_links'][number]>();
+
+  ordered.forEach((row) => {
+    row.player_updates.forEach((update) => {
+      const key = JSON.stringify([update.player ?? '', update.team ?? '', update.status ?? '']);
+      if (!playerUpdates.has(key)) playerUpdates.set(key, update);
+    });
+    row.key_players.forEach((player) => {
+      const key = JSON.stringify([player.name ?? '', player.batter ?? '', player.bowler ?? '', player.team ?? '']);
+      if (!keyPlayers.has(key)) keyPlayers.set(key, player);
+    });
+    row.source_links.forEach((link) => {
+      const key = link.url?.trim() || JSON.stringify([link.title ?? '', link.source ?? '']);
+      if (!sourceLinks.has(key)) sourceLinks.set(key, link);
+    });
   });
 
-  return sortMatchesByPriority(matchesWithForm.filter((match) => isLiveMatch(match) || isFutureMatch(match, now)));
+  return {
+    ...primary,
+    venue_name: firstPresentString(ordered.map((row) => row.venue_name)),
+    expert_preview: firstPresentString(ordered.map((row) => row.expert_preview)) ?? null,
+    toss_insight: firstPresentString(ordered.map((row) => row.toss_insight)) ?? null,
+    possible_xi: {
+      team1: uniqueStrings(ordered.flatMap((row) => row.possible_xi.team1 ?? [])),
+      team2: uniqueStrings(ordered.flatMap((row) => row.possible_xi.team2 ?? [])),
+    },
+    player_updates: [...playerUpdates.values()],
+    key_players: [...keyPlayers.values()],
+    source_links: [...sourceLinks.values()],
+  };
+}
+
+function normalizeEspnMatchDataRow(row: RawEspnMatchDataRow): ESPNMatchData {
+  return {
+    match_id: row.match_id,
+    espn_event_id: row.espn_event_id ?? null,
+    venue_name: row.venue_name ?? null,
+    venue_city: row.venue_city ?? null,
+    venue_country: row.venue_country ?? null,
+    venue_capacity: row.venue_capacity ?? null,
+    venue_grass: row.venue_grass ?? null,
+    venue_image_url: row.venue_image_url ?? null,
+    toss_winner: row.toss_winner ?? null,
+    toss_decision: row.toss_decision ?? null,
+    match_number: row.match_number ?? null,
+    match_days: row.match_days ?? null,
+    hours_of_play: row.hours_of_play ?? null,
+    series_note: row.series_note ?? null,
+    series_scoreline: row.series_scoreline ?? null,
+    series_leaders: parseJsonField(row.series_leaders, []),
+    officials: parseJsonField(row.officials, []),
+    rosters: parseJsonField(row.rosters, []),
+    head_to_head: parseJsonField(row.head_to_head, []),
+    standings: parseJsonField(row.standings, []),
+    scorecards: parseJsonField(row.scorecards, []),
+    fetched_at: row.fetched_at ?? null,
+  };
+}
+
+function mergeEspnMatchDataRows(rows: ESPNMatchData[]): ESPNMatchData | null {
+  if (!rows.length) return null;
+
+  const ordered = [...rows].sort((left, right) => {
+    const leftCoverage = Number(Boolean(left.espn_event_id))
+      + Number((left.head_to_head?.length ?? 0) > 0)
+      + Number((left.rosters?.length ?? 0) > 0)
+      + Number(Boolean(left.venue_name));
+    const rightCoverage = Number(Boolean(right.espn_event_id))
+      + Number((right.head_to_head?.length ?? 0) > 0)
+      + Number((right.rosters?.length ?? 0) > 0)
+      + Number(Boolean(right.venue_name));
+    return rightCoverage - leftCoverage;
+  });
+  const primary = ordered[0];
+  const dedupe = <T>(items: T[], keyFor: (item: T) => string): T[] => {
+    const merged = new Map<string, T>();
+    items.forEach((item) => {
+      const key = keyFor(item);
+      if (!merged.has(key)) merged.set(key, item);
+    });
+    return [...merged.values()];
+  };
+
+  return {
+    ...primary,
+    espn_event_id: firstPresentString(ordered.map((row) => row.espn_event_id)) ?? null,
+    venue_name: firstPresentString(ordered.map((row) => row.venue_name)) ?? null,
+    venue_city: firstPresentString(ordered.map((row) => row.venue_city)) ?? null,
+    venue_country: firstPresentString(ordered.map((row) => row.venue_country)) ?? null,
+    venue_image_url: firstPresentString(ordered.map((row) => row.venue_image_url)) ?? null,
+    toss_winner: firstPresentString(ordered.map((row) => row.toss_winner)) ?? null,
+    toss_decision: firstPresentString(ordered.map((row) => row.toss_decision)) ?? null,
+    match_number: firstPresentString(ordered.map((row) => row.match_number)) ?? null,
+    match_days: firstPresentString(ordered.map((row) => row.match_days)) ?? null,
+    hours_of_play: firstPresentString(ordered.map((row) => row.hours_of_play)) ?? null,
+    series_note: firstPresentString(ordered.map((row) => row.series_note)) ?? null,
+    series_scoreline: firstPresentString(ordered.map((row) => row.series_scoreline)) ?? null,
+    series_leaders: dedupe(ordered.flatMap((row) => row.series_leaders ?? []), (item) => JSON.stringify(item)),
+    officials: dedupe(ordered.flatMap((row) => row.officials ?? []), (item) => JSON.stringify(item)),
+    rosters: dedupe(ordered.flatMap((row) => row.rosters ?? []), (item) => item.team_name ?? JSON.stringify(item)),
+    head_to_head: dedupe(ordered.flatMap((row) => row.head_to_head ?? []), (item) => `${item.date}|${item.note}`),
+    standings: dedupe(ordered.flatMap((row) => row.standings ?? []), (item) => item.team_name ?? JSON.stringify(item)),
+    scorecards: dedupe(ordered.flatMap((row) => row.scorecards ?? []), (item) => JSON.stringify(item)),
+    fetched_at: firstPresentString(ordered.map((row) => row.fetched_at)) ?? null,
+  };
+}
+
+function mergeSquadRows(rows: MatchSquad[]): MatchSquad[] {
+  const grouped = new Map<string, MatchSquad>();
+  rows.forEach((row) => {
+    const current = grouped.get(row.team);
+    if (
+      !current
+      || Number(row.is_confirmed) > Number(current.is_confirmed)
+      || row.players.length > current.players.length
+    ) {
+      grouped.set(row.team, row);
+    }
+  });
+  return [...grouped.values()];
+}
+
+function toEdgeScore(row: Record<string, unknown>): EdgeScore {
+  return {
+    team1_score: Number(row.team1_score ?? 0),
+    team2_score: Number(row.team2_score ?? 0),
+    net_edge: Number(row.net_edge ?? 0),
+    edge_team: String(row.edge_team ?? ''),
+    narrative: String(row.narrative ?? ''),
+    factors: (row.factors as EdgeScore['factors']) ?? { team1: { form: 0, momentum: 0, pressure: 0, market: 0 }, team2: { form: 0, momentum: 0, pressure: 0, market: 0 } },
+  };
+}
+
+async function resolveLogicalMatchGroup(matchId: string): Promise<MatchWithPredictions[]> {
+  const { data: baseMatch, error } = await supabase
+    .from('matches')
+    .select('*, predictions(*)')
+    .eq('match_id', matchId)
+    .single();
+  if (error || !baseMatch) return [];
+
+  const baseTime = parseLogicalFixtureTimestamp(baseMatch.date);
+  let query = supabase.from('matches').select('*, predictions(*)');
+  if (baseTime !== null) {
+    query = query
+      .gte('date', new Date(baseTime - LOGICAL_FIXTURE_WINDOW_MS).toISOString())
+      .lte('date', new Date(baseTime + LOGICAL_FIXTURE_WINDOW_MS).toISOString());
+  } else {
+    query = query.eq('date', baseMatch.date);
+  }
+
+  const { data: candidates } = await query.order('date', { ascending: true });
+  const logicalMatches = ((candidates ?? []) as MatchWithPredictions[]).filter((candidate) => (
+    matchesRepresentSameLogicalFixture(baseMatch as MatchWithPredictions, candidate)
+  ));
+  return logicalMatches.length > 0 ? logicalMatches : [baseMatch as MatchWithPredictions];
+}
+
+export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMatchDetails> {
+  if (isMockDataEnabled()) {
+    const [match, prediction, predictionHistory, enrichment, odds, oddsHistory, squads, espnMatchData, edgeScore] = await Promise.all([
+      getMatch(matchId),
+      getPrediction(matchId),
+      getPredictionSnapshots(matchId),
+      getMatchEnrichment(matchId),
+      getMatchOdds(matchId),
+      getMatchOddsHistory(matchId),
+      getMatchSquads(matchId),
+      getESPNMatchData(matchId),
+      getEdgeScore(matchId),
+    ]);
+    return {
+      match,
+      prediction,
+      predictionHistory,
+      enrichment,
+      odds,
+      oddsHistory,
+      squads,
+      espnMatchData,
+      edgeScore,
+      linkedMatchIds: match ? [match.match_id] : [],
+    };
+  }
+
+  const logicalMatches = await resolveLogicalMatchGroup(matchId);
+  if (!logicalMatches.length) {
+    return {
+      match: null,
+      prediction: null,
+      predictionHistory: [],
+      enrichment: null,
+      odds: [],
+      oddsHistory: [],
+      squads: [],
+      espnMatchData: null,
+      edgeScore: null,
+      linkedMatchIds: [],
+    };
+  }
+
+  const matchIds = logicalMatches.map((match) => match.match_id);
+  const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const [
+    { data: statsData },
+    { data: enrichmentRows },
+    { data: espnRows },
+    { data: franchiseLogoData },
+    { data: oddsRows },
+    { data: oddsHistoryRows },
+    { data: squadRows },
+    { data: snapshotRows },
+    { data: edgeRows },
+  ] = await Promise.all([
+    supabase.from('stats_cache').select('stat_type, match_type, data').eq('stat_type', 'team_stats'),
+    supabase.from('match_enrichment').select('*').in('match_id', matchIds),
+    supabase.from('espn_match_data').select('*').in('match_id', matchIds),
+    supabase.from('franchise_logos').select('normalized_team_name, team_name, team_abbr, logo_url, competition_name'),
+    supabase.from('match_odds').select('*').in('match_id', matchIds).order('fetched_at', { ascending: false }),
+    supabase.from('match_odds_history').select('match_id, bookmaker, team1_odds, team2_odds, draw_odds, market, fetched_at').in('match_id', matchIds).gte('fetched_at', cutoff).order('fetched_at', { ascending: false }).limit(400),
+    supabase.from('match_squads').select('*').in('match_id', matchIds),
+    supabase.from('prediction_snapshots').select('match_id, team1, team2, predicted_winner, team1_win_probability, team2_win_probability, confidence, edge_score, model, ensemble_size, input_state, change_events, captured_at').in('match_id', matchIds).order('captured_at', { ascending: false }).limit(400),
+    supabase.from('match_edge_scores').select('*').in('match_id', matchIds),
+  ]);
+
+  const espnVenue = new Map<string, string>();
+  const espnH2H = new Map<string, ESPNH2HGame[]>();
+  const espnCompetition = new Map<string, string>();
+  const espnRosters = new Map<string, ESPNRoster[]>();
+  const normalizedEspnRows = ((espnRows ?? []) as RawEspnMatchDataRow[]).map(normalizeEspnMatchDataRow);
+  normalizedEspnRows.forEach((row) => {
+    if (!isPlaceholderEvidenceText(row.venue_name)) espnVenue.set(row.match_id, row.venue_name!.trim());
+    if (row.head_to_head.length > 0) espnH2H.set(row.match_id, row.head_to_head);
+    if (row.series_note) espnCompetition.set(row.match_id, row.series_note);
+    if (row.rosters.length > 0) espnRosters.set(row.match_id, row.rosters);
+  });
+
+  const franchiseLogosByName = new Map<string, string>();
+  const franchiseLogosByAbbr = new Map<string, string>();
+  const franchiseLogosByCompetitionAbbr = new Map<string, string>();
+  (franchiseLogoData ?? []).forEach((row: FranchiseLogoRow) => {
+    const logoUrl = row.logo_url?.trim();
+    if (!logoUrl) return;
+    const normalizedName = normalizeLogoTeamName(row.team_name || row.normalized_team_name);
+    if (normalizedName) franchiseLogosByName.set(normalizedName, logoUrl);
+    const normalizedAlias = normalizeLogoTeamName(row.normalized_team_name);
+    if (normalizedAlias) franchiseLogosByName.set(normalizedAlias, logoUrl);
+    const abbr = row.team_abbr?.trim().toUpperCase();
+    if (abbr) franchiseLogosByAbbr.set(abbr, logoUrl);
+    const competition = normalizeLogoTeamName(row.competition_name ?? '');
+    if (competition && abbr) franchiseLogosByCompetitionAbbr.set(`${competition}::${abbr}`, logoUrl);
+  });
+
+  const enrichmentVenue = new Map<string, string>();
+  const enrichmentSignals = new Map<string, MatchSpotlightSignals>();
+  const normalizedEnrichmentRows = ((enrichmentRows ?? []) as RawEnrichmentRow[]).map(normalizeEnrichmentRow);
+  normalizedEnrichmentRows.forEach((row) => {
+    if (!isPlaceholderEvidenceText(row.venue_name)) enrichmentVenue.set(row.match_id, row.venue_name!.trim());
+    enrichmentSignals.set(row.match_id, {
+      enrichment_confidence: row.confidence,
+      has_expert_preview: !isPlaceholderEvidenceText(row.expert_preview),
+      key_player_count: row.key_players.length,
+      player_update_count: row.player_updates.length,
+      possible_xi_player_count: (row.possible_xi.team1?.length ?? 0) + (row.possible_xi.team2?.length ?? 0),
+      source_link_count: row.source_links.filter((link) => link.source !== 'demo').length,
+    });
+  });
+
+  const oddsByMatch = new Map<string, RawOddsRow[]>();
+  ((oddsRows ?? []) as RawOddsRow[]).forEach((row) => {
+    const entries = oddsByMatch.get(row.match_id) ?? [];
+    entries.push(row);
+    oddsByMatch.set(row.match_id, entries);
+  });
+
+  const recentFormByTeam = new Map<string, Array<'W' | 'L'>>();
+  ((statsData ?? []) as TeamStatsCacheRow[]).forEach((cacheRow) => {
+    cacheRow.data.forEach((record) => {
+      if (record.form_last_10) {
+        recentFormByTeam.set(
+          getTeamStatsKey(record.team, record.gender || 'male', cacheRow.match_type),
+          record.form_last_10,
+        );
+      }
+    });
+  });
+
+  const context: SurfaceBuildContext = {
+    espnVenue,
+    espnH2H,
+    espnCompetition,
+    espnRosters,
+    franchiseLogosByName,
+    franchiseLogosByAbbr,
+    franchiseLogosByCompetitionAbbr,
+    enrichmentVenue,
+    enrichmentSignals,
+    oddsByMatch,
+    recentFormByTeam,
+  };
+
+  const surfacedMatches = logicalMatches.map((match) => buildSurfaceMatch(match, context, matchIds));
+  const mergedMatch = mergeLogicalSurfaceMatches(surfacedMatches)[0] ?? null;
+  const orderedMatchIds = [
+    mergedMatch?.match_id,
+    ...matchIds.filter((candidate) => candidate !== mergedMatch?.match_id),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const prediction = orderedMatchIds
+    .map((candidate) => surfacedMatches.find((match) => match.match_id === candidate)?.predictions[0] ?? null)
+    .find((candidate): candidate is Prediction => candidate !== null)
+    ?? null;
+  const edgeScore = orderedMatchIds
+    .map((candidate) => (edgeRows ?? []).find((row: Record<string, unknown>) => row.match_id === candidate))
+    .find(Boolean);
+
+  const odds = new Map<string, MatchOdds>();
+  ((oddsRows ?? []) as MatchOdds[]).forEach((row) => {
+    const key = `${normalizeBookmaker(row.bookmaker)}::${row.fetched_at}`;
+    if (!odds.has(key)) odds.set(key, row);
+  });
+  const oddsHistory = new Map<string, MatchOdds>();
+  ((oddsHistoryRows ?? []) as MatchOdds[]).forEach((row) => {
+    const key = `${normalizeBookmaker(row.bookmaker)}::${row.fetched_at}`;
+    if (!oddsHistory.has(key)) oddsHistory.set(key, row);
+  });
+  const predictionHistory = ((snapshotRows ?? []) as PredictionSnapshot[])
+    .filter((snapshot, index, items) => (
+      items.findIndex((candidate) => (
+        candidate.match_id === snapshot.match_id && candidate.captured_at === snapshot.captured_at
+      )) === index
+    ))
+    .reverse();
+
+  return {
+    match: mergedMatch,
+    prediction,
+    predictionHistory,
+    enrichment: mergeEnrichmentRows(normalizedEnrichmentRows),
+    odds: [...odds.values()],
+    oddsHistory: [...oddsHistory.values()].reverse(),
+    squads: mergeSquadRows(((squadRows ?? []) as MatchSquad[]).map((row) => ({
+      ...row,
+      players: parseJsonField(row.players, []),
+    }))),
+    espnMatchData: mergeEspnMatchDataRows(normalizedEspnRows),
+    edgeScore: edgeScore ? toEdgeScore(edgeScore as Record<string, unknown>) : null,
+    linkedMatchIds: orderedMatchIds,
+  };
 }
 
 export async function getMatch(matchId: string): Promise<Match | null> {
