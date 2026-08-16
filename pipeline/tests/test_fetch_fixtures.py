@@ -16,6 +16,7 @@ from fetch_fixtures import (
     _allowed_current_statuses,
     _merge_fixtures_by_identity,
     _normalize_fixture_team,
+    _persist_espn_match_links,
     _persist_fixture_matches,
     _score_espn_completed,
     _same_fixture_window,
@@ -446,12 +447,50 @@ class TestPersistFixtureMatches(unittest.TestCase):
         table.insert.assert_not_called()
 
 
+class TestPersistEspnMatchLinks(unittest.TestCase):
+    def test_upserts_league_aware_espn_link_rows(self):
+        client = MagicMock()
+        tables = {}
+
+        def table_side_effect(name):
+            table = MagicMock()
+            table.update.return_value = table
+            table.eq.return_value = table
+            table.upsert.return_value = table
+            table.execute.return_value = MagicMock(data=[])
+            tables[name] = table
+            return table
+
+        client.table.side_effect = table_side_effect
+
+        _persist_espn_match_links(client, [{
+            "source": "espn",
+            "espn_event_id": "1534187",
+            "league_id": "8623",
+            "team1": "St Lucia Kings",
+            "team2": "Barbados Tridents",
+            "status": "pre",
+        }])
+
+        tables["matches"].update.assert_called_once_with({"espn_event_id": "1534187"})
+        tables["matches"].eq.assert_called_once_with("match_id", "espn-1534187")
+        tables["espn_match_data"].upsert.assert_called_once_with(
+            {
+                "match_id": "espn-1534187",
+                "espn_event_id": "1534187",
+                "league_id": "8623",
+            },
+            on_conflict="match_id",
+        )
+
+
 class TestScoreEspnCompleted(unittest.TestCase):
     """Tests for _score_espn_completed — verifies it scores predictions correctly."""
 
     def _make_espn_fixture(self, espn_eid, winner):
         return {
             "espn_event_id": espn_eid,
+            "league_id": "8048",
             "status": "post",
             "winner": winner,
             "team1": "India",
@@ -587,6 +626,37 @@ class TestScoreEspnCompleted(unittest.TestCase):
 
         scored = _score_espn_completed([self._make_espn_fixture("999", "India")])
         self.assertEqual(scored, 0)
+
+    @patch("fetch_fixtures._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
+    @patch("fetch_fixtures.get_client")
+    def test_uses_fixture_league_id_for_summary_lookup(self, mock_get_client, mock_summary):
+        client = MagicMock()
+        mock_get_client.return_value = client
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.is_.return_value = t
+            t.update.return_value = t
+            t.upsert.return_value = t
+            if name == "espn_match_data":
+                t.execute.return_value = MagicMock(data=[{"match_id": "espn-42"}])
+            elif name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-42",
+                    "team1": "India",
+                    "team2": "Australia",
+                }])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        _score_espn_completed([self._make_espn_fixture("42", "India")])
+
+        mock_summary.assert_called_once_with("42", "8048")
 
     @patch("fetch_fixtures._espn_winner_from_summary", return_value=("Guyana Amazon Warriors", "Final"))
     @patch("fetch_fixtures.get_client")

@@ -1176,7 +1176,15 @@ def _get_espn_event_id(match_id: str, match: dict = None) -> Optional[str]:
 
 def _get_espn_league_id(match_id: str) -> Optional[str]:
     """Look up ESPN league ID for a match. Returns None if not available."""
-    # league_id isn't stored anywhere yet — return None to use default
+    if not match_id:
+        return None
+    try:
+        client = get_client()
+        r = client.table("espn_match_data").select("league_id").eq("match_id", match_id).execute()
+        if r.data and r.data[0].get("league_id"):
+            return str(r.data[0]["league_id"])
+    except Exception:
+        pass
     return None
 
 

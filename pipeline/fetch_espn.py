@@ -123,6 +123,7 @@ def store_espn_data(client, match_id: str, espn_data: dict) -> None:
     row = {
         "match_id": match_id,
         "espn_event_id": espn_data.get("espn_event_id"),
+        "league_id": espn_data.get("league_id"),
         # Venue
         "venue_name": venue.get("name", ""),
         "venue_city": venue.get("city", ""),
@@ -220,14 +221,19 @@ def process_match(client, match: dict) -> bool:
 
     # Check if we already have ESPN data with an event ID
     try:
-        existing = client.table("espn_match_data").select("espn_event_id, fetched_at").eq(
+        existing = client.table("espn_match_data").select("espn_event_id, league_id, fetched_at").eq(
             "match_id", match_id
         ).execute()
         if existing.data and existing.data[0].get("espn_event_id"):
             # Re-fetch to get updated data (toss, scorecard, etc.)
             event_id = existing.data[0]["espn_event_id"]
+            league_id = existing.data[0].get("league_id")
             logger.info("  Re-fetching known ESPN event %s", event_id)
-            espn_data = get_match_summary(event_id)
+            espn_data = (
+                get_match_summary(event_id, league_id=league_id)
+                if league_id else
+                get_match_summary(event_id)
+            )
             if espn_data:
                 store_espn_data(client, match_id, espn_data)
                 backfill_venue(client, match_id, espn_data.get("venue", {}))

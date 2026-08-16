@@ -148,40 +148,57 @@ def _parse_winner_flag(value: object) -> Optional[bool]:
     return None
 
 
-def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) -> tuple[Optional[str], Optional[str]]:
-    """Fetch ESPN summary and extract winner + result text.
-    Returns (team_display_name, result_text) or (None, None).
-    result_text is e.g. 'India won by 47 runs' from ESPN's status note.
-    """
-    try:
-        url = ESPN_SUMMARY_URL.format(league_id=league_id)
-        r = requests.get(url, params={"event": event_id}, timeout=15)
-        if r.status_code != 200:
-            return None, None
-        data = r.json()
-        header = data.get("header", {})
-        comp = header.get("competitions", [{}])[0]
-        comps = comp.get("competitors", [])
-        status = comp.get("status", {})
+def _espn_summary_competition(event_id: str, league_id: Optional[str] = None) -> tuple[Optional[dict], Optional[str]]:
+    """Fetch the summary header competition, preferring the stored league when known."""
+    league_candidates: list[str] = []
+    for candidate in (league_id, DEFAULT_LEAGUE):
+        normalized = str(candidate or "").strip()
+        if normalized and normalized not in league_candidates:
+            league_candidates.append(normalized)
 
-        # Only score if match is actually completed
-        status_desc = status.get("type", {}).get("description", "")
-        if status_desc not in ("Result", "Abandoned", "No Result"):
-            return None, None
+    for candidate in league_candidates:
+        try:
+            url = ESPN_SUMMARY_URL.format(league_id=candidate)
+            response = requests.get(url, params={"event": event_id}, timeout=15)
+            if response.status_code != 200:
+                continue
+            data = response.json()
+            competition = (data.get("header", {}).get("competitions") or [{}])[0]
+            if competition:
+                return competition, candidate
+        except Exception as exc:
+            logger.debug("ESPN summary failed for event %s in league %s: %s", event_id, candidate, exc)
 
-        # ESPN puts the result margin in status.type.shortDetail or comp.note
-        result_text = (
-            status.get("type", {}).get("shortDetail")
-            or comp.get("note")
-            or status.get("shortDetail")
-        ) or None
+    return None, None
 
-        # Abandoned / No Result — no winner
-        if status_desc in ("Abandoned", "No Result"):
-            return "__no_result__", result_text or status_desc
 
+def _espn_summary_status(event_id: str, league_id: Optional[str] = None) -> dict[str, Optional[str]]:
+    """Fetch ESPN summary status, winner, and result text for one event."""
+    competition, resolved_league_id = _espn_summary_competition(event_id, league_id)
+    if not competition:
+        return {
+            "state": None,
+            "winner": None,
+            "result_text": None,
+            "league_id": resolved_league_id,
+        }
+
+    competitors = competition.get("competitors", [])
+    status = competition.get("status", {})
+    status_type = status.get("type", {})
+    status_desc = status_type.get("description", "")
+    result_text = (
+        status_type.get("shortDetail")
+        or competition.get("note")
+        or status.get("shortDetail")
+    ) or None
+    state = status_type.get("state") or None
+
+    if status_desc in ("Abandoned", "No Result"):
+        winner = "__no_result__"
+    elif status_desc == "Result":
         winners = []
-        for competitor in comps:
+        for competitor in competitors:
             raw_flag = competitor.get("winner")
             parsed_flag = _parse_winner_flag(raw_flag)
             if raw_flag is not None and parsed_flag is None:
@@ -190,7 +207,12 @@ def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) ->
                     event_id,
                     raw_flag,
                 )
-                return None, None
+                return {
+                    "state": state,
+                    "winner": None,
+                    "result_text": result_text,
+                    "league_id": resolved_league_id,
+                }
             if parsed_flag is True:
                 winners.append(competitor)
 
@@ -200,13 +222,26 @@ def _espn_winner_from_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) ->
                 event_id,
                 len(winners),
             )
-            return None, None
+            winner = None
+        else:
+            winner = winners[0].get("team", {}).get("displayName")
+    else:
+        winner = None
 
-        winner_name = winners[0].get("team", {}).get("displayName")
-        return (winner_name, result_text) if winner_name else (None, None)
-    except Exception as e:
-        logger.debug(f"ESPN summary failed for event {event_id}: {e}")
+    return {
+        "state": state,
+        "winner": winner,
+        "result_text": result_text,
+        "league_id": resolved_league_id,
+    }
+
+
+def _espn_winner_from_summary(event_id: str, league_id: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
+    """Fetch ESPN summary and extract winner + result text."""
+    summary = _espn_summary_status(event_id, league_id)
+    if not summary["winner"]:
         return None, None
+    return summary["winner"], summary["result_text"]
 
 
 def _match_espn_winner_to_prediction(espn_winner: str, prediction: dict) -> Optional[str]:
@@ -247,7 +282,7 @@ def _correct_espn_event(client, event_id: str) -> bool:
     """Re-fetch and idempotently repair a previously scored ESPN event."""
     link_resp = (
         client.table("espn_match_data")
-        .select("match_id")
+        .select("match_id,league_id")
         .eq("espn_event_id", event_id)
         .execute()
     )
@@ -276,7 +311,7 @@ def _correct_espn_event(client, event_id: str) -> bool:
         return False
 
     prediction = predictions[0]
-    espn_winner, result_text = _espn_winner_from_summary(event_id)
+    espn_winner, result_text = _espn_winner_from_summary(event_id, links[0].get("league_id"))
     if not espn_winner or espn_winner == "__no_result__":
         logger.warning("Correction for ESPN event %s found no valid winner", event_id)
         return False
@@ -301,33 +336,57 @@ def _finalize_stale_active_matches(client, now: datetime) -> dict[str, int]:
     )
     stale_matches = stale_resp.data or []
     if not stale_matches:
-        return {"authoritative": 0, "retired": 0}
+        return {"authoritative": 0, "promoted": 0, "retired": 0}
 
-    event_ids = {
-        match["match_id"]: match.get("espn_event_id")
+    espn_links = {
+        match["match_id"]: {
+            "espn_event_id": match.get("espn_event_id"),
+            "league_id": None,
+        }
         for match in stale_matches
         if match.get("espn_event_id")
     }
-    missing_event_match_ids = [
-        match["match_id"] for match in stale_matches if not event_ids.get(match["match_id"])
+    stale_match_ids = [
+        match["match_id"] for match in stale_matches if match.get("match_id")
     ]
-    if missing_event_match_ids:
+    if stale_match_ids:
         espn_resp = (
             client.table("espn_match_data")
-            .select("match_id,espn_event_id")
-            .in_("match_id", missing_event_match_ids)
+            .select("match_id,espn_event_id,league_id")
+            .in_("match_id", stale_match_ids)
             .execute()
         )
         for row in espn_resp.data or []:
             if row.get("espn_event_id"):
-                event_ids[row["match_id"]] = row["espn_event_id"]
+                espn_links[row["match_id"]] = {
+                    "espn_event_id": row["espn_event_id"],
+                    "league_id": row.get("league_id"),
+                }
 
     authoritative = 0
+    promoted = 0
     retired = 0
     for match in stale_matches:
-        event_id = event_ids.get(match["match_id"])
+        link = espn_links.get(match["match_id"], {})
+        event_id = link.get("espn_event_id")
+        league_id = link.get("league_id")
         if event_id:
-            espn_winner, result_text = _espn_winner_from_summary(str(event_id))
+            summary = _espn_summary_status(str(event_id), league_id)
+            if summary["state"] == "in":
+                if match.get("status") == "upcoming":
+                    client.table("matches").update({
+                        "status": "live",
+                    }).eq("match_id", match["match_id"]).eq("status", "upcoming").execute()
+                    logger.info(
+                        "  Promoted overdue upcoming match to live from ESPN: %s vs %s",
+                        match["team1"],
+                        match["team2"],
+                    )
+                    promoted += 1
+                continue
+
+            espn_winner = summary["winner"]
+            result_text = summary["result_text"]
             if espn_winner == "__no_result__":
                 client.table("matches").update({
                     "status": "completed",
@@ -368,7 +427,7 @@ def _finalize_stale_active_matches(client, now: datetime) -> dict[str, int]:
         )
         retired += 1
 
-    return {"authoritative": authoritative, "retired": retired}
+    return {"authoritative": authoritative, "promoted": promoted, "retired": retired}
 
 
 # ---------------------------------------------------------------------------
@@ -398,11 +457,12 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
 
     if not unscored:
         finalized = _finalize_stale_active_matches(client, now)
-        total_finalized = finalized["authoritative"] + finalized["retired"]
+        total_finalized = finalized["authoritative"] + finalized["promoted"] + finalized["retired"]
         logger.info(
-            "Finalized %s stale active matches (%s authoritative, %s retired without result)",
+            "Finalized %s stale active matches (%s authoritative, %s promoted live, %s retired without result)",
             total_finalized,
             finalized["authoritative"],
+            finalized["promoted"],
             finalized["retired"],
         )
         return
@@ -444,19 +504,27 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
         return
 
     # --- Phase 1: Score via ESPN (stored event IDs) ---
-    espn_resp = client.table("espn_match_data").select("match_id,espn_event_id").execute()
-    espn_map = {e["match_id"]: e["espn_event_id"] for e in espn_resp.data}
+    espn_resp = client.table("espn_match_data").select("match_id,espn_event_id,league_id").execute()
+    espn_map = {
+        e["match_id"]: {
+            "espn_event_id": e.get("espn_event_id"),
+            "league_id": e.get("league_id"),
+        }
+        for e in espn_resp.data
+    }
 
     scored = 0
     still_unscored = []
 
     for prediction in past_unscored:
         mid = prediction["match_id"]
-        espn_eid = espn_map.get(mid)
+        espn_link = espn_map.get(mid, {})
+        espn_eid = espn_link.get("espn_event_id")
+        espn_league_id = espn_link.get("league_id")
 
         if espn_eid:
             logger.info(f"Checking ESPN event {espn_eid} for {prediction['team1']} vs {prediction['team2']}...")
-            espn_winner, result_text = _espn_winner_from_summary(str(espn_eid))
+            espn_winner, result_text = _espn_winner_from_summary(str(espn_eid), espn_league_id)
             if espn_winner and espn_winner != "__no_result__":
                 mapped = _match_espn_winner_to_prediction(espn_winner, prediction)
                 if mapped:
@@ -517,6 +585,7 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
                                 client.table("espn_match_data").insert({
                                     "match_id": mid,
                                     "espn_event_id": espn_eid,
+                                    "league_id": espn_match.get("league_id"),
                                 }).execute()
                         except Exception:
                             pass
@@ -527,11 +596,12 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
             logger.warning(f"ESPN header scoring failed: {e}")
 
     finalized = _finalize_stale_active_matches(client, now)
-    total_finalized = finalized["authoritative"] + finalized["retired"]
+    total_finalized = finalized["authoritative"] + finalized["promoted"] + finalized["retired"]
     logger.info(
-        "Finalized %s stale active matches (%s authoritative, %s retired without result)",
+        "Finalized %s stale active matches (%s authoritative, %s promoted live, %s retired without result)",
         total_finalized,
         finalized["authoritative"],
+        finalized["promoted"],
         finalized["retired"],
     )
     logger.info(f"Total scored this run: {scored}")
