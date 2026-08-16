@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 ESPN_SUMMARY_URL = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/{league_id}/summary"
 DEFAULT_LEAGUE = "8048"
+CRICBUZZ_UPCOMING_RETIRE_GRACE = timedelta(hours=6)
+DEFAULT_UPCOMING_RETIRE_GRACE = timedelta(hours=18)
+DEFAULT_LIVE_RETIRE_GRACE = timedelta(hours=18)
+MULTIDAY_LIVE_RETIRE_GRACE = timedelta(days=7)
+MULTIDAY_MATCH_TYPES = {"test", "first-class", "first class", "firstclass"}
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +93,46 @@ def _normalize(name: str) -> str:
     name = name.lower().strip()
     name = re.sub(r"\s*(women|men)\s*$", "", name)
     return name
+
+
+def _parse_match_datetime(value: object) -> Optional[datetime]:
+    """Parse stored match timestamps into timezone-aware datetimes."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _match_source(match: dict) -> str:
+    match_id = str(match.get("match_id", "") or "")
+    if "-" not in match_id:
+        return "legacy"
+    return match_id.split("-", 1)[0]
+
+
+def _stale_retire_grace(match: dict) -> timedelta:
+    status = str(match.get("status", "") or "").lower()
+    if status == "live":
+        match_type = str(match.get("match_type", "") or "").strip().lower()
+        if match_type in MULTIDAY_MATCH_TYPES:
+            return MULTIDAY_LIVE_RETIRE_GRACE
+        return DEFAULT_LIVE_RETIRE_GRACE
+
+    if _match_source(match) == "cricbuzz":
+        return CRICBUZZ_UPCOMING_RETIRE_GRACE
+    return DEFAULT_UPCOMING_RETIRE_GRACE
+
+
+def _should_force_retire_stale_match(match: dict, now: datetime) -> bool:
+    kickoff = _parse_match_datetime(match.get("date"))
+    if kickoff is None:
+        return False
+    return kickoff + _stale_retire_grace(match) < now
 
 
 def _parse_winner_flag(value: object) -> Optional[bool]:
@@ -245,18 +290,18 @@ def _correct_espn_event(client, event_id: str) -> bool:
     return True
 
 
-def _mark_stale_upcoming_completed(client, now: datetime) -> int:
-    """Finalize stale upcoming matches from stored ESPN event IDs without scoring."""
+def _finalize_stale_active_matches(client, now: datetime) -> dict[str, int]:
+    """Finalize or retire stale active matches after their lifecycle should have advanced."""
     stale_resp = (
         client.table("matches")
-        .select("match_id,team1,team2,date,espn_event_id")
-        .eq("status", "upcoming")
+        .select("match_id,team1,team2,date,status,match_type,espn_event_id")
+        .in_("status", ["upcoming", "live"])
         .lt("date", now.isoformat())
         .execute()
     )
     stale_matches = stale_resp.data or []
     if not stale_matches:
-        return 0
+        return {"authoritative": 0, "retired": 0}
 
     event_ids = {
         match["match_id"]: match.get("espn_event_id")
@@ -277,44 +322,53 @@ def _mark_stale_upcoming_completed(client, now: datetime) -> int:
             if row.get("espn_event_id"):
                 event_ids[row["match_id"]] = row["espn_event_id"]
 
-    marked = 0
+    authoritative = 0
+    retired = 0
     for match in stale_matches:
         event_id = event_ids.get(match["match_id"])
-        if not event_id:
-            logger.info(
-                f"  Stale upcoming {match['team1']} vs {match['team2']} has no ESPN event ID; leaving unchanged"
-            )
-            continue
+        if event_id:
+            espn_winner, result_text = _espn_winner_from_summary(str(event_id))
+            if espn_winner == "__no_result__":
+                client.table("matches").update({
+                    "status": "completed",
+                    "winner": None,
+                }).eq("match_id", match["match_id"]).execute()
+                logger.info(
+                    f"  Marked stale completed: {match['team1']} vs {match['team2']} — {result_text or 'No Result'}"
+                )
+                authoritative += 1
+                continue
 
-        espn_winner, result_text = _espn_winner_from_summary(str(event_id))
-        if espn_winner == "__no_result__":
-            client.table("matches").update({
-                "status": "completed",
-                "winner": None,
-            }).eq("match_id", match["match_id"]).execute()
-            logger.info(
-                f"  Marked stale completed: {match['team1']} vs {match['team2']} — {result_text or 'No Result'}"
-            )
-            marked += 1
-            continue
+            if espn_winner:
+                actual = _match_espn_winner_to_prediction(espn_winner, match)
+                if actual:
+                    client.table("matches").update({
+                        "status": "completed",
+                        "winner": actual,
+                    }).eq("match_id", match["match_id"]).execute()
+                    logger.info(
+                        f"  Marked stale completed: {match['team1']} vs {match['team2']} → winner={actual}"
+                    )
+                    authoritative += 1
+                    continue
 
-        if not espn_winner:
-            continue
-
-        actual = _match_espn_winner_to_prediction(espn_winner, match)
-        if not actual:
+        if not _should_force_retire_stale_match(match, now):
             continue
 
         client.table("matches").update({
             "status": "completed",
-            "winner": actual,
+            "winner": None,
         }).eq("match_id", match["match_id"]).execute()
         logger.info(
-            f"  Marked stale completed: {match['team1']} vs {match['team2']} → winner={actual}"
+            "  Retired stale %s fixture without authoritative result: %s vs %s (%s)",
+            _match_source(match),
+            match["team1"],
+            match["team2"],
+            match["status"],
         )
-        marked += 1
+        retired += 1
 
-    return marked
+    return {"authoritative": authoritative, "retired": retired}
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +397,14 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
     now = datetime.now(timezone.utc)
 
     if not unscored:
-        finalized = _mark_stale_upcoming_completed(client, now)
-        logger.info(f"Marked {finalized} stale upcoming matches completed")
+        finalized = _finalize_stale_active_matches(client, now)
+        total_finalized = finalized["authoritative"] + finalized["retired"]
+        logger.info(
+            "Finalized %s stale active matches (%s authoritative, %s retired without result)",
+            total_finalized,
+            finalized["authoritative"],
+            finalized["retired"],
+        )
         return
 
     # Get match dates from matches table
@@ -360,9 +420,10 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
             past_unscored.append(p)
             continue
         try:
-            match_time = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            if match_time.tzinfo is None:
-                match_time = match_time.replace(tzinfo=timezone.utc)
+            match_time = _parse_match_datetime(date_str)
+            if match_time is None:
+                past_unscored.append(p)
+                continue
             if match_time < now:
                 past_unscored.append(p)
         except (ValueError, TypeError):
@@ -372,8 +433,14 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
 
     if not past_unscored:
         logger.info("No past-date unscored predictions to check.")
-        finalized = _mark_stale_upcoming_completed(client, now)
-        logger.info(f"Marked {finalized} stale upcoming matches completed")
+        finalized = _finalize_stale_active_matches(client, now)
+        total_finalized = finalized["authoritative"] + finalized["retired"]
+        logger.info(
+            "Finalized %s stale active matches (%s authoritative, %s retired without result)",
+            total_finalized,
+            finalized["authoritative"],
+            finalized["retired"],
+        )
         return
 
     # --- Phase 1: Score via ESPN (stored event IDs) ---
@@ -459,8 +526,14 @@ def main(force: bool = False, correction_events: Optional[list[str]] = None) -> 
         except Exception as e:
             logger.warning(f"ESPN header scoring failed: {e}")
 
-    finalized = _mark_stale_upcoming_completed(client, now)
-    logger.info(f"Marked {finalized} stale upcoming matches completed")
+    finalized = _finalize_stale_active_matches(client, now)
+    total_finalized = finalized["authoritative"] + finalized["retired"]
+    logger.info(
+        "Finalized %s stale active matches (%s authoritative, %s retired without result)",
+        total_finalized,
+        finalized["authoritative"],
+        finalized["retired"],
+    )
     logger.info(f"Total scored this run: {scored}")
 
 
