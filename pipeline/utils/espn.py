@@ -47,6 +47,10 @@ TEAM_ALIASES = {
     "afghanistan": ["afghanistan", "afg"],
     "zimbabwe": ["zimbabwe", "zim"],
     "ireland": ["ireland", "ire"],
+    "st lucia kings": ["saint lucia kings", "st lucia kings", "st lucia stars", "st lucia zouks"],
+    "barbados royals": ["barbados royals", "barbados tridents"],
+    "antigua and barbuda falcons": ["antigua and barbuda falcons", "antigua barbuda falcons", "antigua & barbuda falcons"],
+    "st kitts and nevis patriots": ["st kitts and nevis patriots", "st kitts & nevis patriots"],
 }
 
 

@@ -290,6 +290,20 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["espn_event_id"], "1521249")
 
+    def test_same_fixture_window_matches_cpl_aliases(self):
+        cricbuzz_fixture = self._make_fixture(
+            team1="Saint Lucia Kings",
+            team2="Barbados Royals",
+            date="2026-08-16T23:00:00Z",
+        )
+        espn_fixture = self._make_fixture(
+            team1="St Lucia Kings",
+            team2="Barbados Tridents",
+            date="2026-08-16T22:30:00Z",
+        )
+
+        self.assertTrue(_same_fixture_window(cricbuzz_fixture, espn_fixture))
+
     def test_fixture_team_normalizer_preserves_women(self):
         self.assertEqual(_normalize_fixture_team("Welsh Fire (Women)"), "welsh fire women")
         self.assertEqual(_normalize_fixture_team("Welsh Fire Women"), "welsh fire women")

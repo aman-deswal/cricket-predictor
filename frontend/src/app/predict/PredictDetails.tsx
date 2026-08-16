@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { getMatch, getMatchEnrichment, getMatchOdds, getMatchOddsHistory, getMatchSquads, getPlayerStats, getPrediction, getPredictionSnapshots, getESPNMatchData, getEdgeScore, Match, MatchEnrichment, MatchOdds, MatchSquad, SquadPlayer, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getPlayerStats, getUnifiedMatchDetails, Match, MatchEnrichment, MatchOdds, MatchSquad, SquadPlayer, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -764,17 +764,17 @@ export function PredictDetails() {
       }
 
       try {
-        const [matchData, predictionData, predictionHistoryData, enrichmentData, oddsData, oddsHistoryData, squadData, espn, edgeData] = await Promise.all([
-          getMatch(matchId),
-          getPrediction(matchId),
-          getPredictionSnapshots(matchId),
-          getMatchEnrichment(matchId),
-          getMatchOdds(matchId),
-          getMatchOddsHistory(matchId),
-          getMatchSquads(matchId),
-          getESPNMatchData(matchId),
-          getEdgeScore(matchId),
-        ]);
+        const {
+          match: matchData,
+          prediction: predictionData,
+          predictionHistory: predictionHistoryData,
+          enrichment: enrichmentData,
+          odds: oddsData,
+          oddsHistory: oddsHistoryData,
+          squads: squadData,
+          espnMatchData: espn,
+          edgeScore: edgeData,
+        } = await getUnifiedMatchDetails(matchId);
         setMatch(matchData);
         setPrediction(predictionData);
         setPredictionHistory(predictionHistoryData);
