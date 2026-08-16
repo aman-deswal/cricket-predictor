@@ -13,11 +13,12 @@ from datetime import datetime, timezone
 from fetch_results import (
     _correct_espn_event,
     _espn_winner_from_summary,
-    _mark_stale_upcoming_completed,
+    _finalize_stale_active_matches,
     _match_espn_winner_to_prediction,
     _normalize,
     _parse_winner_flag,
     _score_prediction,
+    _should_force_retire_stale_match,
 )
 
 
@@ -227,23 +228,34 @@ class TestScorePrediction(unittest.TestCase):
         self.assertIsInstance(result["scored_at"], str)
 
 
-class TestMarkStaleUpcomingCompleted(unittest.TestCase):
-    def test_stale_cleanup_only_queries_upcoming_so_multiday_live_test_is_preserved(self):
+class TestFinalizeStaleActiveMatches(unittest.TestCase):
+    def test_live_test_match_within_grace_is_preserved(self):
         client = MagicMock()
         matches = MagicMock()
         client.table.return_value = matches
         matches.select.return_value = matches
-        matches.eq.return_value = matches
+        matches.in_.return_value = matches
         matches.lt.return_value = matches
-        matches.execute.return_value = MagicMock(data=[])
+        matches.execute.return_value = MagicMock(data=[{
+            "match_id": "espn-99",
+            "team1": "India",
+            "team2": "Australia",
+            "date": "2026-08-01T10:00:00Z",
+            "status": "live",
+            "match_type": "Test",
+            "espn_event_id": None,
+        }])
 
-        marked = _mark_stale_upcoming_completed(
+        marked = _finalize_stale_active_matches(
             client,
             datetime(2026, 8, 6, tzinfo=timezone.utc),
         )
 
-        self.assertEqual(marked, 0)
-        matches.eq.assert_called_once_with("status", "upcoming")
+        self.assertEqual(marked, {"authoritative": 0, "retired": 0})
+        self.assertIn(
+            unittest.mock.call("status", ["upcoming", "live"]),
+            matches.in_.call_args_list,
+        )
         matches.update.assert_not_called()
 
     @patch("fetch_results._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
@@ -273,15 +285,69 @@ class TestMarkStaleUpcomingCompleted(unittest.TestCase):
 
         client.table.side_effect = table_side_effect
 
-        marked = _mark_stale_upcoming_completed(client, datetime(2026, 8, 1, tzinfo=timezone.utc))
+        marked = _finalize_stale_active_matches(client, datetime(2026, 8, 1, tzinfo=timezone.utc))
 
-        self.assertEqual(marked, 1)
+        self.assertEqual(marked, {"authoritative": 1, "retired": 0})
         tables["matches"].update.assert_called_once_with({
             "status": "completed",
             "winner": "India",
         })
         client.table.assert_any_call("matches")
         self.assertNotIn("prediction_results", tables)
+
+    def test_retires_stale_cricbuzz_upcoming_without_espn_link(self):
+        client = MagicMock()
+        tables = {}
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.lt.return_value = t
+            t.in_.return_value = t
+            t.update.return_value = t
+            if name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "cricbuzz-abc123",
+                    "team1": "Lancashire",
+                    "team2": "Surrey",
+                    "date": "2026-07-21T10:00:00Z",
+                    "status": "upcoming",
+                    "match_type": "T20",
+                    "espn_event_id": None,
+                }])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            tables[name] = t
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        marked = _finalize_stale_active_matches(client, datetime(2026, 7, 22, tzinfo=timezone.utc))
+
+        self.assertEqual(marked, {"authoritative": 0, "retired": 1})
+        tables["matches"].update.assert_called_once_with({
+            "status": "completed",
+            "winner": None,
+        })
+
+
+class TestStaleRetireGrace(unittest.TestCase):
+    def test_force_retires_cricbuzz_upcoming_after_short_grace(self):
+        self.assertTrue(_should_force_retire_stale_match({
+            "match_id": "cricbuzz-abc123",
+            "date": "2026-07-21T10:00:00Z",
+            "status": "upcoming",
+            "match_type": "T20",
+        }, datetime(2026, 7, 21, 17, tzinfo=timezone.utc)))
+
+    def test_live_test_is_not_force_retired_during_multiday_window(self):
+        self.assertFalse(_should_force_retire_stale_match({
+            "match_id": "espn-99",
+            "date": "2026-08-01T10:00:00Z",
+            "status": "live",
+            "match_type": "Test",
+        }, datetime(2026, 8, 6, tzinfo=timezone.utc)))
 
 
 if __name__ == "__main__":
