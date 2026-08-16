@@ -215,6 +215,10 @@ export type MatchWithPredictions = Match & {
   team2_logo_url?: string;
 };
 
+type MatchWithEmbeddedPredictionRelation = Omit<MatchWithPredictions, 'predictions'> & {
+  predictions?: Prediction[] | Prediction | null;
+};
+
 interface FranchiseLogoRow {
   normalized_team_name: string;
   team_name: string;
@@ -495,8 +499,25 @@ function getStatusPriority(status: string): number {
   return 0;
 }
 
+function normalizeEmbeddedPredictions(predictions: Prediction[] | Prediction | null | undefined): Prediction[] {
+  if (Array.isArray(predictions)) {
+    return predictions.filter((prediction): prediction is Prediction => Boolean(prediction) && typeof prediction === 'object');
+  }
+  if (predictions && typeof predictions === 'object') {
+    return [predictions];
+  }
+  return [];
+}
+
+function normalizeMatchWithPredictions(match: MatchWithEmbeddedPredictionRelation): MatchWithPredictions {
+  return {
+    ...match,
+    predictions: normalizeEmbeddedPredictions(match.predictions),
+  };
+}
+
 function getPrimaryPredictionFromMatch(match: Pick<MatchWithPredictions, 'predictions'>): Prediction | null {
-  return match.predictions[0] ?? null;
+  return normalizeEmbeddedPredictions(match.predictions)[0] ?? null;
 }
 
 function getLogicalFixtureCoverageScore(match: MatchWithPredictions): number {
@@ -573,7 +594,7 @@ export function mergeLogicalSurfaceMatches(matches: MatchWithPredictions[]): Mat
     const ordered = [...group].sort(compareLogicalFixtureCandidates);
     const primary = ordered[0];
     const predictions = ordered
-      .flatMap((match) => match.predictions)
+      .flatMap((match) => normalizeEmbeddedPredictions(match.predictions))
       .filter((prediction, index, items) => (
         items.findIndex((candidate) => candidate.match_id === prediction.match_id) === index
       ));
@@ -855,7 +876,8 @@ export async function getUpcomingMatches(): Promise<MatchWithPredictions[]> {
     recentFormByTeam,
   };
 
-  const matchesWithForm = ((data ?? []) as MatchWithPredictions[]).map((match) => buildSurfaceMatch(match, context));
+  const normalizedMatches = ((data ?? []) as MatchWithEmbeddedPredictionRelation[]).map(normalizeMatchWithPredictions);
+  const matchesWithForm = normalizedMatches.map((match) => buildSurfaceMatch(match, context));
   const mergedMatches = mergeLogicalSurfaceMatches(matchesWithForm);
   return sortMatchesByPriority(mergedMatches.filter((match) => isLiveMatch(match) || isFutureMatch(match, now)));
 }
@@ -1042,21 +1064,24 @@ async function resolveLogicalMatchGroup(matchId: string): Promise<MatchWithPredi
     .single();
   if (error || !baseMatch) return [];
 
-  const baseTime = parseLogicalFixtureTimestamp(baseMatch.date);
+  const normalizedBaseMatch = normalizeMatchWithPredictions(baseMatch as MatchWithEmbeddedPredictionRelation);
+  const baseTime = parseLogicalFixtureTimestamp(normalizedBaseMatch.date);
   let query = supabase.from('matches').select('*, predictions(*)');
   if (baseTime !== null) {
     query = query
       .gte('date', new Date(baseTime - LOGICAL_FIXTURE_WINDOW_MS).toISOString())
       .lte('date', new Date(baseTime + LOGICAL_FIXTURE_WINDOW_MS).toISOString());
   } else {
-    query = query.eq('date', baseMatch.date);
+    query = query.eq('date', normalizedBaseMatch.date);
   }
 
   const { data: candidates } = await query.order('date', { ascending: true });
-  const logicalMatches = ((candidates ?? []) as MatchWithPredictions[]).filter((candidate) => (
-    matchesRepresentSameLogicalFixture(baseMatch as MatchWithPredictions, candidate)
+  const logicalMatches = ((candidates ?? []) as MatchWithEmbeddedPredictionRelation[])
+    .map(normalizeMatchWithPredictions)
+    .filter((candidate) => (
+      matchesRepresentSameLogicalFixture(normalizedBaseMatch, candidate)
   ));
-  return logicalMatches.length > 0 ? logicalMatches : [baseMatch as MatchWithPredictions];
+  return logicalMatches.length > 0 ? logicalMatches : [normalizedBaseMatch];
 }
 
 export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMatchDetails> {
@@ -1210,7 +1235,10 @@ export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMa
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   const prediction = orderedMatchIds
-    .map((candidate) => surfacedMatches.find((match) => match.match_id === candidate)?.predictions[0] ?? null)
+    .map((candidate) => {
+      const match = surfacedMatches.find((surfaceMatch) => surfaceMatch.match_id === candidate);
+      return match ? getPrimaryPredictionFromMatch(match) : null;
+    })
     .find((candidate): candidate is Prediction => candidate !== null)
     ?? null;
   const edgeScore = orderedMatchIds

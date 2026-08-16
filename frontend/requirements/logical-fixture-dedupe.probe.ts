@@ -5,7 +5,11 @@ import {
   mergeLogicalSurfaceMatches,
 } from '../src/lib/supabase';
 
-function candidate(matchId: string, overrides: Partial<MatchWithPredictions>): MatchWithPredictions {
+type CandidateOverrides = Partial<Omit<MatchWithPredictions, 'predictions'>> & {
+  predictions?: MatchWithPredictions['predictions'] | MatchWithPredictions['predictions'][number] | null;
+};
+
+function candidate(matchId: string, overrides: CandidateOverrides): MatchWithPredictions {
   return {
     match_id: matchId,
     name: `${matchId} fixture`,
@@ -17,7 +21,7 @@ function candidate(matchId: string, overrides: Partial<MatchWithPredictions>): M
     status: 'upcoming',
     predictions: [],
     ...overrides,
-  };
+  } as MatchWithPredictions;
 }
 
 const cricbuzz = candidate('cricbuzz-1a1a6148534b5f4c', {
@@ -69,6 +73,31 @@ assert.equal(mergedCpl[0].match_id, 'cricbuzz-1a1a6148534b5f4c', 'the richer spo
 assert.equal(Boolean(mergedCpl[0].bookmaker_odds), true, 'merged match keeps trusted odds from the richer row');
 assert.equal(mergedCpl[0].spotlight_signals?.has_espn_context, true, 'merged match keeps ESPN context from the sibling row');
 assert.equal(mergedCpl[0].spotlight_signals?.has_expert_preview, true, 'merged match keeps expert preview signals from the sibling row');
+
+const embeddedObjectPrediction = candidate('cricbuzz-e8bc9fbc0211c7a9', {
+  predictions: {
+    match_id: 'cricbuzz-e8bc9fbc0211c7a9',
+    team1: 'Saint Lucia Kings',
+    team2: 'Barbados Royals',
+    predicted_winner: 'Saint Lucia Kings',
+    team1_win_probability: 0.61,
+    team2_win_probability: 0.39,
+    confidence: 'high',
+    reasoning: 'Embedded relation can arrive as a single object in production.',
+    model: 'deterministic-core',
+    ensemble_size: 1,
+  } as MatchWithPredictions['predictions'][number],
+});
+const embeddedNullPrediction = candidate('espn-1534188', {
+  predictions: null,
+  spotlight_signals: {
+    has_espn_context: true,
+  },
+});
+const mergedEmbeddedPredictions = mergeLogicalSurfaceMatches([embeddedObjectPrediction, embeddedNullPrediction]);
+assert.equal(mergedEmbeddedPredictions.length, 1, 'logical merge still succeeds when embedded predictions are object-or-null shaped');
+assert.equal(mergedEmbeddedPredictions[0].predictions.length, 1, 'single-object embedded predictions are normalized into the surfaced prediction array');
+assert.equal(mergedEmbeddedPredictions[0].predictions[0]?.match_id, 'cricbuzz-e8bc9fbc0211c7a9', 'normalized prediction data survives the logical-fixture merge');
 
 const hongKong = candidate('cricbuzz-be7445532a7ca58e', {
   team1: 'Hong Kong',
