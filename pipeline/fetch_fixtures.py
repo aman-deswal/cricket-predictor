@@ -50,6 +50,30 @@ MATCH_STATUS_RANK = {
 }
 
 
+def _persist_espn_match_links(client, fixtures: list[dict]) -> None:
+    """Persist ESPN event/league mappings for canonical ESPN match rows."""
+    links: dict[str, dict] = {}
+    for fixture in fixtures:
+        if fixture.get("source", "espn") != "espn":
+            continue
+        espn_event_id = str(fixture.get("espn_event_id", "") or "").strip()
+        if not espn_event_id:
+            continue
+        match_id = f"espn-{espn_event_id}"
+        league_id = str(fixture.get("league_id", "") or "").strip()
+        links[match_id] = {
+            "match_id": match_id,
+            "espn_event_id": espn_event_id,
+            "league_id": league_id or None,
+        }
+
+    for match_id, link in links.items():
+        client.table("matches").update({
+            "espn_event_id": link["espn_event_id"],
+        }).eq("match_id", match_id).execute()
+        client.table("espn_match_data").upsert(link, on_conflict="match_id").execute()
+
+
 def _merge_fixtures_by_event(fixtures: list[dict]) -> list[dict]:
     """Deduplicate fixtures by ESPN event ID, keeping the best-quality row."""
     merged: dict[str, dict] = {}
@@ -331,7 +355,10 @@ def _score_espn_completed(espn_fixtures: list[dict]) -> int:
         espn_eid = fixture["espn_event_id"]
         fixture_winner = fixture["winner"]
 
-        summary_winner, result_text = _espn_winner_from_summary(str(espn_eid))
+        summary_winner, result_text = _espn_winner_from_summary(
+            str(espn_eid),
+            fixture.get("league_id"),
+        )
         if summary_winner == "__no_result__":
             logger.info("ESPN event %s is a no-result; skipping fixture-feed winner %s", espn_eid, fixture_winner)
             continue
@@ -626,26 +653,7 @@ def main(match_types: Optional[list[str]] = None) -> None:
         persisted = _persist_fixture_matches(client, fixture_matches)
         logger.info(f"Persisted {persisted} fixture states...")
 
-        # Stamp espn_event_id on matches row and create espn_match_data stubs
-        for m in fixture_matches:
-            if not m["match_id"].startswith("espn-"):
-                continue
-            espn_eid = m["match_id"].removeprefix("espn-")
-            try:
-                client.table("matches").update({
-                    "espn_event_id": espn_eid,
-                }).eq("match_id", m["match_id"]).execute()
-            except Exception:
-                pass
-            try:
-                existing = client.table("espn_match_data").select("match_id").eq("match_id", m["match_id"]).execute()
-                if not existing.data:
-                    client.table("espn_match_data").insert({
-                        "match_id": m["match_id"],
-                        "espn_event_id": espn_eid,
-                    }).execute()
-            except Exception:
-                pass
+        _persist_espn_match_links(client, all_fixtures)
         reconciled = _reconcile_provisional_fixtures(client, all_fixtures)
         if reconciled:
             logger.info(f"Reconciled {reconciled} provisional Cricbuzz fixtures to ESPN IDs")

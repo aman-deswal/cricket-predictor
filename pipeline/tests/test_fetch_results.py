@@ -117,7 +117,10 @@ class TestTargetedCorrection(unittest.TestCase):
             table.select.return_value = table
             table.eq.return_value = table
             if name == "espn_match_data":
-                table.execute.return_value = MagicMock(data=[{"match_id": "espn-1534180"}])
+                table.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-1534180",
+                    "league_id": "8623",
+                }])
             elif name == "predictions":
                 table.execute.return_value = MagicMock(data=[{
                     "match_id": "espn-1534180",
@@ -135,6 +138,7 @@ class TestTargetedCorrection(unittest.TestCase):
 
         self.assertTrue(_correct_espn_event(client, "1534180"))
         mock_persist.assert_called_once()
+        _mock_summary.assert_called_once_with("1534180", "8623")
         self.assertEqual(mock_persist.call_args.args[2], "Trinbago Knight Riders")
 
 
@@ -251,14 +255,19 @@ class TestFinalizeStaleActiveMatches(unittest.TestCase):
             datetime(2026, 8, 6, tzinfo=timezone.utc),
         )
 
-        self.assertEqual(marked, {"authoritative": 0, "retired": 0})
+        self.assertEqual(marked, {"authoritative": 0, "promoted": 0, "retired": 0})
         self.assertIn(
             unittest.mock.call("status", ["upcoming", "live"]),
             matches.in_.call_args_list,
         )
         matches.update.assert_not_called()
 
-    @patch("fetch_results._espn_winner_from_summary", return_value=("India", "India won by 5 wickets"))
+    @patch("fetch_results._espn_summary_status", return_value={
+        "state": "post",
+        "winner": "India",
+        "result_text": "India won by 5 wickets",
+        "league_id": None,
+    })
     def test_marks_stale_match_completed_without_scoring(self, _mock_summary):
         client = MagicMock()
         tables = {}
@@ -287,13 +296,60 @@ class TestFinalizeStaleActiveMatches(unittest.TestCase):
 
         marked = _finalize_stale_active_matches(client, datetime(2026, 8, 1, tzinfo=timezone.utc))
 
-        self.assertEqual(marked, {"authoritative": 1, "retired": 0})
+        self.assertEqual(marked, {"authoritative": 1, "promoted": 0, "retired": 0})
         tables["matches"].update.assert_called_once_with({
             "status": "completed",
             "winner": "India",
         })
         client.table.assert_any_call("matches")
         self.assertNotIn("prediction_results", tables)
+
+    @patch("fetch_results._espn_summary_status", return_value={
+        "state": "in",
+        "winner": None,
+        "result_text": None,
+        "league_id": "8623",
+    })
+    def test_promotes_overdue_upcoming_match_to_live_when_espn_reports_in_progress(self, mock_summary):
+        client = MagicMock()
+        tables = {}
+
+        def table_side_effect(name):
+            t = MagicMock()
+            t.select.return_value = t
+            t.eq.return_value = t
+            t.lt.return_value = t
+            t.in_.return_value = t
+            t.update.return_value = t
+            if name == "matches":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-1534187",
+                    "team1": "St Lucia Kings",
+                    "team2": "Barbados Tridents",
+                    "date": "2026-08-16T22:30:00+00:00",
+                    "status": "upcoming",
+                    "match_type": "T20",
+                    "espn_event_id": "1534187",
+                }])
+            elif name == "espn_match_data":
+                t.execute.return_value = MagicMock(data=[{
+                    "match_id": "espn-1534187",
+                    "espn_event_id": "1534187",
+                    "league_id": "8623",
+                }])
+            else:
+                t.execute.return_value = MagicMock(data=[])
+            tables[name] = t
+            return t
+
+        client.table.side_effect = table_side_effect
+
+        marked = _finalize_stale_active_matches(client, datetime(2026, 8, 16, 23, tzinfo=timezone.utc))
+
+        self.assertEqual(marked, {"authoritative": 0, "promoted": 1, "retired": 0})
+        tables["matches"].update.assert_called_once_with({"status": "live"})
+        self.assertIn(unittest.mock.call("status", "upcoming"), tables["matches"].eq.call_args_list)
+        mock_summary.assert_called_once_with("1534187", "8623")
 
     def test_retires_stale_cricbuzz_upcoming_without_espn_link(self):
         client = MagicMock()
@@ -325,7 +381,7 @@ class TestFinalizeStaleActiveMatches(unittest.TestCase):
 
         marked = _finalize_stale_active_matches(client, datetime(2026, 7, 22, tzinfo=timezone.utc))
 
-        self.assertEqual(marked, {"authoritative": 0, "retired": 1})
+        self.assertEqual(marked, {"authoritative": 0, "promoted": 0, "retired": 1})
         tables["matches"].update.assert_called_once_with({
             "status": "completed",
             "winner": None,

@@ -272,12 +272,16 @@ def get_match_summary(event_id: str, league_id: str = DEFAULT_LEAGUE) -> Optiona
         logger.warning("ESPN summary returned error for event %s: %s", event_id, data.get("message"))
         return None
 
-    return _parse_summary(data, event_id)
+    return _parse_summary(data, event_id, league_id=league_id)
 
 
-def _parse_summary(data: dict, event_id: str) -> Dict[str, Any]:
+def _parse_summary(data: dict, event_id: str, league_id: Optional[str] = None) -> Dict[str, Any]:
     """Parse the raw ESPN summary response into a clean structure."""
-    result = {"espn_event_id": event_id}
+    payload_league = str(((data.get("leagues") or [{}])[0].get("id") or "")).strip()
+    result = {
+        "espn_event_id": event_id,
+        "league_id": payload_league or str(league_id or DEFAULT_LEAGUE),
+    }
 
     # -- Venue --
     gi = data.get("gameInfo", {})

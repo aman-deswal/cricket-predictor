@@ -310,15 +310,21 @@ def fetch_squad_from_espn(match_id: str) -> Optional[list[dict]]:
     client = get_client()
     espn_resp = (
         client.table("espn_match_data")
-        .select("espn_event_id")
+        .select("espn_event_id,league_id")
         .eq("match_id", match_id)
         .execute()
     )
     if not espn_resp.data:
         return None
 
-    espn_eid = str(espn_resp.data[0]["espn_event_id"])
-    summary = get_match_summary(espn_eid)
+    espn_row = espn_resp.data[0]
+    espn_eid = str(espn_row["espn_event_id"])
+    league_id = espn_row.get("league_id")
+    summary = (
+        get_match_summary(espn_eid, league_id=league_id)
+        if league_id else
+        get_match_summary(espn_eid)
+    )
     if not summary:
         return None
 
