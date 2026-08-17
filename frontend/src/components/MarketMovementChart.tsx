@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  ColorType,
+  CrosshairMode,
+  LineSeries,
+  LineStyle,
+  LineType,
+  createChart,
+  createSeriesMarkers,
+  type ISeriesApi,
+  type LineData,
+  type MouseEventParams,
+  type Time,
+} from 'lightweight-charts';
 import type { MovementAnnotation, MovementSeries } from '@/lib/pre-match-movement';
 
 interface MarketMovementChartProps {
@@ -22,6 +25,37 @@ interface MarketMovementChartProps {
   annotations: MovementAnnotation[];
   insightCaption?: string;
   heightClassName?: string;
+}
+
+interface HoverRow {
+  id: string;
+  label: string;
+  color: string;
+  value: number;
+}
+
+interface HoverState {
+  x: number;
+  y: number;
+  timestamp: number | null;
+  rows: HoverRow[];
+}
+
+interface EndpointLabel {
+  id: string;
+  x: number;
+  y: number;
+  color: string;
+  label: string;
+}
+
+function toChartTime(timestamp: number): Time {
+  return Math.floor(timestamp / 1000) as Time;
+}
+
+function fromChartTime(time: Time | undefined): number | null {
+  if (typeof time === 'number') return time * 1000;
+  return null;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -45,60 +79,9 @@ function formatSignedDelta(value: number): string {
   return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(1)} pts`;
 }
 
-interface TooltipEntry {
-  color?: string;
-  dataKey?: string | number;
-  name?: string | number;
-  value?: number | string | Array<number | string>;
-}
-
-function MarketMovementTooltip({
-  active,
-  label,
-  payload,
-}: {
-  active?: boolean;
-  label?: string | number;
-  payload?: TooltipEntry[];
-}) {
-  if (!active || payload === undefined || payload.length === 0) return null;
-
-  const rows = payload
-    .map((entry) => {
-      const numericValue = typeof entry.value === 'number'
-        ? entry.value
-        : Array.isArray(entry.value) && typeof entry.value[0] === 'number'
-          ? entry.value[0]
-          : null;
-      if (numericValue === null) return null;
-      return {
-        label: entry.name ?? String(entry.dataKey ?? 'Series'),
-        color: entry.color ?? '#94a3b8',
-        value: `${numericValue.toFixed(1)}%`,
-      };
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="min-w-[12rem] rounded-2xl border border-white/10 bg-[#0d141d]/96 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-        {typeof label === 'number' ? formatMarketTimestamp(label) : 'Snapshot'}
-      </p>
-      <div className="mt-2 space-y-2">
-        {rows.map((entry) => (
-          <div key={entry.label} className="flex items-center justify-between gap-3 text-xs">
-            <span className="inline-flex items-center gap-2 text-slate-300">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
-              {entry.label}
-            </span>
-            <span className="font-mono font-black text-white">{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function buildTimestampLabel(firstTimestamp: number | null, lastTimestamp: number | null): string | null {
+  if (firstTimestamp === null || lastTimestamp === null) return null;
+  return `${formatMarketTimestamp(firstTimestamp, true)} to ${formatMarketTimestamp(lastTimestamp, true)}`;
 }
 
 export function MarketMovementChart({
@@ -111,15 +94,23 @@ export function MarketMovementChart({
   insightCaption,
   heightClassName,
 }: MarketMovementChartProps) {
-  const annotationsByTimestamp = useMemo(() => new Map(
-    annotations.map((annotation) => [annotation.timestamp, annotation]),
-  ), [annotations]);
+  const chartHostRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
+
+  const [hoverState, setHoverState] = useState<HoverState | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<{
     annotation: MovementAnnotation;
     x: number;
     y: number;
   } | null>(null);
+  const [endpointLabels, setEndpointLabels] = useState<EndpointLabel[]>([]);
+
+  const annotationsByTimestamp = useMemo(() => new Map(
+    annotations.map((annotation) => [annotation.timestamp, annotation]),
+  ), [annotations]);
+  const annotationsById = useMemo(() => new Map(
+    annotations.map((annotation) => [`annotation-${annotation.timestamp}`, annotation]),
+  ), [annotations]);
 
   useEffect(() => {
     if (!selectedMarker) return;
@@ -143,347 +134,346 @@ export function MarketMovementChart({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [selectedMarker]);
 
-  const accessibleSummaries = series.map((entry) => {
-    const values = chartRows
-      .map((row) => row[entry.id])
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    if (values.length === 0) return `${entry.label}: no plotted snapshots are available yet.`;
-    const opening = values[0];
-    const latest = values[values.length - 1];
-    const delta = latest - opening;
-    const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
-    return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${values.length} ${values.length === 1 ? 'snapshot' : 'snapshots'}.`;
-  });
-  const pointCountsBySeries = new Map(series.map((entry) => [
-    entry.id,
-    chartRows.reduce((count, row) => {
-      const value = row[entry.id];
-      return typeof value === 'number' && Number.isFinite(value) ? count + 1 : count;
-    }, 0),
-  ]));
-  const latestIndexBySeries = new Map(series.map((entry) => [
-    entry.id,
-    chartRows.reduce((latestIndex, row, index) => {
-      const value = row[entry.id];
-      return typeof value === 'number' && Number.isFinite(value) ? index : latestIndex;
-    }, -1),
-  ]));
-  const firstTimestamp = Number(chartRows[0]?.timestamp ?? Number.NaN);
-  const lastTimestamp = Number(chartRows[chartRows.length - 1]?.timestamp ?? Number.NaN);
-  const seriesSummaries = series.map((entry) => {
+  const seriesSummaries = useMemo(() => series.map((entry) => {
     const values = chartRows
       .map((row) => row[entry.id])
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const opening = values[0] ?? null;
     const latest = values[values.length - 1] ?? null;
-    const delta = opening !== null && latest !== null ? latest - opening : null;
     return {
       ...entry,
       opening,
       latest,
-      delta,
+      delta: opening !== null && latest !== null ? latest - opening : null,
       hasData: values.length > 0,
     };
-  });
-  const overlappingDotOffsets = new Map<string, number>();
-  chartRows.forEach((row) => {
-    const timestamp = Number(row.timestamp);
-    const groups = new Map<string, string[]>();
+  }), [chartRows, series]);
 
-    series.forEach((entry) => {
-      const value = row[entry.id];
-      if (typeof value !== 'number' || !Number.isFinite(value)) return;
-      const bucketKey = `${timestamp}:${value.toFixed(1)}`;
-      const entries = groups.get(bucketKey) ?? [];
-      entries.push(entry.id);
-      groups.set(bucketKey, entries);
+  const firstTimestamp = chartRows.length > 0 ? Number(chartRows[0].timestamp) : null;
+  const lastTimestamp = chartRows.length > 0 ? Number(chartRows[chartRows.length - 1].timestamp) : null;
+  const timestampLabel = buildTimestampLabel(firstTimestamp, lastTimestamp);
+
+  const preparedSeries = useMemo(() => series.map((entry) => ({
+    ...entry,
+    data: chartRows
+      .map((row) => {
+        const timestamp = Number(row.timestamp);
+        const value = row[entry.id];
+        if (!Number.isFinite(timestamp) || typeof value !== 'number' || !Number.isFinite(value)) return null;
+        return { time: toChartTime(timestamp), value } satisfies LineData<Time>;
+      })
+      .filter((row): row is LineData<Time> => row !== null),
+  })), [chartRows, series]);
+
+  const annotationMarkers = useMemo(() => annotations.map((annotation) => ({
+    id: `annotation-${annotation.timestamp}`,
+    time: toChartTime(annotation.timestamp),
+    position: 'atPriceMiddle' as const,
+    shape: 'circle' as const,
+    color: '#fbbf24',
+    size: 1.35,
+    price: annotation.probability,
+  })), [annotations]);
+
+  const accessibleSummaries = useMemo(() => seriesSummaries.map((entry) => {
+    if (entry.latest === null || entry.opening === null || entry.delta === null) {
+      return `${entry.label}: no plotted snapshots are available yet.`;
+    }
+    const direction = Math.abs(entry.delta) < 0.05 ? 'was unchanged' : entry.delta > 0 ? 'rose' : 'fell';
+    return `${entry.label}: opened at ${entry.opening.toFixed(1)}%, latest ${entry.latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(entry.delta).toFixed(1)} percentage points`}.`;
+  }), [seriesSummaries]);
+
+  useEffect(() => {
+    const container = chartHostRef.current;
+    if (!container) return;
+    if (preparedSeries.every((entry) => entry.data.length === 0)) {
+      setEndpointLabels([]);
+      setHoverState(null);
+      return;
+    }
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: '#050b13' },
+        attributionLogo: false,
+      },
+      leftPriceScale: {
+        visible: true,
+        borderVisible: false,
+        ticksVisible: false,
+        scaleMargins: { top: 0.16, bottom: 0.18 },
+      },
+      rightPriceScale: {
+        visible: false,
+        borderVisible: false,
+      },
+      timeScale: {
+        borderVisible: false,
+        ticksVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 7,
+        barSpacing: preparedSeries.some((entry) => entry.data.length >= 5) ? 26 : 42,
+        minBarSpacing: 20,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
+      grid: {
+        vertLines: { visible: false },
+        horzLines: {
+          color: 'rgba(36, 48, 65, 0.55)',
+          style: LineStyle.SparseDotted,
+        },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(71, 85, 105, 0.48)',
+          style: LineStyle.SparseDotted,
+          width: 1,
+          labelVisible: false,
+        },
+        horzLine: {
+          color: 'rgba(71, 85, 105, 0.48)',
+          style: LineStyle.SparseDotted,
+          width: 1,
+          labelBackgroundColor: '#0f172a',
+        },
+      },
+      handleScroll: {
+        mouseWheel: false,
+        pressedMouseMove: false,
+        horzTouchDrag: false,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        mouseWheel: false,
+        pinch: false,
+        axisPressedMouseMove: false,
+        axisDoubleClickReset: false,
+      },
+      localization: {
+        priceFormatter: (value: number) => `${value.toFixed(0)}%`,
+      },
     });
 
-    groups.forEach((bookIds, bucketKey) => {
-      const offsets = bookIds.length === 1
-        ? [0]
-        : bookIds.length === 2
-          ? [-5, 5]
-          : [-8, 0, 8];
+    const seriesApiById = new Map<string, ISeriesApi<'Line', Time>>();
 
-      bookIds.forEach((bookId, index) => {
-        overlappingDotOffsets.set(`${bucketKey}:${bookId}`, offsets[index] ?? 0);
+    preparedSeries.forEach((entry) => {
+      const line = chart.addSeries(LineSeries, {
+        color: entry.color,
+        lineWidth: entry.kind === 'model' ? 3 : 2,
+        lineType: LineType.Simple,
+        lineStyle: entry.kind === 'model' ? LineStyle.Solid : LineStyle.LargeDashed,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: entry.kind === 'model' ? 5 : 4,
+        crosshairMarkerBorderColor: entry.color,
+        crosshairMarkerBackgroundColor: '#050b13',
+        lastValueVisible: false,
+        priceLineVisible: false,
+        pointMarkersVisible: entry.data.length <= 2,
+        pointMarkersRadius: entry.kind === 'model' ? 3 : 2,
+        priceScaleId: 'left',
       });
+      line.setData(entry.data);
+      seriesApiById.set(entry.id, line);
+
+      if (entry.kind === 'model') {
+        createSeriesMarkers(line, annotationMarkers);
+        line.createPriceLine({
+          price: 50,
+          color: 'rgba(100, 116, 139, 0.32)',
+          lineWidth: 1,
+          lineStyle: LineStyle.LargeDashed,
+          axisLabelVisible: false,
+          title: '',
+        });
+      }
     });
-  });
 
-  const renderEndLabel = (
-    dotProps: {
-      x?: number;
-      y?: number;
-      value?: number | string;
-      index?: number;
-    },
-    entry: MovementSeries,
-  ) => {
-    const latestIndex = latestIndexBySeries.get(entry.id) ?? -1;
-    const numericValue = typeof dotProps.value === 'number' ? dotProps.value : null;
-    if (
-      latestIndex < 0
-      || dotProps.index !== latestIndex
-      || typeof dotProps.x !== 'number'
-      || typeof dotProps.y !== 'number'
-      || numericValue === null
-    ) {
-      return <g />;
-    }
+    chart.priceScale('left').applyOptions({
+      autoScale: false,
+      mode: 0,
+    });
+    chart.timeScale().fitContent();
+    chart.priceScale('left').setVisibleRange({ from: minDomain, to: maxDomain });
 
-    const label = `${entry.kind === 'model' ? 'SixSense' : 'Market'} ${numericValue.toFixed(1)}%`;
-    const labelWidth = Math.max(88, label.length * 6.35 + 16);
+    const updateEndpointPositions = () => {
+      const labels = preparedSeries
+        .map((entry) => {
+          const api = seriesApiById.get(entry.id);
+          const latestPoint = entry.data[entry.data.length - 1];
+          if (!api || !latestPoint) return null;
+          const x = chart.timeScale().timeToCoordinate(latestPoint.time);
+          const y = api.priceToCoordinate(latestPoint.value);
+          if (x === null || y === null) return null;
+          return {
+            id: entry.id,
+            x: Number(x),
+            y: Number(y),
+            color: entry.color,
+            label: `${entry.kind === 'model' ? 'SixSense' : 'Market'} ${latestPoint.value.toFixed(1)}%`,
+          };
+        })
+        .filter((entry): entry is EndpointLabel => entry !== null);
+      setEndpointLabels(labels);
+    };
 
-    return (
-      <g transform={`translate(${dotProps.x + 10}, ${dotProps.y - 13})`}>
-        <rect
-          width={labelWidth}
-          height={26}
-          rx={13}
-          fill="rgba(11,16,22,0.94)"
-          stroke={entry.color}
-          strokeOpacity={0.85}
-        />
-        <text
-          x={10}
-          y={16.5}
-          fill="#f8fafc"
-          fontSize={10}
-          fontWeight={800}
-          letterSpacing="0.04em"
-        >
-          {label}
-        </text>
-      </g>
-    );
-  };
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+      if (!param.point || param.point.x < 0 || param.point.y < 0 || !container) {
+        setHoverState(null);
+        return;
+      }
 
-  const renderMarketDot = (dotProps: {
-    cx?: number;
-    cy?: number;
-    payload?: Record<string, number | string | null>;
-    value?: number | string | Array<number | string>;
-    dataKey?: string | number;
-    stroke?: string;
-  }) => {
-    const emptyDot = (
-      <circle
-        key={`empty-${String(dotProps.dataKey)}-${String(dotProps.cx)}-${String(dotProps.cy)}`}
-        cx={0}
-        cy={0}
-        r={0}
-        fill="transparent"
-        stroke="none"
-      />
-    );
-    if (typeof dotProps.cx !== 'number' || typeof dotProps.cy !== 'number' || typeof dotProps.dataKey !== 'string') {
-      return emptyDot;
-    }
+      const rows = preparedSeries
+        .map((entry) => {
+          const api = seriesApiById.get(entry.id);
+          if (!api) return null;
+          const dataPoint = param.seriesData.get(api);
+          if (!dataPoint || !('value' in dataPoint) || typeof dataPoint.value !== 'number') return null;
+          return {
+            id: entry.id,
+            label: entry.kind === 'model' ? 'SixSense' : 'Market',
+            color: entry.color,
+            value: dataPoint.value,
+          } satisfies HoverRow;
+        })
+        .filter((entry): entry is HoverRow => entry !== null);
 
-    const timestamp = Number(dotProps.payload?.timestamp);
-    const numericValue = typeof dotProps.value === 'number'
-      ? dotProps.value
-      : Array.isArray(dotProps.value) && typeof dotProps.value[0] === 'number'
-        ? dotProps.value[0]
-        : null;
+      if (rows.length === 0) {
+        setHoverState(null);
+        return;
+      }
 
-    if (!Number.isFinite(timestamp) || numericValue === null) return emptyDot;
+      setHoverState({
+        x: param.point.x,
+        y: param.point.y,
+        timestamp: fromChartTime(param.time),
+        rows,
+      });
+    };
 
-    const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
-    const annotation = dotProps.dataKey === 'sixsense-model'
-      ? annotationsByTimestamp.get(timestamp)
-      : undefined;
-    const isSelected = annotation?.timestamp === selectedMarker?.annotation.timestamp;
-    const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
-    const cy = dotProps.cy;
-    const showSinglePointStub = (pointCountsBySeries.get(dotProps.dataKey) ?? 0) === 1;
+    const handleChartClick = (param: MouseEventParams<Time>) => {
+      const markerId = typeof param.hoveredObjectId === 'string' ? param.hoveredObjectId : null;
+      if (!markerId || !param.point) {
+        setSelectedMarker(null);
+        return;
+      }
 
-    if (annotation) {
-      return (
-        <g
-          key={offsetKey}
-          data-annotation-trigger="true"
-          role="button"
-          tabIndex={0}
-          onClick={() => setSelectedMarker((current) => (
-            current?.annotation.timestamp === annotation.timestamp
-              ? null
-              : { annotation, x: cx, y: cy }
-          ))}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              setSelectedMarker({ annotation, x: cx, y: cy });
-            } else if (event.key === 'Escape') {
-              setSelectedMarker(null);
-            }
-          }}
-          aria-expanded={isSelected}
-          aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
-          className="cursor-pointer"
-        >
-          {showSinglePointStub && (
-            <line
-              x1={cx - 10}
-              x2={cx + 10}
-              y1={cy}
-              y2={cy}
-              stroke={dotProps.stroke}
-              strokeWidth={3}
-              strokeLinecap="round"
-              opacity={0.92}
-            />
-          )}
-          <circle
-            cx={cx}
-            cy={cy}
-            r={isSelected ? 8.5 : 7}
-            fill="rgba(245, 158, 11, 0.14)"
-            stroke="none"
-          />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={isSelected ? 5.75 : 5}
-            fill="#0b1016"
-            stroke="#fbbf24"
-            strokeWidth={2.5}
-          />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={2.2}
-            fill="#fbbf24"
-            stroke="none"
-          />
-        </g>
-      );
-    }
+      const annotation = annotationsById.get(markerId);
+      if (!annotation) {
+        setSelectedMarker(null);
+        return;
+      }
 
-    return (
-      <g key={offsetKey}>
-        {showSinglePointStub && (
-          <line
-            x1={cx - 10}
-            x2={cx + 10}
-            y1={cy}
-            y2={cy}
-            stroke={dotProps.stroke}
-            strokeWidth={3}
-            strokeLinecap="round"
-            opacity={0.9}
-          />
-        )}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={3.25}
-          fill={dotProps.stroke}
-          stroke="#0b1016"
-          strokeWidth={1.5}
-        />
-      </g>
-    );
-  };
+      setSelectedMarker({
+        annotation,
+        x: param.point.x,
+        y: param.point.y,
+      });
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    chart.subscribeClick(handleChartClick);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      chart.resize(width, height);
+      requestAnimationFrame(updateEndpointPositions);
+    });
+    resizeObserver.observe(container);
+
+    requestAnimationFrame(updateEndpointPositions);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.unsubscribeClick(handleChartClick);
+      chart.remove();
+    };
+  }, [annotationMarkers, annotationsById, maxDomain, minDomain, preparedSeries]);
 
   return (
     <>
-      <div
-        className={`relative ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
-        role="img"
-        aria-label={ariaLabel}
-      >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
-              Higher line = stronger win chance
-            </span>
-            {annotations.length > 0 && (
-              <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100">
-                Gold points = explained SixSense moves
-              </span>
-            )}
-          </div>
-          {Number.isFinite(firstTimestamp) && Number.isFinite(lastTimestamp) && (
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-              {formatMarketTimestamp(firstTimestamp, true)} to {formatMarketTimestamp(lastTimestamp, true)}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
+            Cleaner finance-style view
+          </span>
+          {annotations.length > 0 && (
+            <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-100">
+              Gold markers = explained SixSense moves
             </span>
           )}
         </div>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 18, right: 104, bottom: 10, left: 2 }}>
-            <defs>
-              <filter id="movement-line-glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="2.6" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-            <CartesianGrid vertical={false} stroke="#243041" strokeDasharray="3 6" strokeOpacity={0.55} />
-            <XAxis
-              dataKey="timestamp"
-              type="number"
-              domain={['dataMin', 'dataMax']}
-              tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
-              tickLine={false}
-              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
-              minTickGap={28}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              domain={[minDomain, maxDomain]}
-              tickFormatter={(value) => `${Math.round(Number(value))}%`}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
-              tickLine={false}
-              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
-              width={46}
-              tickCount={5}
-            />
-            <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
-            <Tooltip
-              cursor={{ stroke: '#475569', strokeDasharray: '4 4', strokeOpacity: 0.45 }}
-              content={({ active, label, payload }) => (
-                <MarketMovementTooltip
-                  active={active}
-                  label={label}
-                  payload={payload?.map((entry) => ({
-                    color: entry.color,
-                    dataKey: entry.dataKey,
-                    name: entry.name,
-                    value: entry.value,
-                  }))}
-                />
-              )}
-            />
-            {series.map((entry) => (
-              <Line
-                key={entry.id}
-                type="linear"
-                dataKey={entry.id}
-                stroke={entry.color}
-                strokeWidth={entry.kind === 'model' ? 3.5 : 2.75}
-                strokeOpacity={entry.kind === 'model' ? 1 : 0.88}
-                dot={chartRows.length <= 8 ? renderMarketDot : false}
-                activeDot={{ fill: '#0b1016', r: entry.kind === 'model' ? 5 : 4, stroke: entry.color, strokeWidth: 2 }}
-                connectNulls
-                isAnimationActive={false}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#movement-line-glow)"
-                label={(dotProps) => renderEndLabel(dotProps, entry)}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        {timestampLabel && (
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+            {timestampLabel}
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`relative mt-3 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(7,12,20,0.96),rgba(5,9,16,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <div ref={chartHostRef} className="h-full w-full" />
+
+        {endpointLabels.map((entry) => (
+          <div
+            key={entry.id}
+            className="pointer-events-none absolute z-[2]"
+            style={{
+              left: `clamp(0.75rem, ${entry.x + 12}px, calc(100% - 8.75rem))`,
+              top: `clamp(0.5rem, ${entry.y - 14}px, calc(100% - 2.5rem))`,
+            }}
+          >
+            <div
+              className="rounded-full border bg-[#0b1016]/95 px-3 py-1.5 text-[11px] font-black tracking-[0.02em] text-white shadow-[0_10px_24px_rgba(0,0,0,0.32)]"
+              style={{ borderColor: entry.color }}
+            >
+              {entry.label}
+            </div>
+          </div>
+        ))}
+
+        {hoverState && (
+          <div
+            className={`pointer-events-none absolute z-[3] min-w-[10rem] rounded-2xl border border-white/10 bg-[#0d141d]/96 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur ${
+              hoverState.y < 92 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
+            }`}
+            style={{
+              left: `clamp(0.75rem, calc(${hoverState.x}px - 5rem), calc(100% - 11rem))`,
+              top: `${hoverState.y}px`,
+            }}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+              {hoverState.timestamp !== null ? formatMarketTimestamp(hoverState.timestamp) : 'Snapshot'}
+            </p>
+            <div className="mt-2 space-y-2">
+              {hoverState.rows.map((row) => (
+                <div key={row.id} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="inline-flex items-center gap-2 text-slate-300">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                    {row.label}
+                  </span>
+                  <span className="font-mono font-black text-white">{row.value.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {selectedMarker && (
           <div
             ref={popupRef}
-            className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
+            className={`pointer-events-auto absolute z-[4] w-[min(18rem,calc(100%-1rem))] rounded-2xl border border-white/10 bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
               selectedMarker.y < 88 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
             }`}
             style={{
@@ -533,11 +523,13 @@ export function MarketMovementChart({
           </div>
         )}
       </div>
+
       <ul className="sr-only">
         {accessibleSummaries.map((summary, index) => (
           <li key={series[index].id}>{summary}</li>
         ))}
       </ul>
+
       <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Chart legend">
         {seriesSummaries.map((entry) => (
           <div
@@ -575,8 +567,12 @@ export function MarketMovementChart({
           </div>
         ))}
       </div>
+
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-        {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
+        {insightCaption ?? 'Hover for exact values. Tap a gold marker to inspect the input changes tied to that SixSense move.'}
+      </p>
+      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+        Chart rendering by TradingView Lightweight Charts
       </p>
     </>
   );
