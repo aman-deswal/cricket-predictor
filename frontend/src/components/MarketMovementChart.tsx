@@ -41,14 +41,6 @@ interface HoverState {
   rows: HoverRow[];
 }
 
-interface EndpointLabel {
-  id: string;
-  x: number;
-  y: number;
-  color: string;
-  label: string;
-}
-
 function toChartTime(timestamp: number): Time {
   return Math.floor(timestamp / 1000) as Time;
 }
@@ -84,6 +76,19 @@ function buildTimestampLabel(firstTimestamp: number | null, lastTimestamp: numbe
   return `${formatMarketTimestamp(firstTimestamp, true)} to ${formatMarketTimestamp(lastTimestamp, true)}`;
 }
 
+function formatAxisTimeLabel(timestamp: number): string {
+  const date = new Date(timestamp);
+  if (date.getMinutes() === 0) {
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+    });
+  }
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function MarketMovementChart({
   chartRows,
   series,
@@ -103,7 +108,6 @@ export function MarketMovementChart({
     x: number;
     y: number;
   } | null>(null);
-  const [endpointLabels, setEndpointLabels] = useState<EndpointLabel[]>([]);
 
   const annotationsByTimestamp = useMemo(() => new Map(
     annotations.map((annotation) => [annotation.timestamp, annotation]),
@@ -171,7 +175,7 @@ export function MarketMovementChart({
     position: 'atPriceMiddle' as const,
     shape: 'circle' as const,
     color: '#fbbf24',
-    size: 1.35,
+    size: 0.6,
     price: annotation.probability,
   })), [annotations]);
 
@@ -187,7 +191,6 @@ export function MarketMovementChart({
     const container = chartHostRef.current;
     if (!container) return;
     if (preparedSeries.every((entry) => entry.data.length === 0)) {
-      setEndpointLabels([]);
       setHoverState(null);
       return;
     }
@@ -215,9 +218,16 @@ export function MarketMovementChart({
         ticksVisible: false,
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 7,
-        barSpacing: preparedSeries.some((entry) => entry.data.length >= 5) ? 26 : 42,
-        minBarSpacing: 20,
+        rightOffsetPixels: 20,
+        barSpacing: preparedSeries.some((entry) => entry.data.length >= 5) ? 28 : 52,
+        minBarSpacing: 24,
+        tickMarkFormatter: (time: Time) => {
+          const timestamp = fromChartTime(time);
+          return timestamp === null ? '' : formatAxisTimeLabel(timestamp);
+        },
+        tickMarkMaxCharacterLength: 6,
+        uniformDistribution: true,
+        allowBoldLabels: false,
         fixLeftEdge: true,
         fixRightEdge: true,
       },
@@ -257,6 +267,10 @@ export function MarketMovementChart({
       },
       localization: {
         priceFormatter: (value: number) => `${value.toFixed(0)}%`,
+        timeFormatter: (time: Time) => {
+          const timestamp = fromChartTime(time);
+          return timestamp === null ? '' : formatMarketTimestamp(timestamp);
+        },
       },
     });
 
@@ -269,13 +283,13 @@ export function MarketMovementChart({
         lineType: LineType.Simple,
         lineStyle: entry.kind === 'model' ? LineStyle.Solid : LineStyle.LargeDashed,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: entry.kind === 'model' ? 5 : 4,
+        crosshairMarkerRadius: entry.kind === 'model' ? 4 : 3,
         crosshairMarkerBorderColor: entry.color,
         crosshairMarkerBackgroundColor: '#050b13',
         lastValueVisible: false,
         priceLineVisible: false,
-        pointMarkersVisible: entry.data.length <= 2,
-        pointMarkersRadius: entry.kind === 'model' ? 3 : 2,
+        pointMarkersVisible: false,
+        pointMarkersRadius: entry.kind === 'model' ? 2 : 1.5,
         priceScaleId: 'left',
       });
       line.setData(entry.data);
@@ -300,27 +314,6 @@ export function MarketMovementChart({
     });
     chart.timeScale().fitContent();
     chart.priceScale('left').setVisibleRange({ from: minDomain, to: maxDomain });
-
-    const updateEndpointPositions = () => {
-      const labels = preparedSeries
-        .map((entry) => {
-          const api = seriesApiById.get(entry.id);
-          const latestPoint = entry.data[entry.data.length - 1];
-          if (!api || !latestPoint) return null;
-          const x = chart.timeScale().timeToCoordinate(latestPoint.time);
-          const y = api.priceToCoordinate(latestPoint.value);
-          if (x === null || y === null) return null;
-          return {
-            id: entry.id,
-            x: Number(x),
-            y: Number(y),
-            color: entry.color,
-            label: `${entry.kind === 'model' ? 'SixSense' : 'Market'} ${latestPoint.value.toFixed(1)}%`,
-          };
-        })
-        .filter((entry): entry is EndpointLabel => entry !== null);
-      setEndpointLabels(labels);
-    };
 
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.point || param.point.x < 0 || param.point.y < 0 || !container) {
@@ -384,11 +377,8 @@ export function MarketMovementChart({
       if (!entry) return;
       const { width, height } = entry.contentRect;
       chart.resize(width, height);
-      requestAnimationFrame(updateEndpointPositions);
     });
     resizeObserver.observe(container);
-
-    requestAnimationFrame(updateEndpointPositions);
 
     return () => {
       resizeObserver.disconnect();
@@ -400,23 +390,18 @@ export function MarketMovementChart({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
-            Cleaner finance-style view
-          </span>
-          {annotations.length > 0 && (
-            <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-100">
-              Gold markers = explained SixSense moves
-            </span>
-          )}
-        </div>
-        {timestampLabel && (
+      {timestampLabel && (
+        <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
             {timestampLabel}
           </span>
-        )}
-      </div>
+          {annotations.length > 0 && (
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-200/80">
+              Gold = explained move
+            </span>
+          )}
+        </div>
+      )}
 
       <div
         className={`relative mt-3 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(7,12,20,0.96),rgba(5,9,16,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
@@ -424,24 +409,6 @@ export function MarketMovementChart({
         aria-label={ariaLabel}
       >
         <div ref={chartHostRef} className="h-full w-full" />
-
-        {endpointLabels.map((entry) => (
-          <div
-            key={entry.id}
-            className="pointer-events-none absolute z-[2]"
-            style={{
-              left: `clamp(0.75rem, ${entry.x + 12}px, calc(100% - 8.75rem))`,
-              top: `clamp(0.5rem, ${entry.y - 14}px, calc(100% - 2.5rem))`,
-            }}
-          >
-            <div
-              className="rounded-full border bg-[#0b1016]/95 px-3 py-1.5 text-[11px] font-black tracking-[0.02em] text-white shadow-[0_10px_24px_rgba(0,0,0,0.32)]"
-              style={{ borderColor: entry.color }}
-            >
-              {entry.label}
-            </div>
-          </div>
-        ))}
 
         {hoverState && (
           <div
@@ -522,6 +489,10 @@ export function MarketMovementChart({
             </ol>
           </div>
         )}
+
+        <div className="pointer-events-none absolute bottom-2 right-3 text-[8px] uppercase tracking-[0.14em] text-slate-600">
+          TradingView
+        </div>
       </div>
 
       <ul className="sr-only">
@@ -570,9 +541,6 @@ export function MarketMovementChart({
 
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
         {insightCaption ?? 'Hover for exact values. Tap a gold marker to inspect the input changes tied to that SixSense move.'}
-      </p>
-      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-slate-500">
-        Chart rendering by TradingView Lightweight Charts
       </p>
     </>
   );
