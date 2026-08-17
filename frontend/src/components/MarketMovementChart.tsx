@@ -41,6 +41,62 @@ function formatPopupEventTime(value: string): string {
   });
 }
 
+interface TooltipEntry {
+  color?: string;
+  dataKey?: string | number;
+  name?: string | number;
+  value?: number | string | Array<number | string>;
+}
+
+function MarketMovementTooltip({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string | number;
+  payload?: TooltipEntry[];
+}) {
+  if (!active || payload === undefined || payload.length === 0) return null;
+
+  const rows = payload
+    .map((entry) => {
+      const numericValue = typeof entry.value === 'number'
+        ? entry.value
+        : Array.isArray(entry.value) && typeof entry.value[0] === 'number'
+          ? entry.value[0]
+          : null;
+      if (numericValue === null) return null;
+      return {
+        label: entry.name ?? String(entry.dataKey ?? 'Series'),
+        color: entry.color ?? '#94a3b8',
+        value: `${numericValue.toFixed(1)}%`,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="min-w-[12rem] rounded-2xl border border-white/10 bg-[#0d141d]/96 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+        {typeof label === 'number' ? formatMarketTimestamp(label) : 'Snapshot'}
+      </p>
+      <div className="mt-2 space-y-2">
+        {rows.map((entry) => (
+          <div key={entry.label} className="flex items-center justify-between gap-3 text-xs">
+            <span className="inline-flex items-center gap-2 text-slate-300">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+              {entry.label}
+            </span>
+            <span className="font-mono font-black text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MarketMovementChart({
   chartRows,
   series,
@@ -264,7 +320,16 @@ export function MarketMovementChart({
       >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 2 }}>
-            <CartesianGrid vertical={false} stroke="#243041" strokeOpacity={0.55} />
+            <defs>
+              <filter id="movement-line-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <CartesianGrid vertical={false} stroke="#243041" strokeDasharray="3 6" strokeOpacity={0.55} />
             <XAxis
               dataKey="timestamp"
               type="number"
@@ -285,37 +350,35 @@ export function MarketMovementChart({
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#111820',
-                border: '1px solid rgba(245,158,11,0.16)',
-                borderRadius: '12px',
-                fontSize: '11px',
-                fontFamily: 'var(--font-jetbrains-mono, monospace)',
-              }}
-              labelFormatter={(value) => formatMarketTimestamp(Number(value))}
-              formatter={(value, name) => {
-                const entry = series.find((candidate) => candidate.id === name);
-                const numericValue = typeof value === 'number'
-                  ? value
-                  : Array.isArray(value) && typeof value[0] === 'number'
-                    ? value[0]
-                    : null;
-                if (numericValue === null) return ['—', entry?.label ?? String(name)];
-                return [`${numericValue.toFixed(1)}%`, entry?.label ?? String(name)];
-              }}
+              cursor={{ stroke: '#475569', strokeDasharray: '4 4', strokeOpacity: 0.45 }}
+              content={({ active, label, payload }) => (
+                <MarketMovementTooltip
+                  active={active}
+                  label={label}
+                  payload={payload?.map((entry) => ({
+                    color: entry.color,
+                    dataKey: entry.dataKey,
+                    name: entry.name,
+                    value: entry.value,
+                  }))}
+                />
+              )}
             />
             {series.map((entry) => (
               <Line
                 key={entry.id}
-                type="monotone"
+                type="linear"
                 dataKey={entry.id}
                 stroke={entry.color}
                 strokeWidth={entry.kind === 'model' ? 3.5 : 2.75}
                 strokeOpacity={entry.kind === 'model' ? 1 : 0.88}
                 dot={chartRows.length <= 8 ? renderMarketDot : false}
-                activeDot={{ fill: entry.color, r: 4, strokeWidth: 0 }}
+                activeDot={{ fill: '#0b1016', r: entry.kind === 'model' ? 5 : 4, stroke: entry.color, strokeWidth: 2 }}
                 connectNulls
                 isAnimationActive={false}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#movement-line-glow)"
               />
             ))}
           </LineChart>
@@ -382,7 +445,7 @@ export function MarketMovementChart({
         {series.map((entry) => (
           <span
             key={`${entry.id}-legend`}
-            className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
+            className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
           >
             <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
               <span

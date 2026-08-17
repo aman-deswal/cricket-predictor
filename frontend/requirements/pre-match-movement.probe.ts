@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert';
 import {
+  buildConsensusMarketBook,
   buildPreMatchMovement,
+  MARKET_CONSENSUS_SERIES_ID,
   SIXSENSE_SERIES_ID,
   toNormalizedImpliedProbability,
 } from '../src/lib/pre-match-movement';
@@ -70,6 +72,36 @@ assert.equal(movement.events[0].display_probability_delta, 0.07);
 
 const noVig = toNormalizedImpliedProbability(marketHistory[1], 'team1');
 assert.ok(noVig !== null && noVig > 54 && noVig < 56, 'market probability removes the two-sided overround');
+
+const consensusBook = buildConsensusMarketBook([
+  {
+    id: 'bet365',
+    bookmaker: 'Bet365',
+    color: '#22d3ee',
+    history: marketHistory,
+  },
+  {
+    id: 'draftkings',
+    bookmaker: 'DraftKings',
+    color: '#34d399',
+    history: [
+      {
+        team1_odds: 1.95,
+        team2_odds: 2.05,
+        draw_odds: null,
+        fetched_at: '2026-08-10T02:00:00Z',
+      },
+    ],
+  },
+]);
+assert.ok(consensusBook, 'a consensus market book is built when trusted histories exist');
+assert.equal(consensusBook?.id, MARKET_CONSENSUS_SERIES_ID);
+assert.equal(consensusBook?.history.length, 3, 'consensus history forward-fills across market timestamps');
+assert.ok(
+  consensusBook?.history[1] !== undefined
+  && toNormalizedImpliedProbability(consensusBook.history[1], 'team1') !== null,
+  'consensus snapshots can be consumed by the movement chart builder',
+);
 
 const marketOnly = buildPreMatchMovement(
   [],
