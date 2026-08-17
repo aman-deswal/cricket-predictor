@@ -47,6 +47,7 @@ TEAM_ALIASES = {
     "afghanistan": ["afghanistan", "afg"],
     "zimbabwe": ["zimbabwe", "zim"],
     "ireland": ["ireland", "ire"],
+    "hong kong": ["hong kong", "hong kong, china", "hong kong china", "hk"],
 }
 
 

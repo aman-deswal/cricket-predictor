@@ -269,6 +269,20 @@ class TestEspnFixturesToMatches(unittest.TestCase):
 
         self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
 
+    def test_same_fixture_window_matches_hong_kong_alias(self):
+        espn_fixture = self._make_fixture(
+            team1="Hong Kong",
+            team2="Italy",
+            date="2026-08-17T06:00:00Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Hong Kong, China",
+            team2="Italy",
+            date="2026-08-17T06:00:00.000Z",
+        )
+
+        self.assertTrue(_same_fixture_window(espn_fixture, cricbuzz_fixture))
+
     def test_merge_identity_deduplicates_parenthetical_source_names(self):
         espn_fixture = self._make_fixture(
             espn_id="1521249",
@@ -290,10 +304,32 @@ class TestEspnFixturesToMatches(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["espn_event_id"], "1521249")
 
+    def test_merge_identity_deduplicates_hong_kong_aliases(self):
+        espn_fixture = self._make_fixture(
+            espn_id="1546351",
+            team1="Hong Kong",
+            team2="Italy",
+            date="2026-08-17T06:00:00Z",
+        )
+        cricbuzz_fixture = self._make_fixture(
+            team1="Hong Kong, China",
+            team2="Italy",
+            date="2026-08-17T06:00:00.000Z",
+        )
+        cricbuzz_fixture.pop("espn_event_id")
+        cricbuzz_fixture["source"] = "cricbuzz"
+        cricbuzz_fixture["source_id"] = "be7445532a7ca58e"
+
+        merged = _merge_fixtures_by_identity([cricbuzz_fixture, espn_fixture])
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["espn_event_id"], "1546351")
+
     def test_fixture_team_normalizer_preserves_women(self):
         self.assertEqual(_normalize_fixture_team("Welsh Fire (Women)"), "welsh fire women")
         self.assertEqual(_normalize_fixture_team("Welsh Fire Women"), "welsh fire women")
         self.assertEqual(_normalize_fixture_team("Welsh Fire (Men)"), "welsh fire")
+        self.assertEqual(_normalize_fixture_team("Hong Kong, China"), "hong kong")
 
     def test_same_fixture_window_rejects_different_dates(self):
         espn_fixture = self._make_fixture(date="2026-08-03T17:30:00Z")
