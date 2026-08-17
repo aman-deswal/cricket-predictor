@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
-import { buildScorecardSummaries, type LedgerEntry } from '@/lib/ledger';
+import {
+  buildScorecardSummaries,
+  getLedgerAvailabilityNotes,
+  getLedgerRecapLevel,
+  type LedgerEntry,
+} from '@/lib/ledger';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { getFlagUrl, getTeamMeta, isInternationalTeam } from '@/lib/teams';
 
@@ -65,9 +70,11 @@ function getMarketGap(entry: LedgerEntry): { team: string; gap: number } | null 
   const gap1 = Math.round((entry.team1_win_probability - normalized1) * 100);
   const gap2 = Math.round((entry.team2_win_probability - normalized2) * 100);
 
-  return Math.abs(gap1) >= Math.abs(gap2)
+  const strongestGap = Math.abs(gap1) >= Math.abs(gap2)
     ? { team: entry.team1, gap: gap1 }
     : { team: entry.team2, gap: gap2 };
+
+  return Math.abs(strongestGap.gap) >= 4 ? strongestGap : null;
 }
 
 export function LedgerCard({
@@ -83,6 +90,18 @@ export function LedgerCard({
   const marketGap = getMarketGap(entry);
   const winner = entry.actual_winner;
   const pickedTeam = entry.predicted_winner;
+  const recapLevel = getLedgerRecapLevel(entry);
+  const availabilityNotes = getLedgerAvailabilityNotes(entry);
+  const recapTitle = entry.result_text?.trim() || (winner ? `${winner} won` : 'Final result confirmed');
+  const recapSupport = entry.result_text?.trim()
+    ? null
+    : recapLevel === 'result-only'
+      ? 'Fuller recap details are still building from structured match data.'
+      : 'Structured result is locked in; richer recap evidence is still filling in.';
+  const footerMeta = entry.venue
+    || entry.series_scoreline
+    || scorecards[0]?.total
+    || 'Settled recap';
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(entry.match_id)}`} className="group block">
@@ -109,6 +128,9 @@ export function LedgerCard({
               <MatchFormatBadge match={{ name: entry.name, match_type: entry.match_type, competition_name: entry.competition_name ?? null }} />
               <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
                 {entry.competition_name || 'Settled match'}
+              </span>
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                {recapLevel === 'full' ? 'Full recap' : recapLevel === 'balanced' ? 'Balanced recap' : 'Result-only recap'}
               </span>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] ${
@@ -151,8 +173,13 @@ export function LedgerCard({
 
           <div className="rounded-2xl border border-white/[0.06] bg-black/15 px-3 py-3">
             <p className="text-sm font-bold leading-snug text-white">
-              {entry.result_text || `${winner} won`}
+              {recapTitle}
             </p>
+            {recapSupport && (
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                {recapSupport}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-slate-300">
                 SixSense picked <span className="font-black text-white">{pickedTeam}</span>
@@ -168,7 +195,7 @@ export function LedgerCard({
             </div>
           </div>
 
-          {(marketGap || scorecards[0]?.topBatter) && (
+          {(marketGap || scorecards[0]?.topBatter || availabilityNotes.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold">
               {marketGap && (
                 <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-sky-100">
@@ -180,11 +207,19 @@ export function LedgerCard({
                   {scorecards[0].topBatter}
                 </span>
               )}
+              {!marketGap && availabilityNotes.map((note) => (
+                <span
+                  key={note}
+                  className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-slate-400"
+                >
+                  {note}
+                </span>
+              ))}
             </div>
           )}
 
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.05] pt-2.5 text-[10px]">
-            <p className="min-w-0 truncate text-slate-500">{entry.venue || entry.series_scoreline || 'Settled recap'}</p>
+            <p className="min-w-0 truncate text-slate-500">{footerMeta}</p>
             <span className="shrink-0 font-black uppercase tracking-[0.16em] text-amber-100 transition-colors group-hover:text-white">
               Match recap →
             </span>

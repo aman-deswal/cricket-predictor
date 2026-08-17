@@ -1,5 +1,11 @@
 import { strict as assert } from 'node:assert';
-import { selectLedgerEntries, type LedgerEntry } from '../src/lib/ledger';
+import {
+  getLedgerAvailabilityNotes,
+  getLedgerRecapLevel,
+  isQualifiedLedgerEntry,
+  selectLedgerEntries,
+  type LedgerEntry,
+} from '../src/lib/ledger';
 
 const NOW = new Date('2026-08-16T12:00:00Z');
 
@@ -72,5 +78,25 @@ assert.ok(
 
 const sparseSelection = selectLedgerEntries([entry('only-one', 'league', 1)], 'league', NOW);
 assert.equal(sparseSelection.length, 1, 'returns sparse sets without inventing filler');
+
+const resultOnlyEntry = entry('result-only', 'international', 5, {
+  result_text: '',
+  scorecards: [],
+  bookmaker_odds: null,
+  edge_score: null,
+  reasoning: null,
+});
+assert.equal(getLedgerRecapLevel(resultOnlyEntry), 'result-only', 'flags thin-data recaps conservatively');
+assert.deepEqual(
+  getLedgerAvailabilityNotes(resultOnlyEntry),
+  ['Trusted market comparison unavailable', 'Scorecard details still building'],
+  'surfaces honest fallback notes for thin-data recaps',
+);
+
+assert.equal(
+  isQualifiedLedgerEntry(entry('missing-teams', 'league', 6, { team1: '', team2: '' })),
+  false,
+  'rejects malformed entries from the eligible pool',
+);
 
 console.log('Ledger selection requirements passed');

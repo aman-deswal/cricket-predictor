@@ -26,7 +26,7 @@ import {
   type HomepageTrustMetrics,
   type HomepageTrustSignal,
 } from '@/lib/prediction-history';
-import type { LedgerEntry } from '@/lib/ledger';
+import { getLedgerRecapLevel, type LedgerEntry } from '@/lib/ledger';
 import Link from 'next/link';
 import { LedgerCard } from '@/components/LedgerCard';
 
@@ -273,13 +273,25 @@ function LedgerSection({
       <div className="space-y-5 p-3">
         {sections.map((section) => (
           <div key={section.key} className="space-y-3">
-            <div className="flex items-center gap-3 px-1">
+            <div className="flex items-start gap-3 px-1">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-500/25 bg-white/[0.04] text-amber-600">
                 {section.icon}
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">{section.eyebrow}</p>
                 <h3 className="text-sm font-black uppercase tracking-[0.14em] text-white">{section.title}</h3>
+                {section.entries.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {section.entries.length < 3
+                      ? `Showing ${section.entries.length} settled recap${section.entries.length === 1 ? '' : 's'} while this track builds toward a full three-card rotation.`
+                      : (() => {
+                        const resultOnlyCount = section.entries.filter((entry) => getLedgerRecapLevel(entry) === 'result-only').length;
+                        return resultOnlyCount > 0
+                          ? `${resultOnlyCount} recap${resultOnlyCount === 1 ? '' : 's'} lean on result-only evidence so losses and thin-data finishes still stay visible.`
+                          : 'Three settled recaps rotate from the recent qualified match pool.';
+                      })()}
+                  </p>
+                )}
               </div>
             </div>
             {section.entries.length > 0 ? (
@@ -290,7 +302,9 @@ function LedgerSection({
               </div>
             ) : (
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
-                No settled {section.key} recaps are ready yet.
+                {section.key === 'international'
+                  ? 'No settled international recaps are ready yet. This lane fills automatically once qualified matches are scored.'
+                  : 'League recaps are still building. They appear automatically once qualified league results are scored.'}
               </div>
             )}
           </div>

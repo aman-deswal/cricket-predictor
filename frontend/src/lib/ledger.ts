@@ -35,7 +35,7 @@ export interface LedgerEntry {
   competition_name?: string | null;
   series_scoreline?: string | null;
   scorecards?: unknown[] | null;
-  reasoning?: string;
+  reasoning?: string | null;
   bookmaker_odds?: LedgerMarketOdds | null;
   edge_score?: LedgerEdgeSnapshot | null;
 }
@@ -47,6 +47,18 @@ export interface ScorecardSummary {
   total: string | null;
   topBatter: string | null;
 }
+
+export interface LedgerSignals {
+  hasTeams: boolean;
+  hasWinner: boolean;
+  hasResultText: boolean;
+  hasScorecards: boolean;
+  hasNarrative: boolean;
+  hasEdgeScore: boolean;
+  hasTrustedOdds: boolean;
+}
+
+export type LedgerRecapLevel = 'full' | 'balanced' | 'result-only';
 
 const LEDGER_POOL_LIMIT = 12;
 const LEDGER_VISIBLE_COUNT = 3;
@@ -94,15 +106,52 @@ export function getLedgerScope(entry: Pick<LedgerEntry, 'team1' | 'team2' | 'pre
 }
 
 export function getLedgerEvidenceScore(entry: LedgerEntry): number {
+  const signals = getLedgerSignals(entry);
   return (
-    Number(Boolean(entry.result_text?.trim())) * 20
-    + Number(Boolean(entry.bookmaker_odds)) * 18
-    + Number((entry.scorecards?.length ?? 0) > 0) * 16
+    Number(signals.hasResultText) * 20
+    + Number(signals.hasTrustedOdds) * 18
+    + Number(signals.hasScorecards) * 16
     + Number(Boolean(entry.series_scoreline?.trim())) * 10
-    + Number(Boolean(entry.edge_score)) * 12
-    + Number(Boolean(entry.reasoning?.trim())) * 8
+    + Number(signals.hasEdgeScore) * 12
+    + Number(signals.hasNarrative) * 8
     + (entry.confidence === 'high' ? 4 : entry.confidence === 'medium' ? 2 : 0)
   );
+}
+
+export function getLedgerSignals(entry: LedgerEntry): LedgerSignals {
+  return {
+    hasTeams: Boolean(entry.team1.trim() && entry.team2.trim()),
+    hasWinner: Boolean(entry.actual_winner.trim()),
+    hasResultText: Boolean(entry.result_text?.trim()),
+    hasScorecards: Array.isArray(entry.scorecards) && entry.scorecards.length > 0,
+    hasNarrative: Boolean(entry.reasoning?.trim()),
+    hasEdgeScore: Boolean(entry.edge_score),
+    hasTrustedOdds: Boolean(
+      entry.bookmaker_odds
+      && Number.isFinite(entry.bookmaker_odds.team1_odds)
+      && entry.bookmaker_odds.team1_odds > 1
+      && Number.isFinite(entry.bookmaker_odds.team2_odds)
+      && entry.bookmaker_odds.team2_odds > 1,
+    ),
+  };
+}
+
+export function getLedgerRecapLevel(entry: LedgerEntry): LedgerRecapLevel {
+  const signals = getLedgerSignals(entry);
+  const richness = Number(signals.hasResultText)
+    + Number(signals.hasScorecards)
+    + Number(signals.hasNarrative)
+    + Number(signals.hasEdgeScore)
+    + Number(signals.hasTrustedOdds);
+
+  if (richness >= 4) return 'full';
+  if (richness >= 2) return 'balanced';
+  return 'result-only';
+}
+
+export function isQualifiedLedgerEntry(entry: LedgerEntry): boolean {
+  const signals = getLedgerSignals(entry);
+  return signals.hasTeams && signals.hasWinner && Boolean(entry.predicted_winner.trim());
 }
 
 function compareLedgerEntries(left: LedgerEntry, right: LedgerEntry): number {
@@ -149,6 +198,7 @@ export function selectLedgerEntries(
 ): LedgerEntry[] {
   const cutoff = now.getTime() - LEDGER_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   const scopedEntries = entries
+    .filter(isQualifiedLedgerEntry)
     .filter((entry) => getLedgerScope(entry) === scope)
     .filter((entry) => {
       const scoredAt = toTimestamp(entry.scored_at);
@@ -254,4 +304,15 @@ export function buildScorecardSummaries(scorecards: unknown[] | null | undefined
     })
     .filter((entry): entry is ScorecardSummary => entry !== null)
     .slice(0, 4);
+}
+
+export function getLedgerAvailabilityNotes(entry: LedgerEntry): string[] {
+  const signals = getLedgerSignals(entry);
+  const notes: string[] = [];
+
+  if (!signals.hasTrustedOdds) notes.push('Trusted market comparison unavailable');
+  if (!signals.hasScorecards) notes.push('Scorecard details still building');
+  if (!signals.hasNarrative) notes.push('Recap leans on structured result data');
+
+  return notes.slice(0, 2);
 }
