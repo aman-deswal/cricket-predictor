@@ -41,6 +41,10 @@ function formatPopupEventTime(value: string): string {
   });
 }
 
+function formatSignedDelta(value: number): string {
+  return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(1)} pts`;
+}
+
 interface TooltipEntry {
   color?: string;
   dataKey?: string | number;
@@ -143,6 +147,7 @@ export function MarketMovementChart({
     const values = chartRows
       .map((row) => row[entry.id])
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (values.length === 0) return `${entry.label}: no plotted snapshots are available yet.`;
     const opening = values[0];
     const latest = values[values.length - 1];
     const delta = latest - opening;
@@ -156,6 +161,30 @@ export function MarketMovementChart({
       return typeof value === 'number' && Number.isFinite(value) ? count + 1 : count;
     }, 0),
   ]));
+  const latestIndexBySeries = new Map(series.map((entry) => [
+    entry.id,
+    chartRows.reduce((latestIndex, row, index) => {
+      const value = row[entry.id];
+      return typeof value === 'number' && Number.isFinite(value) ? index : latestIndex;
+    }, -1),
+  ]));
+  const firstTimestamp = Number(chartRows[0]?.timestamp ?? Number.NaN);
+  const lastTimestamp = Number(chartRows[chartRows.length - 1]?.timestamp ?? Number.NaN);
+  const seriesSummaries = series.map((entry) => {
+    const values = chartRows
+      .map((row) => row[entry.id])
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const opening = values[0] ?? null;
+    const latest = values[values.length - 1] ?? null;
+    const delta = opening !== null && latest !== null ? latest - opening : null;
+    return {
+      ...entry,
+      opening,
+      latest,
+      delta,
+      hasData: values.length > 0,
+    };
+  });
   const overlappingDotOffsets = new Map<string, number>();
   chartRows.forEach((row) => {
     const timestamp = Number(row.timestamp);
@@ -182,6 +211,54 @@ export function MarketMovementChart({
       });
     });
   });
+
+  const renderEndLabel = (
+    dotProps: {
+      x?: number;
+      y?: number;
+      value?: number | string;
+      index?: number;
+    },
+    entry: MovementSeries,
+  ) => {
+    const latestIndex = latestIndexBySeries.get(entry.id) ?? -1;
+    const numericValue = typeof dotProps.value === 'number' ? dotProps.value : null;
+    if (
+      latestIndex < 0
+      || dotProps.index !== latestIndex
+      || typeof dotProps.x !== 'number'
+      || typeof dotProps.y !== 'number'
+      || numericValue === null
+    ) {
+      return <g />;
+    }
+
+    const label = `${entry.kind === 'model' ? 'SixSense' : 'Market'} ${numericValue.toFixed(1)}%`;
+    const labelWidth = Math.max(88, label.length * 6.35 + 16);
+
+    return (
+      <g transform={`translate(${dotProps.x + 10}, ${dotProps.y - 13})`}>
+        <rect
+          width={labelWidth}
+          height={26}
+          rx={13}
+          fill="rgba(11,16,22,0.94)"
+          stroke={entry.color}
+          strokeOpacity={0.85}
+        />
+        <text
+          x={10}
+          y={16.5}
+          fill="#f8fafc"
+          fontSize={10}
+          fontWeight={800}
+          letterSpacing="0.04em"
+        >
+          {label}
+        </text>
+      </g>
+    );
+  };
 
   const renderMarketDot = (dotProps: {
     cx?: number;
@@ -318,8 +395,25 @@ export function MarketMovementChart({
         role="img"
         aria-label={ariaLabel}
       >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+              Higher line = stronger win chance
+            </span>
+            {annotations.length > 0 && (
+              <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100">
+                Gold points = explained SixSense moves
+              </span>
+            )}
+          </div>
+          {Number.isFinite(firstTimestamp) && Number.isFinite(lastTimestamp) && (
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+              {formatMarketTimestamp(firstTimestamp, true)} to {formatMarketTimestamp(lastTimestamp, true)}
+            </span>
+          )}
+        </div>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 2 }}>
+          <LineChart data={chartRows} margin={{ top: 18, right: 104, bottom: 10, left: 2 }}>
             <defs>
               <filter id="movement-line-glow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="2.6" result="blur" />
@@ -339,6 +433,7 @@ export function MarketMovementChart({
               tickLine={false}
               axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
               minTickGap={28}
+              interval="preserveStartEnd"
             />
             <YAxis
               domain={[minDomain, maxDomain]}
@@ -346,7 +441,8 @@ export function MarketMovementChart({
               tick={{ fill: '#94a3b8', fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
-              width={42}
+              width={46}
+              tickCount={5}
             />
             <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
             <Tooltip
@@ -379,6 +475,7 @@ export function MarketMovementChart({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 filter="url(#movement-line-glow)"
+                label={(dotProps) => renderEndLabel(dotProps, entry)}
               />
             ))}
           </LineChart>
@@ -441,29 +538,41 @@ export function MarketMovementChart({
           <li key={series[index].id}>{summary}</li>
         ))}
       </ul>
-      <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
-        {series.map((entry) => (
-          <span
+      <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Chart legend">
+        {seriesSummaries.map((entry) => (
+          <div
             key={`${entry.id}-legend`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
+            className="rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
           >
-            <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
-              <span
-                className="absolute inset-x-0 top-1/2 border-t-2"
-                style={{ borderColor: entry.color, opacity: entry.kind === 'model' ? 1 : 0.88 }}
-              />
-              <span
-                className={`absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
-                  entry.kind === 'model' ? 'border-2 bg-[#0b1016]' : ''
-                }`}
-                style={{
-                  borderColor: entry.color,
-                  backgroundColor: entry.kind === 'model' ? '#0b1016' : entry.color,
-                }}
-              />
-            </span>
-            {entry.label}
-          </span>
+            <div className="flex items-start justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+                <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
+                  <span
+                    className="absolute inset-x-0 top-1/2 border-t-2"
+                    style={{ borderColor: entry.color, opacity: entry.kind === 'model' ? 1 : 0.88 }}
+                  />
+                  <span
+                    className={`absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                      entry.kind === 'model' ? 'border-2 bg-[#0b1016]' : ''
+                    }`}
+                    style={{
+                      borderColor: entry.color,
+                      backgroundColor: entry.kind === 'model' ? '#0b1016' : entry.color,
+                    }}
+                  />
+                </span>
+                {entry.label}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                {entry.hasData ? `${entry.latest?.toFixed(1)}% now` : 'building'}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+              {entry.delta === null || entry.opening === null || entry.latest === null
+                ? 'Waiting for enough snapshots to summarize this line.'
+                : `${entry.opening.toFixed(1)}% to ${entry.latest.toFixed(1)}% (${formatSignedDelta(entry.delta)}) since the first tracked snapshot.`}
+            </p>
+          </div>
         ))}
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
