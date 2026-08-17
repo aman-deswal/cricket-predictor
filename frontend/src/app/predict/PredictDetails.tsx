@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { getPlayerStats, getUnifiedMatchDetails, Match, MatchEnrichment, MatchOdds, MatchSquad, SquadPlayer, PlayerStats, Prediction, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
+import { getPlayerStats, getUnifiedMatchDetails, Match, MatchEnrichment, MatchOdds, MatchSquad, SquadPlayer, PlayerStats, Prediction, PredictionResult, PredictionSnapshot, ESPNMatchData, EdgeScore } from '@/lib/supabase';
 import { getTeamMeta, getFlagUrl, getFlag2xUrl } from '@/lib/teams';
 import { getFranchiseLogoUrl } from '@/lib/franchise-logos';
 import { PredictionChart } from '@/components/PredictionChart';
@@ -16,6 +16,7 @@ import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
 import { buildPreMatchMovement, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
 import { getBookmakerMarketUrl, getTrustedSportsbook, hasValidTwoSidedOdds, normalizeBookmaker, selectFreshestTrustedSportsbookOdds } from '@/lib/market-odds';
+import { buildScorecardSummaries } from '@/lib/ledger';
 
 const MarketMovementChart = dynamic(
   () => import('@/components/MarketMovementChart').then((module) => module.MarketMovementChart),
@@ -735,11 +736,111 @@ function MarketMovementPanel({
   );
 }
 
+function CompletedRecapPanel({
+  prediction,
+  predictionResult,
+  espnData,
+  detailTileStrongClass,
+}: {
+  prediction: Prediction | null;
+  predictionResult: PredictionResult | null;
+  espnData: ESPNMatchData | null;
+  detailTileStrongClass: string;
+}) {
+  if (!prediction || !predictionResult) return null;
+
+  const scorecardSummaries = buildScorecardSummaries(espnData?.scorecards ?? []);
+  const verdictTone = predictionResult.correct
+    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+    : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
+
+  return (
+    <motion.div
+      className={`${detailTileStrongClass} mb-4`}
+      {...fadeUp}
+      transition={{ delay: 0.12 }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-500">Settled recap</p>
+          <h2 className="mt-1 text-lg font-black text-white">
+            {predictionResult.correct ? 'SixSense called it' : 'SixSense missed this one'}
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">
+            {predictionResult.result_text || `${predictionResult.actual_winner} won.`}
+          </p>
+          {espnData?.series_scoreline && (
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {espnData.series_scoreline}
+            </p>
+          )}
+        </div>
+        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${verdictTone}`}>
+          {predictionResult.correct ? 'Correct' : 'Miss'}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Our pick</p>
+          <p className="mt-2 text-base font-black text-white">{prediction.predicted_winner}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {Math.round(predictionResult.predicted_probability * 100)}% confidence
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Actual result</p>
+          <p className="mt-2 text-base font-black text-white">{predictionResult.actual_winner}</p>
+          <p className="mt-1 text-xs text-slate-400">Final winner</p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Confidence band</p>
+          <p className="mt-2 text-base font-black text-white capitalize">{prediction.confidence}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {prediction.team1_win_probability !== undefined && prediction.team2_win_probability !== undefined
+              ? `${Math.round(prediction.team1_win_probability * 100)}% / ${Math.round(prediction.team2_win_probability * 100)}%`
+              : 'Stored pre-match split'}
+          </p>
+        </div>
+      </div>
+
+      {scorecardSummaries.length > 0 && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {scorecardSummaries.map((summary, index) => (
+            <div
+              key={`${summary.teamName}-${summary.inningsNumber ?? index}`}
+              className="rounded-2xl border border-white/[0.08] bg-black/15 p-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-white">{summary.teamName || `Innings ${index + 1}`}</p>
+                  {summary.headline && (
+                    <p className="mt-1 text-xs text-slate-400">{summary.headline}</p>
+                  )}
+                </div>
+                {summary.total && (
+                  <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs font-black text-amber-100">
+                    {summary.total}
+                  </span>
+                )}
+              </div>
+              {summary.topBatter && (
+                <p className="mt-3 text-xs font-semibold text-slate-300">{summary.topBatter}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export function PredictDetails() {
   const searchParams = useSearchParams();
   const matchId = searchParams.get('id');
   const [match, setMatch] = useState<Match | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [enrichment, setEnrichment] = useState<MatchEnrichment | null>(null);
   const [odds, setOdds] = useState<MatchOdds[]>([]);
   const [oddsHistory, setOddsHistory] = useState<MatchOdds[]>([]);
@@ -767,6 +868,7 @@ export function PredictDetails() {
         const {
           match: matchData,
           prediction: predictionData,
+          predictionResult: predictionResultData,
           predictionHistory: predictionHistoryData,
           enrichment: enrichmentData,
           odds: oddsData,
@@ -777,6 +879,7 @@ export function PredictDetails() {
         } = await getUnifiedMatchDetails(matchId);
         setMatch(matchData);
         setPrediction(predictionData);
+        setPredictionResult(predictionResultData);
         setPredictionHistory(predictionHistoryData);
         setEnrichment(enrichmentData);
         setOdds(oddsData);
@@ -874,6 +977,7 @@ export function PredictDetails() {
   const matchStatus = getMatchStatusPresentation(match.status);
   const matchFormat = getMatchFormatLabel({ ...match, competition_name: espnData?.series_note ?? null });
   const isLiveMatch = matchStatus.kind === 'live';
+  const isCompletedMatch = matchStatus.kind === 'completed';
   const isUpcomingMatch = matchStatus.kind === 'upcoming'
     && new Date(matchDate).getTime() > Date.now();
   const hasSquadOrXi = enrichment?.possible_xi && ((enrichment.possible_xi.team1?.length ?? 0) > 0 || (enrichment.possible_xi.team2?.length ?? 0) > 0);
@@ -1049,6 +1153,15 @@ export function PredictDetails() {
               <LiveStatusBadge compact />
               <p className="mt-0.5 text-[10px] font-bold text-white sm:text-xs">Match in progress</p>
             </div>
+          ) : isCompletedMatch ? (
+            <div className="text-center">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[11px]">
+                Settled result
+              </p>
+              <p className="mt-0.5 text-xs font-black text-white sm:text-sm">
+                {predictionResult?.correct ? 'Called it' : 'Missed'}
+              </p>
+            </div>
           ) : (
             <div className="text-center">
               <p className={`text-[9px] font-black uppercase tracking-[0.18em] sm:text-[11px] ${
@@ -1094,6 +1207,13 @@ export function PredictDetails() {
         <MatchFormatBadge match={match} competitionName={espnData?.series_note ?? null} />
         {isLiveMatch ? (
           <LiveStatusBadge />
+        ) : isCompletedMatch ? (
+          <div className="order-last inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[clamp(0.8rem,1vw,0.95rem)] text-emerald-100 sm:order-none sm:w-auto">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+            <span className="font-semibold whitespace-nowrap">
+              {predictionResult?.result_text || 'Final result confirmed'}
+            </span>
+          </div>
         ) : countdown && (
           <div className="order-last inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[clamp(0.8rem,1vw,0.95rem)] text-slate-300 sm:order-none sm:w-auto">
             <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
@@ -1399,6 +1519,15 @@ export function PredictDetails() {
           <span className="truncate max-w-[150px]">{getSeriesName(match)}</span>
         </motion.div>
       </motion.div>
+
+      {isCompletedMatch && (
+        <CompletedRecapPanel
+          prediction={prediction}
+          predictionResult={predictionResult}
+          espnData={espnData}
+          detailTileStrongClass={detailTileStrongClass}
+        />
+      )}
 
       <MarketMovementPanel
         prediction={prediction}
