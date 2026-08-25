@@ -121,6 +121,8 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
   const team1Meta = getTeamMeta(match.team1);
   const team2Meta = getTeamMeta(match.team2);
   const winner = prediction?.predicted_winner;
+  const team1DisplayName = match.team1;
+  const team2DisplayName = match.team2;
 
   return (
     <Link href={`/predict?id=${encodeURIComponent(match.match_id)}`} className="group relative block min-w-0 w-full max-w-full">
@@ -167,8 +169,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
               {/* Team 1 */}
               <div className="min-w-0 flex-1 text-center">
                 <TeamCrest team={match.team1} logoUrl={match.team1_logo_url} selected={winner === match.team1} />
-                <p className="truncate text-base font-black leading-tight text-white">{team1Meta.shortName}</p>
-                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team1Meta.name}</p>
+                <p className="truncate text-sm font-black leading-tight text-white" title={team1DisplayName}>{team1DisplayName}</p>
                 <FormDots form={match.team1_recent_form} />
                 {prediction && (
                   <motion.p
@@ -189,8 +190,7 @@ export function MatchCard({ match, prediction, index = 0 }: MatchCardProps) {
               {/* Team 2 */}
               <div className="min-w-0 flex-1 text-center">
                 <TeamCrest team={match.team2} logoUrl={match.team2_logo_url} selected={winner === match.team2} />
-                <p className="truncate text-base font-black leading-tight text-white">{team2Meta.shortName}</p>
-                <p className="mt-0.5 truncate text-[8px] font-semibold text-gray-500">{team2Meta.name}</p>
+                <p className="truncate text-sm font-black leading-tight text-white" title={team2DisplayName}>{team2DisplayName}</p>
                 <FormDots form={match.team2_recent_form} />
                 {prediction && (
                   <motion.p
