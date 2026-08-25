@@ -916,14 +916,16 @@ function FeaturedHero({
   const winner = prediction?.predicted_winner;
   const hasMarket = hasValidMarketOdds(match);
   const periodLabel = trustSignal?.period === 'week' ? 'last 7 days' : 'last 30 days';
-  const predictedTeamMeta = winner === match.team2 ? team2Meta : team1Meta;
+  const team1DisplayName = match.team1;
+  const team2DisplayName = match.team2;
+  const predictedTeamName = winner === match.team2 ? team2DisplayName : team1DisplayName;
   const predictionGap = prediction
     ? Math.round(Math.abs(prediction.team1_win_probability - prediction.team2_win_probability) * 100)
     : 0;
   const actionableLabel = trustSignal?.scope === 'international'
     ? null
     : prediction && winner
-      ? `${predictedTeamMeta.shortName} +${predictionGap}pt model lean`
+      ? `${predictedTeamName} +${predictionGap}pt model lean`
       : trustSignal
         ? `${trustSignal.stats.pct}% accuracy ${periodLabel}`
         : null;
@@ -993,7 +995,9 @@ function FeaturedHero({
                 selected={winner === match.team1}
               />
               <div className="min-w-0">
-                <p className="text-base sm:text-lg font-black text-white leading-none">{team1Meta.shortName}</p>
+                <p className="truncate text-sm font-black leading-tight text-white sm:text-base" title={team1DisplayName}>
+                  {team1DisplayName}
+                </p>
                 {prediction && (
                   <p className="text-2xl sm:text-3xl font-black tabular-nums mt-0.5 leading-none"
                      style={{ color: team1Meta.primaryColor }}>
@@ -1016,7 +1020,9 @@ function FeaturedHero({
             {/* Team 2 */}
             <div className="flex min-w-0 flex-col-reverse items-center gap-2 text-center sm:flex-row sm:justify-end sm:gap-3 sm:text-right">
               <div className="min-w-0">
-                <p className="text-base sm:text-lg font-black text-white leading-none">{team2Meta.shortName}</p>
+                <p className="truncate text-sm font-black leading-tight text-white sm:text-base" title={team2DisplayName}>
+                  {team2DisplayName}
+                </p>
                 {prediction && (
                   <p className="text-2xl sm:text-3xl font-black tabular-nums mt-0.5 leading-none"
                      style={{ color: team2Meta.primaryColor }}>
