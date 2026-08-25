@@ -1,0 +1,20 @@
+{
+  "name": "sixsense",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace cricket-predictor-frontend",
+    "dev:mobile": "npm run start --workspace @sixsense/mobile",
+    "build:web": "npm run build --workspace cricket-predictor-frontend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:mobile": "npm run typecheck --workspace @sixsense/mobile"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
