@@ -67,7 +67,7 @@ export function Navbar() {
 
   return (
     <>
-    <nav className="relative sticky top-0 z-50 border-b border-slate-700/35 bg-[#10151b]/95 shadow-lg shadow-black/10 backdrop-blur-xl">
+    <nav className="safe-area-top safe-area-x relative sticky top-0 z-50 border-b border-slate-700/35 bg-[#10151b]/95 shadow-lg shadow-black/10 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between sm:h-[4.5rem]">
           <Link href="/" className="group flex min-h-12 items-center space-x-2 sm:min-h-[3.25rem] sm:space-x-3">
@@ -143,7 +143,7 @@ export function Navbar() {
       </div>
     </nav>
     <nav
-      className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0c1117]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:hidden"
+      className="safe-area-x safe-area-bottom mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0c1117]/95 px-2 pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:hidden"
       aria-label="Primary navigation"
     >
       <div className="mx-auto grid max-w-md grid-cols-3 gap-1.5">

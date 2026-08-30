@@ -1,0 +1,23 @@
+instructions: |
+  For any code-development task in this repository:
+
+  1. Do not create or rename a branch, edit files, or open a pull request until a GitHub issue exists for the work.
+  2. If no issue exists, create one first with:
+     - a clear problem statement
+     - scope
+     - acceptance criteria
+  3. After creating or identifying the issue:
+     - add it to the active sprint or GitHub Project when one is in use
+     - set its status to In Progress before implementation begins
+  4. Only then proceed with code changes.
+  5. Any pull request for the work must:
+     - link to the issue
+     - include `Fixes #<issue-number>` in the pull request body
+  6. When the pull request is merged, the issue should end in Closed or Done.
+  7. If any required GitHub workflow step cannot be completed, stop and report the blocker instead of proceeding with code changes.
+
+  Treat this workflow as mandatory for every engineering task in this repository.
+
+automation:
+  auto_issue_session: true
+  remote_control: false

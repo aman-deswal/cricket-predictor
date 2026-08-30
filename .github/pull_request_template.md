@@ -1,5 +1,7 @@
 ## Summary
 
+Fixes #
+
 ## Checks
 
 - [ ] I preserved the primary information hierarchy on the touched surface (hero/top panel first, secondary cards below).
