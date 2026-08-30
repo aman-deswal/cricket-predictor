@@ -2,15 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  CandlestickSeries,
+  ColorType,
+  CrosshairMode,
+  LineSeries,
+  LineStyle,
+  LineType,
+  createChart,
+  createSeriesMarkers,
+  type CandlestickData,
+  type ISeriesApi,
+  type LineData,
+  type MouseEventParams,
+  type Time,
+} from 'lightweight-charts';
 import type { MovementAnnotation, MovementSeries } from '@/lib/pre-match-movement';
 
 interface MarketMovementChartProps {
@@ -22,6 +27,63 @@ interface MarketMovementChartProps {
   annotations: MovementAnnotation[];
   insightCaption?: string;
   heightClassName?: string;
+}
+
+interface HoverRow {
+  id: string;
+  label: string;
+  color: string;
+  presentation: 'line' | 'candle';
+  value: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  delta?: number;
+}
+
+interface HoverState {
+  x: number;
+  y: number;
+  timestamp: number | null;
+  hasCandleRow: boolean;
+  rows: HoverRow[];
+}
+
+interface PreparedSeriesPoint {
+  timestamp: number;
+  value: number;
+}
+
+interface PreparedSeries {
+  id: string;
+  label: string;
+  color: string;
+  kind: 'model' | 'market';
+  points: PreparedSeriesPoint[];
+  lineData: LineData<Time>[];
+}
+
+const CANDLE_INTERVALS_MS = [
+  5 * 60 * 1000,
+  15 * 60 * 1000,
+  30 * 60 * 1000,
+  60 * 60 * 1000,
+  2 * 60 * 60 * 1000,
+  4 * 60 * 60 * 1000,
+  6 * 60 * 60 * 1000,
+  12 * 60 * 60 * 1000,
+  24 * 60 * 60 * 1000,
+  2 * 24 * 60 * 60 * 1000,
+] as const;
+
+function toChartTime(timestamp: number): Time {
+  return Math.floor(timestamp / 1000) as Time;
+}
+
+function fromChartTime(time: Time | undefined): number | null {
+  if (typeof time === 'number') return time * 1000;
+  return null;
 }
 
 function formatMarketTimestamp(timestamp: number, compact = false): string {
@@ -41,6 +103,163 @@ function formatPopupEventTime(value: string): string {
   });
 }
 
+function formatSignedDelta(value: number): string {
+  return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(1)} pts`;
+}
+
+function buildTimestampLabel(firstTimestamp: number | null, lastTimestamp: number | null): string | null {
+  if (firstTimestamp === null || lastTimestamp === null) return null;
+  return `${formatMarketTimestamp(firstTimestamp, true)} to ${formatMarketTimestamp(lastTimestamp, true)}`;
+}
+
+function formatAxisTimeLabel(timestamp: number): string {
+  const date = new Date(timestamp);
+  if (date.getMinutes() === 0) {
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+    });
+  }
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatCandleIntervalLabel(intervalMs: number): string {
+  if (intervalMs < 60 * 60 * 1000) {
+    return `${Math.round(intervalMs / (24 * 60 * 60 * 1000))}d`;
+  }
+  if (intervalMs < 24 * 60 * 60 * 1000) {
+    return `${Math.round(intervalMs / (60 * 60 * 1000))}h`;
+  }
+  return `${Math.round(intervalMs / (24 * 60 * 60 * 1000))}d`;
+}
+
+function formatCandleWindowLabel(timestamp: number, intervalMs: number, compact = false): string {
+  const endTimestamp = timestamp + intervalMs;
+  const start = new Date(timestamp);
+  const end = new Date(endTimestamp);
+  const sameDay = start.toDateString() === end.toDateString();
+
+  if (compact) {
+    const startLabel = start.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+    });
+    const endLabel = end.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return sameDay ? `${startLabel}-${endLabel}` : `${startLabel} to ${formatMarketTimestamp(endTimestamp, true)}`;
+  }
+
+  const startLabel = start.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const endLabel = sameDay
+    ? end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : end.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+  return `${startLabel} to ${endLabel}`;
+}
+
+function chooseCandleInterval(timestamps: number[]): number {
+  if (timestamps.length <= 1) return 60 * 60 * 1000;
+
+  const ordered = [...timestamps].sort((left, right) => left - right);
+  const span = Math.max(ordered[ordered.length - 1] - ordered[0], 1);
+  const gaps = ordered
+    .slice(1)
+    .map((timestamp, index) => timestamp - ordered[index])
+    .filter((gap) => gap > 0)
+    .sort((left, right) => left - right);
+  const medianGap = gaps.length > 0 ? gaps[Math.floor(gaps.length / 2)] : span;
+  const targetBucket = Math.max(medianGap, span / 14);
+  return CANDLE_INTERVALS_MS.find((interval) => interval >= targetBucket)
+    ?? CANDLE_INTERVALS_MS[CANDLE_INTERVALS_MS.length - 1];
+}
+
+function buildCandles(points: PreparedSeriesPoint[], intervalMs: number): CandlestickData<Time>[] {
+  if (points.length === 0) return [];
+
+  const buckets = new Map<number, CandlestickData<Time>>();
+
+  points.forEach((point) => {
+    const bucketStart = Math.floor(point.timestamp / intervalMs) * intervalMs;
+    const existing = buckets.get(bucketStart);
+    if (!existing) {
+      buckets.set(bucketStart, {
+        time: toChartTime(bucketStart),
+        open: point.value,
+        high: point.value,
+        low: point.value,
+        close: point.value,
+      });
+      return;
+    }
+
+    existing.high = Math.max(existing.high, point.value);
+    existing.low = Math.min(existing.low, point.value);
+    existing.close = point.value;
+  });
+
+  return [...buckets.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([, candle]) => candle);
+}
+
+function isLineHoverData(data: unknown): data is { value: number } {
+  return typeof data === 'object'
+    && data !== null
+    && 'value' in data
+    && typeof data.value === 'number'
+    && Number.isFinite(data.value);
+}
+
+function isCandleHoverData(data: unknown): data is { open: number; high: number; low: number; close: number } {
+  return typeof data === 'object'
+    && data !== null
+    && 'open' in data
+    && 'high' in data
+    && 'low' in data
+    && 'close' in data
+    && typeof data.open === 'number'
+    && typeof data.high === 'number'
+    && typeof data.low === 'number'
+    && typeof data.close === 'number';
+}
+
+function getCandlePalette(kind: 'model' | 'market') {
+  if (kind === 'model') {
+    return {
+      upColor: 'rgba(251, 191, 36, 0.82)',
+      downColor: 'rgba(217, 119, 6, 0.68)',
+      borderUpColor: '#fbbf24',
+      borderDownColor: '#d97706',
+      wickUpColor: 'rgba(253, 224, 71, 0.82)',
+      wickDownColor: 'rgba(245, 158, 11, 0.74)',
+    };
+  }
+
+  return {
+    upColor: 'rgba(56, 189, 248, 0.5)',
+    downColor: 'rgba(14, 165, 233, 0.24)',
+    borderUpColor: '#7dd3fc',
+    borderDownColor: '#38bdf8',
+    wickUpColor: 'rgba(125, 211, 252, 0.72)',
+    wickDownColor: 'rgba(56, 189, 248, 0.64)',
+  };
+}
+
 export function MarketMovementChart({
   chartRows,
   series,
@@ -51,15 +270,22 @@ export function MarketMovementChart({
   insightCaption,
   heightClassName,
 }: MarketMovementChartProps) {
-  const annotationsByTimestamp = useMemo(() => new Map(
-    annotations.map((annotation) => [annotation.timestamp, annotation]),
-  ), [annotations]);
+  const chartHostRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
+
+  const [hoverState, setHoverState] = useState<HoverState | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<{
     annotation: MovementAnnotation;
     x: number;
     y: number;
   } | null>(null);
+
+  const annotationsByTimestamp = useMemo(() => new Map(
+    annotations.map((annotation) => [annotation.timestamp, annotation]),
+  ), [annotations]);
+  const annotationsById = useMemo(() => new Map(
+    annotations.map((annotation) => [`annotation-${annotation.timestamp}`, annotation]),
+  ), [annotations]);
 
   useEffect(() => {
     if (!selectedMarker) return;
@@ -83,247 +309,406 @@ export function MarketMovementChart({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [selectedMarker]);
 
-  const accessibleSummaries = series.map((entry) => {
+  const seriesSummaries = useMemo(() => series.map((entry) => {
     const values = chartRows
       .map((row) => row[entry.id])
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    const opening = values[0];
-    const latest = values[values.length - 1];
-    const delta = latest - opening;
-    const direction = Math.abs(delta) < 0.05 ? 'was unchanged' : delta > 0 ? 'rose' : 'fell';
-    return `${entry.label}: opened at ${opening.toFixed(1)}%, latest ${latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(delta).toFixed(1)} percentage points`} across ${values.length} ${values.length === 1 ? 'snapshot' : 'snapshots'}.`;
-  });
-  const pointCountsBySeries = new Map(series.map((entry) => [
-    entry.id,
-    chartRows.reduce((count, row) => {
-      const value = row[entry.id];
-      return typeof value === 'number' && Number.isFinite(value) ? count + 1 : count;
-    }, 0),
-  ]));
-  const overlappingDotOffsets = new Map<string, number>();
-  chartRows.forEach((row) => {
-    const timestamp = Number(row.timestamp);
-    const groups = new Map<string, string[]>();
+    const opening = values[0] ?? null;
+    const latest = values[values.length - 1] ?? null;
+    return {
+      ...entry,
+      opening,
+      latest,
+      delta: opening !== null && latest !== null ? latest - opening : null,
+      hasData: values.length > 0,
+    };
+  }), [chartRows, series]);
 
-    series.forEach((entry) => {
-      const value = row[entry.id];
-      if (typeof value !== 'number' || !Number.isFinite(value)) return;
-      const bucketKey = `${timestamp}:${value.toFixed(1)}`;
-      const entries = groups.get(bucketKey) ?? [];
-      entries.push(entry.id);
-      groups.set(bucketKey, entries);
+  const firstTimestamp = chartRows.length > 0 ? Number(chartRows[0].timestamp) : null;
+  const lastTimestamp = chartRows.length > 0 ? Number(chartRows[chartRows.length - 1].timestamp) : null;
+  const timestampLabel = buildTimestampLabel(firstTimestamp, lastTimestamp);
+
+  const preparedSeries = useMemo(() => series.map((entry) => ({
+    ...entry,
+    points: chartRows
+      .map((row) => {
+        const timestamp = Number(row.timestamp);
+        const value = row[entry.id];
+        if (!Number.isFinite(timestamp) || typeof value !== 'number' || !Number.isFinite(value)) return null;
+        return { timestamp, value } satisfies PreparedSeriesPoint;
+      })
+      .filter((row): row is PreparedSeriesPoint => row !== null),
+  })).map((entry) => ({
+    ...entry,
+    lineData: entry.points.map((point) => ({
+      time: toChartTime(point.timestamp),
+      value: point.value,
+    }) satisfies LineData<Time>),
+  })), [chartRows, series]);
+
+  const primaryCandleSeries = useMemo(() => preparedSeries.find((entry) => entry.kind === 'market' && entry.points.length > 0)
+    ?? preparedSeries.find((entry) => entry.points.length > 0)
+    ?? null, [preparedSeries]);
+  const candleIntervalMs = useMemo(() => chooseCandleInterval(
+    primaryCandleSeries?.points.map((point) => point.timestamp) ?? [],
+  ), [primaryCandleSeries]);
+  const primaryCandles = useMemo(() => (
+    primaryCandleSeries ? buildCandles(primaryCandleSeries.points, candleIntervalMs) : []
+  ), [candleIntervalMs, primaryCandleSeries]);
+  const comparisonSeries = useMemo(() => preparedSeries.filter((entry) => entry.id !== primaryCandleSeries?.id), [preparedSeries, primaryCandleSeries]);
+
+  const annotationMarkers = useMemo(() => annotations.map((annotation) => ({
+    id: `annotation-${annotation.timestamp}`,
+    time: toChartTime(annotation.timestamp),
+    position: 'atPriceMiddle' as const,
+    shape: 'circle' as const,
+    color: '#fbbf24',
+    size: 0.6,
+    price: annotation.probability,
+  })), [annotations]);
+
+  const accessibleSummaries = useMemo(() => seriesSummaries.map((entry) => {
+    if (entry.latest === null || entry.opening === null || entry.delta === null) {
+      return `${entry.label}: no plotted snapshots are available yet.`;
+    }
+    const direction = Math.abs(entry.delta) < 0.05 ? 'was unchanged' : entry.delta > 0 ? 'rose' : 'fell';
+    return `${entry.label}: opened at ${entry.opening.toFixed(1)}%, latest ${entry.latest.toFixed(1)}%, and ${direction}${direction === 'was unchanged' ? '' : ` by ${Math.abs(entry.delta).toFixed(1)} percentage points`}.`;
+  }), [seriesSummaries]);
+
+  useEffect(() => {
+    const container = chartHostRef.current;
+    if (!container) return;
+    if (preparedSeries.every((entry) => entry.lineData.length === 0)) {
+      setHoverState(null);
+      return;
+    }
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: '#050b13' },
+        attributionLogo: false,
+      },
+      leftPriceScale: {
+        visible: true,
+        borderVisible: false,
+        ticksVisible: false,
+        scaleMargins: { top: 0.12, bottom: 0.18 },
+      },
+      rightPriceScale: {
+        visible: false,
+        borderVisible: false,
+      },
+      timeScale: {
+        borderVisible: false,
+        ticksVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffsetPixels: 20,
+        barSpacing: primaryCandles.length >= 10 ? 18 : 26,
+        minBarSpacing: 10,
+        tickMarkFormatter: (time: Time) => {
+          const timestamp = fromChartTime(time);
+          return timestamp === null ? '' : formatAxisTimeLabel(timestamp);
+        },
+        tickMarkMaxCharacterLength: 8,
+        uniformDistribution: true,
+        allowBoldLabels: false,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
+      grid: {
+        vertLines: { visible: false },
+        horzLines: {
+          color: 'rgba(36, 48, 65, 0.55)',
+          style: LineStyle.SparseDotted,
+        },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(71, 85, 105, 0.48)',
+          style: LineStyle.SparseDotted,
+          width: 1,
+          labelVisible: false,
+        },
+        horzLine: {
+          color: 'rgba(71, 85, 105, 0.48)',
+          style: LineStyle.SparseDotted,
+          width: 1,
+          labelBackgroundColor: '#0f172a',
+        },
+      },
+      handleScroll: {
+        mouseWheel: false,
+        pressedMouseMove: false,
+        horzTouchDrag: false,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        mouseWheel: false,
+        pinch: false,
+        axisPressedMouseMove: false,
+        axisDoubleClickReset: false,
+      },
+      localization: {
+      priceFormatter: (value: number) => `${value.toFixed(1)}%`,
+        timeFormatter: (time: Time) => {
+          const timestamp = fromChartTime(time);
+          return timestamp === null ? '' : formatMarketTimestamp(timestamp);
+        },
+      },
     });
 
-    groups.forEach((bookIds, bucketKey) => {
-      const offsets = bookIds.length === 1
-        ? [0]
-        : bookIds.length === 2
-          ? [-5, 5]
-          : [-8, 0, 8];
+    const renderedSeries: Array<{
+      entry: PreparedSeries;
+      api: ISeriesApi<'Candlestick', Time> | ISeriesApi<'Line', Time>;
+      presentation: 'candle' | 'line';
+    }> = [];
 
-      bookIds.forEach((bookId, index) => {
-        overlappingDotOffsets.set(`${bucketKey}:${bookId}`, offsets[index] ?? 0);
+    let markerSeries: ISeriesApi<'Candlestick', Time> | ISeriesApi<'Line', Time> | null = null;
+
+    if (primaryCandleSeries && primaryCandles.length > 0) {
+      const candle = chart.addSeries(CandlestickSeries, {
+      ...getCandlePalette(primaryCandleSeries.kind),
+      borderVisible: true,
+      wickVisible: true,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      priceScaleId: 'left',
       });
+      candle.setData(primaryCandles);
+      renderedSeries.push({
+      entry: primaryCandleSeries,
+      api: candle,
+      presentation: 'candle',
+      });
+      if (primaryCandleSeries.kind === 'model') {
+      markerSeries = candle;
+      }
+      candle.createPriceLine({
+      price: 50,
+      color: 'rgba(100, 116, 139, 0.32)',
+      lineWidth: 1,
+      lineStyle: LineStyle.LargeDashed,
+      axisLabelVisible: false,
+      title: '',
+      });
+    }
+
+    comparisonSeries.forEach((entry) => {
+      const line = chart.addSeries(LineSeries, {
+      color: entry.color,
+      lineWidth: entry.kind === 'model' ? 3 : 2,
+      lineType: LineType.Simple,
+      lineStyle: entry.kind === 'model' ? LineStyle.Solid : LineStyle.LargeDashed,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: entry.kind === 'model' ? 4 : 2,
+      crosshairMarkerBorderColor: entry.color,
+      crosshairMarkerBackgroundColor: '#050b13',
+      lastValueVisible: false,
+      priceLineVisible: false,
+      pointMarkersVisible: false,
+      pointMarkersRadius: entry.kind === 'model' ? 2 : 1.5,
+      priceScaleId: 'left',
+      });
+      line.setData(entry.lineData);
+      renderedSeries.push({
+      entry,
+      api: line,
+      presentation: 'line',
+      });
+      if (entry.kind === 'model') {
+      markerSeries = line;
+      }
     });
-  });
 
-  const renderMarketDot = (dotProps: {
-    cx?: number;
-    cy?: number;
-    payload?: Record<string, number | string | null>;
-    value?: number | string | Array<number | string>;
-    dataKey?: string | number;
-    stroke?: string;
-  }) => {
-    const emptyDot = (
-      <circle
-        key={`empty-${String(dotProps.dataKey)}-${String(dotProps.cx)}-${String(dotProps.cy)}`}
-        cx={0}
-        cy={0}
-        r={0}
-        fill="transparent"
-        stroke="none"
-      />
-    );
-    if (typeof dotProps.cx !== 'number' || typeof dotProps.cy !== 'number' || typeof dotProps.dataKey !== 'string') {
-      return emptyDot;
+    if (markerSeries) {
+      createSeriesMarkers(markerSeries, annotationMarkers);
     }
 
-    const timestamp = Number(dotProps.payload?.timestamp);
-    const numericValue = typeof dotProps.value === 'number'
-      ? dotProps.value
-      : Array.isArray(dotProps.value) && typeof dotProps.value[0] === 'number'
-        ? dotProps.value[0]
-        : null;
+    chart.priceScale('left').applyOptions({
+      autoScale: false,
+      mode: 0,
+    });
+    chart.timeScale().fitContent();
+    chart.priceScale('left').setVisibleRange({ from: minDomain, to: maxDomain });
 
-    if (!Number.isFinite(timestamp) || numericValue === null) return emptyDot;
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+      if (!param.point || param.point.x < 0 || param.point.y < 0 || !container) {
+        setHoverState(null);
+        return;
+      }
 
-    const offsetKey = `${timestamp}:${numericValue.toFixed(1)}:${dotProps.dataKey}`;
-    const annotation = dotProps.dataKey === 'sixsense-model'
-      ? annotationsByTimestamp.get(timestamp)
-      : undefined;
-    const isSelected = annotation?.timestamp === selectedMarker?.annotation.timestamp;
-    const cx = dotProps.cx + (overlappingDotOffsets.get(offsetKey) ?? 0);
-    const cy = dotProps.cy;
-    const showSinglePointStub = (pointCountsBySeries.get(dotProps.dataKey) ?? 0) === 1;
+      const rows = renderedSeries
+        .map(({ entry, api, presentation }) => {
+          const dataPoint = param.seriesData.get(api);
+          if (!dataPoint) return null;
 
-    if (annotation) {
-      return (
-        <g
-          key={offsetKey}
-          data-annotation-trigger="true"
-          role="button"
-          tabIndex={0}
-          onClick={() => setSelectedMarker((current) => (
-            current?.annotation.timestamp === annotation.timestamp
-              ? null
-              : { annotation, x: cx, y: cy }
-          ))}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              setSelectedMarker({ annotation, x: cx, y: cy });
-            } else if (event.key === 'Escape') {
-              setSelectedMarker(null);
-            }
-          }}
-          aria-expanded={isSelected}
-          aria-label={`${formatMarketTimestamp(annotation.timestamp)}: ${annotation.eventCount} input ${annotation.eventCount === 1 ? 'event' : 'events'} tied to this SixSense move`}
-          className="cursor-pointer"
-        >
-          {showSinglePointStub && (
-            <line
-              x1={cx - 10}
-              x2={cx + 10}
-              y1={cy}
-              y2={cy}
-              stroke={dotProps.stroke}
-              strokeWidth={3}
-              strokeLinecap="round"
-              opacity={0.92}
-            />
-          )}
-          <circle
-            cx={cx}
-            cy={cy}
-            r={isSelected ? 8.5 : 7}
-            fill="rgba(245, 158, 11, 0.14)"
-            stroke="none"
-          />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={isSelected ? 5.75 : 5}
-            fill="#0b1016"
-            stroke="#fbbf24"
-            strokeWidth={2.5}
-          />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={2.2}
-            fill="#fbbf24"
-            stroke="none"
-          />
-        </g>
-      );
-    }
+          if (presentation === 'candle' && isCandleHoverData(dataPoint)) {
+            const row: HoverRow = {
+              id: entry.id,
+              label: entry.label,
+              color: entry.color,
+              presentation,
+              value: dataPoint.close,
+              open: dataPoint.open,
+              high: dataPoint.high,
+              low: dataPoint.low,
+              close: dataPoint.close,
+              delta: dataPoint.close - dataPoint.open,
+            };
+            return row;
+          }
 
-    return (
-      <g key={offsetKey}>
-        {showSinglePointStub && (
-          <line
-            x1={cx - 10}
-            x2={cx + 10}
-            y1={cy}
-            y2={cy}
-            stroke={dotProps.stroke}
-            strokeWidth={3}
-            strokeLinecap="round"
-            opacity={0.9}
-          />
-        )}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={3.25}
-          fill={dotProps.stroke}
-          stroke="#0b1016"
-          strokeWidth={1.5}
-        />
-      </g>
-    );
-  };
+          if (presentation === 'line' && isLineHoverData(dataPoint)) {
+            const row: HoverRow = {
+              id: entry.id,
+              label: entry.label,
+              color: entry.color,
+              presentation,
+              value: dataPoint.value,
+            };
+            return row;
+          }
+
+          return null;
+        })
+        .filter((entry): entry is HoverRow => entry !== null);
+
+      if (rows.length === 0) {
+        setHoverState(null);
+        return;
+      }
+
+      setHoverState({
+        x: param.point.x,
+        y: param.point.y,
+        timestamp: fromChartTime(param.time),
+        hasCandleRow: rows.some((row) => row.presentation === 'candle'),
+        rows,
+      });
+    };
+
+    const handleChartClick = (param: MouseEventParams<Time>) => {
+      const markerId = typeof param.hoveredObjectId === 'string' ? param.hoveredObjectId : null;
+      if (!markerId || !param.point) {
+        setSelectedMarker(null);
+        return;
+      }
+
+      const annotation = annotationsById.get(markerId);
+      if (!annotation) {
+        setSelectedMarker(null);
+        return;
+      }
+
+      setSelectedMarker({
+        annotation,
+        x: param.point.x,
+        y: param.point.y,
+      });
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    chart.subscribeClick(handleChartClick);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      chart.resize(width, height);
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.unsubscribeClick(handleChartClick);
+      chart.remove();
+    };
+  }, [annotationMarkers, annotationsById, maxDomain, minDomain, preparedSeries]);
 
   return (
     <>
+      {timestampLabel && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em]">
+          <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-slate-400">
+            {timestampLabel}
+          </span>
+          {primaryCandleSeries && (
+            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-slate-300">
+              {primaryCandleSeries.kind === 'market' ? 'Market' : 'SixSense'} {formatCandleIntervalLabel(candleIntervalMs)} candles
+            </span>
+          )}
+          {annotations.length > 0 && (
+            <span className="rounded-full border border-amber-300/10 bg-amber-300/[0.08] px-2.5 py-1 text-amber-200/90">
+              Gold dots = explained model move
+            </span>
+          )}
+        </div>
+      )}
+
       <div
-        className={`relative ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
+        className={`relative mt-3 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(30,41,59,0.2),transparent_40%),linear-gradient(180deg,rgba(7,12,20,0.98),rgba(5,9,16,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${heightClassName ?? 'h-40 sm:h-48 lg:h-56'}`}
         role="img"
         aria-label={ariaLabel}
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 2 }}>
-            <CartesianGrid vertical={false} stroke="#243041" strokeOpacity={0.55} />
-            <XAxis
-              dataKey="timestamp"
-              type="number"
-              domain={['dataMin', 'dataMax']}
-              tickFormatter={(value) => formatMarketTimestamp(Number(value), true)}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
-              tickLine={false}
-              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
-              minTickGap={28}
-            />
-            <YAxis
-              domain={[minDomain, maxDomain]}
-              tickFormatter={(value) => `${Math.round(Number(value))}%`}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
-              tickLine={false}
-              axisLine={{ stroke: '#223041', strokeOpacity: 0.7 }}
-              width={42}
-            />
-            <ReferenceLine y={50} stroke="#64748b" strokeDasharray="4 4" strokeOpacity={0.28} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#111820',
-                border: '1px solid rgba(245,158,11,0.16)',
-                borderRadius: '12px',
-                fontSize: '11px',
-                fontFamily: 'var(--font-jetbrains-mono, monospace)',
-              }}
-              labelFormatter={(value) => formatMarketTimestamp(Number(value))}
-              formatter={(value, name) => {
-                const entry = series.find((candidate) => candidate.id === name);
-                const numericValue = typeof value === 'number'
-                  ? value
-                  : Array.isArray(value) && typeof value[0] === 'number'
-                    ? value[0]
-                    : null;
-                if (numericValue === null) return ['—', entry?.label ?? String(name)];
-                return [`${numericValue.toFixed(1)}%`, entry?.label ?? String(name)];
-              }}
-            />
-            {series.map((entry) => (
-              <Line
-                key={entry.id}
-                type="monotone"
-                dataKey={entry.id}
-                stroke={entry.color}
-                strokeWidth={entry.kind === 'model' ? 3.5 : 2.75}
-                strokeOpacity={entry.kind === 'model' ? 1 : 0.88}
-                dot={chartRows.length <= 8 ? renderMarketDot : false}
-                activeDot={{ fill: entry.color, r: 4, strokeWidth: 0 }}
-                connectNulls
-                isAnimationActive={false}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        <div ref={chartHostRef} className="h-full w-full" />
+
+        {hoverState && (
+          <div
+            className={`pointer-events-none absolute z-[3] min-w-[10rem] rounded-2xl border border-white/10 bg-[#0d141d]/96 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur ${
+              hoverState.y < 92 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
+            }`}
+            style={{
+              left: `clamp(0.75rem, calc(${hoverState.x}px - 5rem), calc(100% - 11rem))`,
+              top: `${hoverState.y}px`,
+            }}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+              {hoverState.timestamp !== null
+                ? hoverState.hasCandleRow
+                  ? formatCandleWindowLabel(hoverState.timestamp, candleIntervalMs)
+                  : formatMarketTimestamp(hoverState.timestamp)
+                : 'Snapshot'}
+            </p>
+            <div className="mt-2 space-y-2">
+              {hoverState.rows.map((row) => (
+                <div key={row.id} className="rounded-xl bg-white/[0.04] px-2.5 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-slate-300">
+                      <span
+                        className={row.presentation === 'candle' ? 'h-3 w-2 rounded-[2px]' : 'h-2 w-2 rounded-full'}
+                        style={{ backgroundColor: row.color }}
+                      />
+                      {row.label}
+                    </span>
+                    <span className="font-mono font-black text-white">{row.value.toFixed(1)}%</span>
+                  </div>
+                  {row.presentation === 'candle' && row.open !== undefined && row.high !== undefined && row.low !== undefined && row.close !== undefined && (
+                    <div className="mt-1.5 space-y-1 text-[10px] uppercase tracking-[0.12em] text-slate-400">
+                      <div className="flex items-center justify-between gap-2">
+                        <span>O {row.open.toFixed(1)} / H {row.high.toFixed(1)}</span>
+                        <span>L {row.low.toFixed(1)} / C {row.close.toFixed(1)}</span>
+                      </div>
+                      <div className={`${row.delta === undefined ? 'text-slate-400' : row.delta >= 0 ? 'text-emerald-200' : 'text-amber-200'}`}>
+                        {row.delta === undefined ? 'No interval move' : `${formatSignedDelta(row.delta)} in this candle`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {selectedMarker && (
           <div
             ref={popupRef}
-            className={`pointer-events-auto absolute z-10 w-[min(18rem,calc(100%-1rem))] rounded-2xl bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
+            className={`pointer-events-auto absolute z-[4] w-[min(18rem,calc(100%-1rem))] rounded-2xl border border-white/10 bg-[#111820]/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.4)] backdrop-blur ${
               selectedMarker.y < 88 ? 'translate-y-3' : '-translate-y-[calc(100%+0.75rem)]'
             }`}
             style={{
@@ -372,39 +757,46 @@ export function MarketMovementChart({
             </ol>
           </div>
         )}
+
+        <div className="pointer-events-none absolute bottom-2 right-3 text-[8px] uppercase tracking-[0.14em] text-slate-600">
+          TradingView
+        </div>
       </div>
+
       <ul className="sr-only">
         {accessibleSummaries.map((summary, index) => (
           <li key={series[index].id}>{summary}</li>
         ))}
       </ul>
-      <div className="mt-2 flex flex-wrap gap-2" aria-label="Chart legend">
-        {series.map((entry) => (
+
+      <div className="mt-3 flex flex-wrap gap-2" aria-label="Chart legend">
+        {primaryCandleSeries && (
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+            <span
+              className="inline-flex h-3 w-2 rounded-[2px]"
+              style={{ backgroundColor: primaryCandleSeries.color }}
+              aria-hidden="true"
+            />
+            {primaryCandleSeries.label} candles
+          </span>
+        )}
+        {comparisonSeries.map((entry) => (
           <span
             key={`${entry.id}-legend`}
-            className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300"
+            className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300"
           >
-            <span className="relative inline-flex h-2.5 w-5 items-center" aria-hidden="true">
-              <span
-                className="absolute inset-x-0 top-1/2 border-t-2"
-                style={{ borderColor: entry.color, opacity: entry.kind === 'model' ? 1 : 0.88 }}
-              />
-              <span
-                className={`absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
-                  entry.kind === 'model' ? 'border-2 bg-[#0b1016]' : ''
-                }`}
-                style={{
-                  borderColor: entry.color,
-                  backgroundColor: entry.kind === 'model' ? '#0b1016' : entry.color,
-                }}
-              />
-            </span>
+            <span className="inline-flex h-2 w-5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
             {entry.label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+          <span className="font-mono text-slate-400">%</span>
+          Bounded probability scale
+        </span>
       </div>
+
       <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-        {insightCaption ?? 'Tap a gold SixSense point to inspect the input changes tied to that move.'}
+        {insightCaption ?? `Candles compress each ${formatCandleIntervalLabel(candleIntervalMs)} window into open, high, low, and close win probability so the market path reads like a real movement chart. Hover for exact percentages and tap a gold dot to inspect the model inputs behind that move.`}
       </p>
     </>
   );

@@ -14,7 +14,7 @@ import { CricketLoader } from '@/components/CricketLoader';
 import { getMatchStatusPresentation } from '@/lib/match-status';
 import { MatchFormatBadge } from '@/components/MatchFormatBadge';
 import { getMatchFormatLabel } from '@/lib/competition';
-import { buildPreMatchMovement, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
+import { buildConsensusMarketBook, buildPreMatchMovement, SIXSENSE_SERIES_ID, toNormalizedImpliedProbability, type MovementPredictionSnapshot } from '@/lib/pre-match-movement';
 import { getBookmakerMarketUrl, getTrustedSportsbook, hasValidTwoSidedOdds, normalizeBookmaker, selectFreshestTrustedSportsbookOdds } from '@/lib/market-odds';
 
 const MarketMovementChart = dynamic(
@@ -365,6 +365,16 @@ function describeGapStrength(points: number): { label: string; tone: string } {
   return { label: 'Sharp disagreement', tone: 'text-rose-200 border-rose-400/20 bg-rose-400/10' };
 }
 
+function describeRelationshipShift(points: number): { label: string; tone: string } {
+  if (points < 1) return { label: 'Stable since open', tone: 'text-emerald-200 border-emerald-400/20 bg-emerald-400/10' };
+  if (points < 3.5) return { label: 'Notable drift', tone: 'text-sky-200 border-sky-400/20 bg-sky-400/10' };
+  return { label: 'Material change', tone: 'text-amber-200 border-amber-400/20 bg-amber-400/10' };
+}
+
+function formatProbabilityLabel(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)}%` : '—';
+}
+
 function summarizeInputs(inputs: string[]): string {
   if (inputs.length === 0) return 'structured input updates';
   if (inputs.length === 1) return inputs[0];
@@ -464,6 +474,14 @@ function MarketMovementPanel({
     .slice(0, 3)
     : [];
   const featuredBooks = currentFeaturedBooks.length > 0 ? currentFeaturedBooks : fallbackHistoryBooks;
+  const consensusBook = buildConsensusMarketBook(
+    featuredBooks.map((book) => ({
+      id: book.id,
+      bookmaker: book.bookmaker,
+      color: book.color,
+      history: book.history,
+    })),
+  );
 
   const sortedMarketTimestamps = featuredBooks
     .flatMap((book) => book.history.map((snapshot) => new Date(snapshot.fetched_at).getTime()))
@@ -487,12 +505,7 @@ function MarketMovementPanel({
 
   const movement = buildPreMatchMovement(
     chartPredictionHistory,
-    featuredBooks.map((book) => ({
-      id: book.id,
-      bookmaker: book.bookmaker,
-      color: book.color,
-      history: book.history,
-    })),
+    consensusBook ? [consensusBook] : [],
     trackedTeamKey,
   );
 
@@ -504,9 +517,9 @@ function MarketMovementPanel({
         transition={{ delay: 0.16 }}
       >
         <ComingSoonTile
-          eyebrow="Market movement"
-          title="Movement history is not available yet"
-          body="SixSense and market changes will appear after a pre-match refresh captures a new data point."
+          eyebrow="Model vs Market"
+          title="Pre-match movement is still building"
+          body="SixSense and trusted market snapshots will appear here after the next pre-match refresh captures both sides."
         />
       </motion.div>
     );
@@ -532,20 +545,39 @@ function MarketMovementPanel({
   const sortedAnnotations = [...movement.annotations].sort((left, right) => left.timestamp - right.timestamp);
   const latestAnnotation = sortedAnnotations[sortedAnnotations.length - 1] ?? null;
   const previousAnnotation = sortedAnnotations.length > 1 ? sortedAnnotations[sortedAnnotations.length - 2] : null;
-  const latestModelProbability = [...movement.chartRows]
+  const openingModelProbability = [...movement.chartRows]
+    .find((row) => typeof row[SIXSENSE_SERIES_ID] === 'number')?.[SIXSENSE_SERIES_ID] as number | undefined;
+  const currentModelProbability = [...movement.chartRows]
     .reverse()
     .find((row) => typeof row[SIXSENSE_SERIES_ID] === 'number')?.[SIXSENSE_SERIES_ID] as number | undefined;
-  const marketGap = latestModelProbability !== undefined && consensusLatest !== null
-    ? consensusLatest - latestModelProbability
+  const marketGap = currentModelProbability !== undefined && consensusLatest !== null
+    ? consensusLatest - currentModelProbability
+    : null;
+  const openingGap = openingModelProbability !== undefined && consensusOpening !== null
+    ? consensusOpening - openingModelProbability
+    : null;
+  const relationshipShift = marketGap !== null && openingGap !== null
+    ? marketGap - openingGap
     : null;
   const gapStrength = marketGap === null ? null : describeGapStrength(Math.abs(marketGap));
+  const relationshipShiftStrength = relationshipShift === null ? null : describeRelationshipShift(Math.abs(relationshipShift));
+  const marketCoverageLabel = featuredBooks.length > 1
+    ? `${featuredBooks.length} trusted books`
+    : featuredBooks[0]?.bookmaker ?? 'Trusted market';
   const primaryInsight = marketGap === null
-    ? `Tracking ${marketSideMeta.shortName} against the market`
+    ? `Tracking ${marketSideMeta.shortName} against the trusted market`
     : Math.abs(marketGap) < 0.75
-      ? `${marketSideMeta.shortName}: SixSense and market aligned`
+      ? `${marketSideMeta.shortName}: SixSense and market are in step`
       : marketGap > 0
-        ? `${marketSideMeta.shortName}: market +${Math.abs(marketGap).toFixed(1)} pts vs SixSense`
-        : `${marketSideMeta.shortName}: SixSense +${Math.abs(marketGap).toFixed(1)} pts vs market`;
+        ? `${marketSideMeta.shortName}: market sits ${Math.abs(marketGap).toFixed(1)} pts above SixSense`
+        : `${marketSideMeta.shortName}: SixSense sits ${Math.abs(marketGap).toFixed(1)} pts above market`;
+  const movementBalanceStory = currentModelProbability !== undefined && consensusLatest !== null
+    ? `SixSense is at ${formatProbabilityLabel(currentModelProbability)} for ${marketSideMeta.shortName}; the trusted market consensus is ${formatProbabilityLabel(consensusLatest)} across ${marketCoverageLabel}.`
+    : currentModelProbability !== undefined
+      ? `SixSense is at ${formatProbabilityLabel(currentModelProbability)} for ${marketSideMeta.shortName}; trusted market pricing is still filling in.`
+      : consensusLatest !== null
+        ? `Trusted market consensus is ${formatProbabilityLabel(consensusLatest)} for ${marketSideMeta.shortName}; SixSense move history is still filling in.`
+        : `Fresh snapshots will show how SixSense and the trusted market are lining up on ${marketSideMeta.shortName}.`;
   const latestMoveDelta = latestAnnotation && previousAnnotation
     ? latestAnnotation.probability - previousAnnotation.probability
     : null;
@@ -556,14 +588,21 @@ function MarketMovementPanel({
     : [];
   const latestMoveStory = latestMoveDelta === null || !latestAnnotation
     ? syntheticCurrentPrediction
-      ? 'Showing the current SixSense price against the latest market refresh until the first stored model snapshot lands.'
+      ? 'Showing the current SixSense price against the latest trusted market snapshot until the first stored model snapshot lands.'
       : 'Last move will appear once another SixSense snapshot lands.'
     : Math.abs(latestMoveDelta) < 0.05
-      ? `Last move: ${marketSideMeta.shortName} stayed flat with ${summarizeInputs(latestMoveInputs)}.`
-      : `Last move: ${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'rose' : 'fell'} ${Math.abs(latestMoveDelta).toFixed(1)} pts with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'legacy attribution unavailable' : summarizeInputs(latestMoveInputs)}.`;
+      ? `Latest model refresh held ${marketSideMeta.shortName} flat with ${summarizeInputs(latestMoveInputs)}.`
+      : `Latest model refresh moved ${marketSideMeta.shortName} ${latestMoveDelta > 0 ? 'up' : 'down'} ${Math.abs(latestMoveDelta).toFixed(1)} pts with ${latestAnnotation.events.some((event) => event.isLegacyFallback) ? 'legacy attribution unavailable' : summarizeInputs(latestMoveInputs)}.`;
+  const relationshipStory = relationshipShift === null
+    ? 'Relationship change will appear once both the model and market have an opening snapshot.'
+    : Math.abs(relationshipShift) < 0.75
+      ? 'The model-market relationship is essentially unchanged from the first tracked pre-match snapshot.'
+      : relationshipShift > 0
+        ? `Since the first tracked snapshot, the market has moved ${Math.abs(relationshipShift).toFixed(1)} pts further toward ${marketSideMeta.shortName} than SixSense has.`
+        : `Since the first tracked snapshot, SixSense has moved ${Math.abs(relationshipShift).toFixed(1)} pts further toward ${marketSideMeta.shortName} than the market has.`;
   const currentGapCaption = syntheticCurrentPrediction
     ? marketGap === null
-      ? 'This chart pins the current SixSense price to the latest market refresh until full model-move history is available.'
+      ? 'This chart pins the current SixSense price to the latest trusted market snapshot until full model-move history is available.'
       : `${marketGap > 0 ? 'Market' : 'SixSense'} now leads by ${Math.abs(marketGap).toFixed(1)} pts on ${marketSideMeta.shortName}. Full model-move history is still building.`
     : marketGap === null
       ? 'Tap a gold SixSense point to inspect what changed around each model move.'
@@ -573,6 +612,15 @@ function MarketMovementPanel({
     : marketGap > 0
       ? `Market +${Math.abs(marketGap).toFixed(1)} pts`
       : `SixSense +${Math.abs(marketGap).toFixed(1)} pts`;
+  const shiftBadgeLabel = relationshipShift === null
+    ? 'Change pending'
+    : `${relationshipShift >= 0 ? '+' : '-'}${Math.abs(relationshipShift).toFixed(1)} pts vs open`;
+  const latestMoveLabel = latestMoveDelta === null ? 'Building' : formatSignedPoints(latestMoveDelta);
+  const attributionLabel = latestAnnotation === null
+    ? 'Awaiting move attribution'
+    : latestAnnotation.events.some((event) => event.isLegacyFallback)
+      ? 'Legacy attribution'
+      : 'Explained move';
 
   return (
     <motion.div
@@ -586,35 +634,110 @@ function MarketMovementPanel({
             <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 13h12M3 10l2.4-5 2.2 3.1L10.4 3l2.6 7" />
             </svg>
-            Market movement
+            Model vs Market
           </h2>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_38%),radial-gradient(circle_at_75%_20%,rgba(245,158,11,0.08),transparent_28%),rgba(4,8,15,0.92)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.22)] sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-3xl">
-           <div className="flex flex-wrap items-center gap-2">
-             {gapStrength && (
-               <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone.replace(' border-rose-400/20', '').replace(' border-amber-400/20', '').replace(' border-sky-400/20', '').replace(' border-emerald-400/20', '')}`}>
-                 {gapStrength.label}
-               </span>
-             )}
-           </div>
-           <p className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,4.3vw,1.85rem)] font-black leading-tight text-white">
-             {primaryInsight}
-           </p>
-           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-             {latestMoveStory}
-           </p>
+      <div className="mt-4 rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.1),transparent_38%),radial-gradient(circle_at_80%_18%,rgba(245,158,11,0.1),transparent_26%),linear-gradient(180deg,rgba(8,12,20,0.96),rgba(5,9,16,0.96))] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.24)] sm:p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {gapStrength && (
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${gapStrength.tone}`}>
+                  {gapStrength.label}
+                </span>
+              )}
+              {relationshipShiftStrength && (
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${relationshipShiftStrength.tone}`}>
+                  {relationshipShiftStrength.label}
+                </span>
+              )}
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
+                {attributionLabel}
+              </span>
+            </div>
+            <p className="mt-3 max-w-3xl text-[clamp(1.15rem,4.1vw,2.05rem)] font-black leading-tight text-white">
+              {primaryInsight}
+            </p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">
+              {movementBalanceStory}
+            </p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+              {relationshipStory}
+            </p>
           </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] bg-[#060b13]/72 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-200">
-              {gapBadgeLabel}
-            </span>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: 'SixSense now',
+              value: formatProbabilityLabel(currentModelProbability),
+              tone: 'text-amber-100',
+              body: prediction?.predicted_winner
+                ? `${prediction.predicted_winner} is the current model lean.`
+                : 'Current deterministic win probability.',
+            },
+            {
+              label: 'Market now',
+              value: formatProbabilityLabel(consensusLatest),
+              tone: 'text-sky-100',
+              body: featuredBooks.length === 1
+                ? `${marketCoverageLabel} sets the current trusted market read.`
+                : `${marketCoverageLabel} drive the live consensus.`,
+            },
+            {
+              label: 'Alignment',
+              value: gapBadgeLabel,
+              tone: marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-100' : 'text-emerald-100',
+              body: marketGap === null
+                ? 'Waiting for both sides to print a comparable snapshot.'
+                : marketGap > 0
+                  ? `Market is pricing ${marketSideMeta.shortName} higher than SixSense.`
+                  : `SixSense is pricing ${marketSideMeta.shortName} higher than market.`,
+            },
+            {
+              label: 'Since open',
+              value: shiftBadgeLabel,
+              tone: relationshipShift === null ? 'text-white' : Math.abs(relationshipShift) < 0.75 ? 'text-emerald-100' : relationshipShift > 0 ? 'text-sky-100' : 'text-amber-100',
+              body: relationshipStory,
+            },
+          ].map((item) => (
+            <div key={item.label} className="rounded-[22px] border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+              <p className={`mt-2 text-[clamp(1rem,4vw,1.35rem)] font-black leading-none ${item.tone}`}>
+                {item.value}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                {item.body}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-[24px] border border-white/[0.08] bg-[#060b13]/78 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-2xl">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Pre-Match Movement</p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                Clean by default: SixSense vs the trusted market path
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                The chart shows the current SixSense path against a blended market line, while book detail stays below so the view stays readable.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
+                Axis {movement.minDomain}-{movement.maxDomain}%
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
+                {movement.modelPointCount} model point{movement.modelPointCount !== 1 ? 's' : ''}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
+                {movement.marketPointCount} market point{movement.marketPointCount !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
 
           {movement.chartRows.length > 0 ? (
@@ -623,10 +746,10 @@ function MarketMovementPanel({
               series={movement.series}
               minDomain={movement.minDomain}
               maxDomain={movement.maxDomain}
-              ariaLabel={`Market movement for ${trackedTeam}. This chart tracks only ${trackedTeam}'s win probability, comparing the SixSense model with normalized bookmaker implied probabilities.`}
+              ariaLabel={`Pre-match movement for ${trackedTeam}. This chart tracks ${trackedTeam}'s win probability, comparing the SixSense model with the trusted market consensus.`}
               annotations={movement.annotations}
               insightCaption={currentGapCaption}
-              heightClassName="h-52 sm:h-60 lg:h-72"
+              heightClassName="h-56 sm:h-64 lg:h-80"
             />
           ) : (
             <div className="flex h-40 sm:h-48 lg:h-56 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] px-5 text-center text-sm text-slate-400">
@@ -636,46 +759,52 @@ function MarketMovementPanel({
           {(movement.modelPointCount === 0 || movement.marketPointCount === 0) && (
             <p className="mt-3 text-xs leading-relaxed text-slate-400" role="status">
               {movement.modelPointCount === 0
-                ? 'SixSense history is not available yet; showing market movement only.'
+                ? 'SixSense history is not available yet; showing trusted market movement only.'
                 : 'Trusted market history is not available yet; showing SixSense movement only.'}
             </p>
           )}
           {syntheticCurrentPrediction && predictionHistory.length === 0 && (
             <p className="mt-3 text-xs leading-relaxed text-slate-400" role="status">
-              SixSense move history is still building; the chart pins the current model price to the latest market snapshot in the meantime.
+              SixSense move history is still building; the chart pins the current model price to the latest trusted market snapshot in the meantime.
             </p>
           )}
-        </div>
-
-        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-3 sm:gap-3">
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">SixSense</p>
-            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
-              {latestModelProbability !== undefined ? `${latestModelProbability.toFixed(1)}%` : '—'}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Market</p>
-            <p className="mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none text-white">
-              {consensusLatest !== null ? `${consensusLatest.toFixed(1)}%` : '—'}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Gap</p>
-            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${marketGap === null ? 'text-white' : marketGap >= 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
-              {marketGap !== null ? formatSignedPoints(marketGap) : '—'}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500 sm:text-[9px] sm:tracking-[0.16em]">Last move</p>
-            <p className={`mt-1 whitespace-nowrap text-[clamp(1rem,4vw,1.125rem)] font-black leading-none ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
-              {latestMoveDelta !== null ? formatSignedPoints(latestMoveDelta) : '—'}
-            </p>
+          <div className="mt-4 grid gap-2 border-t border-white/[0.06] pt-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-white/[0.03] px-3 py-2.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Latest model move</p>
+              <p className={`mt-1 text-sm font-black ${latestMoveDelta === null ? 'text-white' : latestMoveDelta >= 0 ? 'text-emerald-100' : 'text-rose-100'}`}>
+                {latestMoveLabel}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">{latestMoveStory}</p>
+            </div>
+            <div className="rounded-2xl bg-white/[0.03] px-3 py-2.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Trust guardrail</p>
+              <p className="mt-1 text-sm font-black text-white">Bounded, not exaggerated</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                The y-axis is bounded to the observed range and always labeled in win-probability percentages so small moves stay readable without turning into fake drama.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/[0.03] px-3 py-2.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Attribution</p>
+              <p className="mt-1 text-sm font-black text-white">{attributionLabel}</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                {latestAnnotation?.events.some((event) => event.isLegacyFallback)
+                  ? 'This move came from an older snapshot that did not retain structured input attribution.'
+                  : 'Gold SixSense markers open the structured inputs that coincided with each model move.'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {featuredBooks.length > 0 && <div className="mt-4 grid grid-cols-3 gap-2">
+      {featuredBooks.length > 0 && <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Trusted books</p>
+              <p className="mt-1 text-sm font-semibold text-white">Underlying market detail</p>
+            </div>
+            <p className="text-xs text-slate-400">Kept below the main chart so the default view stays clean.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {featuredBooks.map((book) => (
             <button
               key={book.id}
@@ -683,7 +812,7 @@ function MarketMovementPanel({
               onClick={() => {
                 if (book.marketUrl) openExternalMarket(book.marketUrl);
               }}
-              className="w-full rounded-2xl bg-white/[0.035] px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.055] sm:px-3"
+              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.055] sm:px-3"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -720,7 +849,7 @@ function MarketMovementPanel({
                   {trackedTeam} implied
                 </span>
                 <span className={`${book.delta !== null && book.delta >= 0 ? 'text-emerald-300' : 'text-red-300'} font-black`}>
-                  {book.latestProbability !== null ? `${book.latestProbability.toFixed(1)}%` : '—'}
+                  {formatProbabilityLabel(book.latestProbability)}
                   {book.delta !== null && (
                     <span className="ml-1 hidden text-[9px] uppercase tracking-[0.14em] sm:inline">
                       {book.delta >= 0 ? '↑' : '↓'} {Math.abs(book.delta).toFixed(1)}
@@ -730,6 +859,7 @@ function MarketMovementPanel({
               </div>
             </button>
           ))}
+          </div>
         </div>}
     </motion.div>
   );

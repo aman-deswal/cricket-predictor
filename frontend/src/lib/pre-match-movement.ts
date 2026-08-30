@@ -40,6 +40,7 @@ export interface MovementEventItem extends MovementChangeEvent {
 }
 
 export interface MovementOddsSnapshot {
+  bookmaker?: string;
   team1_odds: number;
   team2_odds: number;
   draw_odds: number | null;
@@ -72,6 +73,63 @@ export interface PreMatchMovement {
 }
 
 export const SIXSENSE_SERIES_ID = 'sixsense-model';
+export const MARKET_CONSENSUS_SERIES_ID = 'market-consensus';
+
+export function buildConsensusMarketBook(marketBooks: MovementMarketBook[]): MovementMarketBook | null {
+  const timestampToSnapshots = new Map<number, Array<{ bookmaker: string; snapshot: MovementOddsSnapshot }>>();
+
+  marketBooks.forEach((book) => {
+    book.history
+      .filter((snapshot) => hasValidTwoSidedOdds(snapshot))
+      .forEach((snapshot) => {
+        const timestamp = new Date(snapshot.fetched_at).getTime();
+        if (Number.isNaN(timestamp)) return;
+        const snapshotsAtTimestamp = timestampToSnapshots.get(timestamp) ?? [];
+        snapshotsAtTimestamp.push({ bookmaker: book.bookmaker, snapshot });
+        timestampToSnapshots.set(timestamp, snapshotsAtTimestamp);
+      });
+  });
+
+  const orderedTimestamps = [...timestampToSnapshots.keys()].sort((left, right) => left - right);
+  if (orderedTimestamps.length === 0) return null;
+
+  const latestByBookmaker = new Map<string, MovementOddsSnapshot>();
+  const consensusHistory: MovementOddsSnapshot[] = [];
+
+  orderedTimestamps.forEach((timestamp) => {
+    const snapshotsAtTimestamp = timestampToSnapshots.get(timestamp) ?? [];
+    snapshotsAtTimestamp.forEach(({ bookmaker, snapshot }) => {
+      latestByBookmaker.set(bookmaker, snapshot);
+    });
+
+    const team1Probabilities = [...latestByBookmaker.values()]
+      .map((snapshot) => toNormalizedImpliedProbability(snapshot, 'team1'))
+      .filter((value): value is number => value !== null && Number.isFinite(value));
+
+    if (team1Probabilities.length === 0) return;
+
+    const team1Probability = team1Probabilities.reduce((sum, value) => sum + value, 0) / team1Probabilities.length;
+    const team2Probability = 100 - team1Probability;
+    if (team1Probability <= 0 || team1Probability >= 100 || team2Probability <= 0 || team2Probability >= 100) return;
+
+    consensusHistory.push({
+      bookmaker: team1Probabilities.length > 1 ? 'Market consensus' : snapshotsAtTimestamp[0]?.bookmaker ?? 'Trusted market',
+      team1_odds: 100 / team1Probability,
+      team2_odds: 100 / team2Probability,
+      draw_odds: null,
+      fetched_at: new Date(timestamp).toISOString(),
+    });
+  });
+
+  if (consensusHistory.length === 0) return null;
+
+  return {
+    id: MARKET_CONSENSUS_SERIES_ID,
+    bookmaker: 'Market consensus',
+    color: '#38bdf8',
+    history: consensusHistory,
+  };
+}
 
 export function toNormalizedImpliedProbability(
   snapshot: MovementOddsSnapshot,
@@ -179,7 +237,7 @@ export function buildPreMatchMovement(
     if (bookPointCount > 0) {
       marketSeries.push({
         id: book.id,
-        label: `${book.bookmaker} market`,
+        label: book.id === MARKET_CONSENSUS_SERIES_ID ? 'Market consensus' : `${book.bookmaker} market`,
         color: book.color,
         kind: 'market',
       });
