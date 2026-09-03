@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
+import { getHomepageLedger, getPredictionHistory, getUpcomingMatches, MatchWithPredictions } from '@/lib/supabase';
 import {
   compareMatchCenterMatches,
   compareMatchesByCompetition,
@@ -26,7 +26,9 @@ import {
   type HomepageTrustMetrics,
   type HomepageTrustSignal,
 } from '@/lib/prediction-history';
+import { getLedgerRecapLevel, type LedgerEntry } from '@/lib/ledger';
 import Link from 'next/link';
+import { LedgerCard } from '@/components/LedgerCard';
 
 const LOGO_AMBER = '#d97706';
 
@@ -207,6 +209,108 @@ function HomeTrustTicker({ metrics }: { metrics: HomepageTrustMetrics }) {
         }
       `}</style>
     </Link>
+  );
+}
+
+function LedgerSection({
+  ledgerGroups,
+  metrics,
+}: {
+  ledgerGroups: Record<'international' | 'league', LedgerEntry[]>;
+  metrics: HomepageTrustMetrics | null;
+}) {
+  const totalEntries = ledgerGroups.international.length + ledgerGroups.league.length;
+  if (totalEntries === 0) {
+    return metrics ? <HomeTrustTicker metrics={metrics} /> : null;
+  }
+
+  const sections: Array<{
+    key: 'international' | 'league';
+    title: string;
+    eyebrow: string;
+    entries: LedgerEntry[];
+    icon: ReactNode;
+  }> = [
+    {
+      key: 'international',
+      title: 'International',
+      eyebrow: 'Settled recaps',
+      entries: ledgerGroups.international,
+      icon: <GlobeIcon className="h-5 w-5" />,
+    },
+    {
+      key: 'league',
+      title: 'League',
+      eyebrow: 'Settled recaps',
+      entries: ledgerGroups.league,
+      icon: <ShieldIcon className="h-5 w-5" />,
+    },
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10">
+      <div className="border-b border-white/[0.07] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionHeading icon={<TargetIcon className="h-6 w-6" />}>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white sm:text-base sm:tracking-[0.18em]">
+                The <span className="text-amber-600">Ledger</span>
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                How SixSense saw settled matches, with wins and misses shown honestly.
+              </p>
+            </div>
+          </SectionHeading>
+          {metrics?.primary && (
+            <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-amber-100">
+              <TargetIcon className="h-3.5 w-3.5" />
+              Verified record {metrics.primary.stats.pct}% · {metrics.primary.stats.correct}/{metrics.primary.stats.total}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-5 p-3">
+        {sections.map((section) => (
+          <div key={section.key} className="space-y-3">
+            <div className="flex items-start gap-3 px-1">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-500/25 bg-white/[0.04] text-amber-600">
+                {section.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">{section.eyebrow}</p>
+                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-white">{section.title}</h3>
+                {section.entries.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {section.entries.length < 3
+                      ? `Showing ${section.entries.length} settled recap${section.entries.length === 1 ? '' : 's'} while this track builds toward a full three-card rotation.`
+                      : (() => {
+                        const resultOnlyCount = section.entries.filter((entry) => getLedgerRecapLevel(entry) === 'result-only').length;
+                        return resultOnlyCount > 0
+                          ? `${resultOnlyCount} recap${resultOnlyCount === 1 ? '' : 's'} lean on result-only evidence so losses and thin-data finishes still stay visible.`
+                          : 'Three settled recaps rotate from the recent qualified match pool.';
+                      })()}
+                  </p>
+                )}
+              </div>
+            </div>
+            {section.entries.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {section.entries.map((entry, index) => (
+                  <LedgerCard key={entry.match_id} entry={entry} index={index} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
+                {section.key === 'international'
+                  ? 'No settled international recaps are ready yet. This lane fills automatically once qualified matches are scored.'
+                  : 'League recaps are still building. They appear automatically once qualified league results are scored.'}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1071,10 +1175,15 @@ function FeaturedHero({
 
 export default function HomePage() {
   const [matches, setMatches] = useState<MatchWithPredictions[]>([]);
+  const [ledgerGroups, setLedgerGroups] = useState<Record<'international' | 'league', LedgerEntry[]>>({
+    international: [],
+    league: [],
+  });
   const [trustMetrics, setTrustMetrics] = useState<HomepageTrustMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [competitionFiltersOpen, setCompetitionFiltersOpen] = useState(false);
+  const hasLedgerEntries = ledgerGroups.international.length + ledgerGroups.league.length > 0;
 
   const featuredMatch = selectFeaturedMatch(matches);
   const featuredMatchScope = featuredMatch
@@ -1126,9 +1235,10 @@ export default function HomePage() {
     : matchesByCompetition.filter((group) => group.key === activeCompetition);
   useEffect(() => {
     async function load() {
-      const [matchesResult, historyResult] = await Promise.allSettled([
+      const [matchesResult, historyResult, ledgerResult] = await Promise.allSettled([
         getUpcomingMatches(),
         getPredictionHistory(),
+        getHomepageLedger(),
       ]);
 
       if (matchesResult.status === 'fulfilled') {
@@ -1143,6 +1253,12 @@ export default function HomePage() {
         console.error('Failed to load prediction history:', historyResult.reason);
       }
 
+      if (ledgerResult.status === 'fulfilled') {
+        setLedgerGroups(ledgerResult.value);
+      } else {
+        console.error('Failed to load ledger recaps:', ledgerResult.reason);
+      }
+
       setLoading(false);
     }
     load();
@@ -1152,7 +1268,7 @@ export default function HomePage() {
 
   return (
     <div className="-mt-4 sm:mt-0">
-      {matches.length === 0 ? (
+      {matches.length === 0 && !hasLedgerEntries ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1176,9 +1292,11 @@ export default function HomePage() {
         </motion.div>
       ) : (
         <div className="space-y-6">
-          {trustMetrics && <HomeTrustTicker metrics={trustMetrics} />}
+          <LedgerSection ledgerGroups={ledgerGroups} metrics={trustMetrics} />
 
-          <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
+          {matches.length > 0 && (
+            <MatchBoardStrip matches={matches} featuredMatchId={featuredMatch?.match_id ?? null} />
+          )}
 
           {featuredMatch && (
             <motion.section
@@ -1202,9 +1320,9 @@ export default function HomePage() {
             </motion.section>
           )}
 
-          <SparseSlateNotice matchCount={matches.length} />
+          {matches.length > 0 && <SparseSlateNotice matchCount={matches.length} />}
 
-          {/* Match discovery board */}
+          {matches.length > 0 && (
           <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-700/45 bg-[#111820]/95 shadow-xl shadow-black/10">
             <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
                 <SectionHeading icon={<GroundsIcon className="h-6 w-6" />}>
@@ -1284,6 +1402,7 @@ export default function HomePage() {
             )}
             </div>
           </section>
+          )}
         </div>
       )}
     </div>

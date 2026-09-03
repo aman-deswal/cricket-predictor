@@ -689,17 +689,19 @@ const demoHistory: PredictionHistoryItem[] = Array.from({ length: 60 }, (_, inde
   const fixture = DEMO_FIXTURES[index % DEMO_FIXTURES.length];
   const correct = index % 3 !== 0;
   const predictedProbability = fixture.t1prob + ((index % 5) * 0.02);
+  const actualWinner = correct ? fixture.favorite : fixture.underdog;
   return {
     prediction_id: `demo-pred-${index + 1}`,
     match_id: `demo-${index + 1}`,
     team1: fixture.team1,
     team2: fixture.team2,
     predicted_winner: fixture.favorite,
-    actual_winner: correct ? fixture.favorite : fixture.underdog,
+    actual_winner: actualWinner,
     correct,
     brier_score: correct ? 0.18 : 0.32,
     predicted_probability: Math.min(predictedProbability, 0.82),
     scored_at: pastIso(60 - index),
+    result_text: `${actualWinner} won by ${correct ? '5 wickets' : '18 runs'}`,
     reasoning: fixture.reasoning,
     toss_insight: fixture.toss_insight,
     confidence: fixture.confidence,
@@ -720,12 +722,50 @@ export function getMockUpcomingMatches(): MatchWithPredictions[] {
   return demoMatches;
 }
 
+function getMockHistoricalMatch(matchId: string): Match | null {
+  const result = demoHistory.find((entry) => entry.match_id === matchId);
+  if (!result) return null;
+
+  return {
+    match_id: result.match_id,
+    name: `${result.team1} vs ${result.team2}`,
+    team1: result.team1,
+    team2: result.team2,
+    date: result.scored_at,
+    venue: 'Completed fixture',
+    match_type: 'T20',
+    status: 'completed',
+    winner: result.actual_winner,
+    team1_recent_form: [],
+    team2_recent_form: [],
+  };
+}
+
 export function getMockMatch(matchId: string): Match | null {
-  return demoMatches.find((match) => match.match_id === matchId) ?? null;
+  return demoMatches.find((match) => match.match_id === matchId) ?? getMockHistoricalMatch(matchId);
 }
 
 export function getMockPrediction(matchId: string): Prediction | null {
-  return demoMatches.find((match) => match.match_id === matchId)?.predictions?.[0] ?? null;
+  const livePrediction = demoMatches.find((match) => match.match_id === matchId)?.predictions?.[0];
+  if (livePrediction) return livePrediction;
+
+  const result = demoHistory.find((entry) => entry.match_id === matchId);
+  if (!result) return null;
+
+  return {
+    match_id: result.match_id,
+    team1: result.team1,
+    team2: result.team2,
+    predicted_winner: result.predicted_winner,
+    team1_win_probability: result.team1_win_probability ?? 0.5,
+    team2_win_probability: result.team2_win_probability ?? 0.5,
+    confidence: result.confidence ?? 'medium',
+    reasoning: result.reasoning ?? '',
+    toss_insight: result.toss_insight,
+    model: 'gpt-4o',
+    ensemble_size: 3,
+    scored_at: result.scored_at,
+  };
 }
 
 export function getMockMatchOdds(matchId: string): MatchOdds[] {
@@ -765,6 +805,23 @@ export function getMockPlayerStats(playerNames: string[], format: string): Playe
 
 export function getMockPredictionHistory(): PredictionHistoryItem[] {
   return demoHistory;
+}
+
+export function getMockPredictionResult(matchId: string) {
+  const result = demoHistory.find((entry) => entry.match_id === matchId);
+  if (!result) return null;
+
+  return {
+    prediction_id: result.prediction_id,
+    match_id: result.match_id,
+    predicted_winner: result.predicted_winner,
+    actual_winner: result.actual_winner,
+    correct: result.correct,
+    brier_score: result.brier_score,
+    predicted_probability: result.predicted_probability,
+    result_text: result.result_text ?? null,
+    scored_at: result.scored_at,
+  };
 }
 
 export function getMockDashboardStats(): { total: number; correct: number; accuracy: number; avgBrier: number } {

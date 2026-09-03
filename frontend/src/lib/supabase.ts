@@ -5,6 +5,7 @@ import { getStoredDemoMode } from './demo-mode';
 import { compareMatchCenterMatches, hasValidMarketOdds } from './competition';
 import { normalizeBookmaker, selectFreshestTrustedSportsbookOdds } from './market-odds';
 import { buildAccuracyTrend } from './prediction-history';
+import { selectLedgerEntries, type LedgerEntry, type LedgerScope } from './ledger';
 export { getMatchSection } from './competition';
 export type { MatchSection } from './competition';
 import {
@@ -18,6 +19,7 @@ import {
   getMockMatchOdds,
   getMockMatchOddsHistory,
   getMockPredictionSnapshots,
+  getMockPredictionResult,
   getMockMatchSquads,
   getMockPlayerStats,
   getMockPrediction,
@@ -427,6 +429,7 @@ type SurfaceBuildContext = {
 export interface UnifiedMatchDetails {
   match: Match | null;
   prediction: Prediction | null;
+  predictionResult: PredictionResult | null;
   predictionHistory: PredictionSnapshot[];
   enrichment: MatchEnrichment | null;
   odds: MatchOdds[];
@@ -1100,6 +1103,7 @@ export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMa
     return {
       match,
       prediction,
+      predictionResult: getMockPredictionResult(matchId),
       predictionHistory,
       enrichment,
       odds,
@@ -1116,6 +1120,7 @@ export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMa
     return {
       match: null,
       prediction: null,
+      predictionResult: null,
       predictionHistory: [],
       enrichment: null,
       odds: [],
@@ -1266,6 +1271,7 @@ export async function getUnifiedMatchDetails(matchId: string): Promise<UnifiedMa
   return {
     match: mergedMatch,
     prediction,
+    predictionResult: await getPredictionResult(matchId),
     predictionHistory,
     enrichment: mergeEnrichmentRows(normalizedEnrichmentRows),
     odds: [...odds.values()],
@@ -1375,6 +1381,21 @@ export async function getPredictionSnapshots(matchId: string): Promise<Predictio
 
   if (error) return [];
   return (data ?? []).reverse();
+}
+
+export async function getPredictionResult(matchId: string): Promise<PredictionResult | null> {
+  if (isMockDataEnabled()) {
+    return getMockPredictionResult(matchId);
+  }
+
+  const { data, error } = await supabase
+    .from('prediction_results')
+    .select('*')
+    .eq('match_id', matchId)
+    .single();
+
+  if (error || !data) return null;
+  return data;
 }
 
 export async function getMatchOdds(matchId: string): Promise<MatchOdds[]> {
@@ -1668,6 +1689,154 @@ export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
     toss_winner: tossMap[r.match_id]?.toss_winner ?? null,
     toss_decision: tossMap[r.match_id]?.toss_decision ?? null,
   }));
+}
+
+function buildLedgerEntryFromSources(
+  result: PredictionHistoryItem,
+  matchesById: Map<string, Partial<Match>>,
+  competitionByMatchId: Map<string, string>,
+  scorecardsByMatchId: Map<string, unknown[]>,
+  seriesScorelineByMatchId: Map<string, string>,
+  trustedOddsByMatchId: Map<string, MatchOdds | null>,
+  edgeByMatchId: Map<string, EdgeScore | null>,
+): LedgerEntry {
+  const match = matchesById.get(result.match_id);
+  const trustedOdds = trustedOddsByMatchId.get(result.match_id) ?? null;
+  const edge = edgeByMatchId.get(result.match_id) ?? null;
+
+  return {
+    match_id: result.match_id,
+    name: match?.name ?? `${result.team1} vs ${result.team2}`,
+    team1: result.team1,
+    team2: result.team2,
+    date: match?.date ?? result.scored_at,
+    venue: match?.venue ?? null,
+    match_type: match?.match_type ?? 'cricket',
+    status: 'completed',
+    predicted_winner: result.predicted_winner,
+    actual_winner: result.actual_winner,
+    correct: result.correct,
+    confidence: result.confidence,
+    team1_win_probability: result.team1_win_probability,
+    team2_win_probability: result.team2_win_probability,
+    predicted_probability: result.predicted_probability,
+    result_text: result.result_text ?? null,
+    scored_at: result.scored_at,
+    competition_name: competitionByMatchId.get(result.match_id) ?? null,
+    series_scoreline: seriesScorelineByMatchId.get(result.match_id) ?? null,
+    scorecards: scorecardsByMatchId.get(result.match_id) ?? [],
+    reasoning: result.reasoning,
+    bookmaker_odds: trustedOdds
+      ? {
+        bookmaker: trustedOdds.bookmaker,
+        team1_odds: trustedOdds.team1_odds,
+        team2_odds: trustedOdds.team2_odds,
+      }
+      : null,
+    edge_score: edge
+      ? {
+        net_edge: edge.net_edge,
+        edge_team: edge.edge_team,
+      }
+      : null,
+  };
+}
+
+export async function getHomepageLedger(now = new Date()): Promise<Record<LedgerScope, LedgerEntry[]>> {
+  const history = await getPredictionHistory();
+  if (history.length === 0) {
+    return { international: [], league: [] };
+  }
+
+  if (isMockDataEnabled()) {
+    const mockEntries = history.map((result) => buildLedgerEntryFromSources(
+      result,
+      new Map([[result.match_id, getMockMatch(result.match_id) ?? {}]]),
+      new Map<string, string>(),
+      new Map<string, unknown[]>(),
+      new Map<string, string>(),
+      new Map<string, MatchOdds | null>(),
+      new Map<string, EdgeScore | null>([[result.match_id, getMockEdgeScore(result.match_id)]]),
+    ));
+
+    return {
+      international: selectLedgerEntries(mockEntries, 'international', now),
+      league: selectLedgerEntries(mockEntries, 'league', now),
+    };
+  }
+
+  const matchIds = [...new Set(history.map((result) => result.match_id))];
+  const [
+    { data: matchesData },
+    { data: espnData },
+    { data: oddsData },
+    { data: edgeData },
+  ] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('match_id, name, team1, team2, date, venue, match_type, status')
+      .in('match_id', matchIds),
+    supabase
+      .from('espn_match_data')
+      .select('match_id, series_note, series_scoreline, scorecards')
+      .in('match_id', matchIds),
+    supabase
+      .from('match_odds')
+      .select('match_id, bookmaker, team1_odds, team2_odds, draw_odds, market, fetched_at')
+      .in('match_id', matchIds)
+      .order('fetched_at', { ascending: false }),
+    supabase
+      .from('match_edge_scores')
+      .select('*')
+      .in('match_id', matchIds),
+  ]);
+
+  const matchesById = new Map<string, Partial<Match>>(
+    ((matchesData ?? []) as Partial<Match>[]).map((match) => [String(match.match_id), match]),
+  );
+  const competitionByMatchId = new Map<string, string>();
+  const scorecardsByMatchId = new Map<string, unknown[]>();
+  const seriesScorelineByMatchId = new Map<string, string>();
+  ((espnData ?? []) as Array<Record<string, unknown>>).forEach((row) => {
+    const matchId = String(row.match_id ?? '');
+    if (!matchId) return;
+    const seriesNote = typeof row.series_note === 'string' ? row.series_note.trim() : '';
+    const seriesScoreline = typeof row.series_scoreline === 'string' ? row.series_scoreline.trim() : '';
+    if (seriesNote) competitionByMatchId.set(matchId, seriesNote);
+    if (seriesScoreline) seriesScorelineByMatchId.set(matchId, seriesScoreline);
+    scorecardsByMatchId.set(matchId, parseJsonField(row.scorecards, []));
+  });
+
+  const oddsByMatchId = new Map<string, MatchOdds[]>();
+  ((oddsData ?? []) as MatchOdds[]).forEach((row) => {
+    const entries = oddsByMatchId.get(row.match_id) ?? [];
+    entries.push(row);
+    oddsByMatchId.set(row.match_id, entries);
+  });
+  const trustedOddsByMatchId = new Map<string, MatchOdds | null>();
+  oddsByMatchId.forEach((entries, matchId) => {
+    trustedOddsByMatchId.set(matchId, selectFreshestTrustedSportsbookOdds(entries)[0] ?? null);
+  });
+
+  const edgeByMatchId = new Map<string, EdgeScore | null>();
+  ((edgeData ?? []) as Array<Record<string, unknown>>).forEach((row) => {
+    edgeByMatchId.set(String(row.match_id ?? ''), toEdgeScore(row));
+  });
+
+  const entries = history.map((result) => buildLedgerEntryFromSources(
+    result,
+    matchesById,
+    competitionByMatchId,
+    scorecardsByMatchId,
+    seriesScorelineByMatchId,
+    trustedOddsByMatchId,
+    edgeByMatchId,
+  ));
+
+  return {
+    international: selectLedgerEntries(entries, 'international', now),
+    league: selectLedgerEntries(entries, 'league', now),
+  };
 }
 
 export async function getAccuracyBySplit(): Promise<{
