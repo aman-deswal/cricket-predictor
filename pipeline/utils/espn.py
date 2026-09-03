@@ -83,6 +83,16 @@ def _parse_date(date_str: str) -> Optional[datetime]:
         return None
 
 
+def _parse_event_id(value: Any) -> Optional[int]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        return None
+
+
 def derive_match_type_from_series_note(series_note: str) -> Optional[str]:
     """Derive a canonical match type from ESPN's series note text."""
     if not series_note:
@@ -597,13 +607,17 @@ def find_espn_event_id(team1: str, team2: str, match_date: str,
             ev_date = (ev.get("date") or "")[:10]
             ev_teams = ev.get("teams", [])
             if ev_date == target_date and _teams_match(ev_teams, team1, team2):
-                return ev["id"]
+                event_id = str(ev.get("id", "") or "").strip()
+                if event_id:
+                    return event_id
 
         # If scoreboard didn't have it (only shows active matches),
         # try summary for nearby event IDs
         # ESPN event IDs for a series are usually sequential
         for ev in events:
-            base_id = int(ev["id"])
+            base_id = _parse_event_id(ev.get("id"))
+            if base_id is None:
+                continue
             found = _scan_nearby_events(base_id, team1, team2, target_date)
             if found:
                 return found
@@ -616,10 +630,12 @@ def find_espn_event_id(team1: str, team2: str, match_date: str,
             ev_date = (ev.get("date") or "")[:10]
             ev_teams = ev.get("teams", [])
             if ev_date == target_date and _teams_match(ev_teams, team1, team2):
-                return ev["id"]
+                event_id = str(ev.get("id", "") or "").strip()
+                if event_id:
+                    return event_id
             # Use any event as anchor for scanning
-            if ev.get("id"):
-                base_id = int(ev["id"])
+            base_id = _parse_event_id(ev.get("id"))
+            if base_id is not None:
                 found = _scan_nearby_events(base_id, team1, team2, target_date)
                 if found:
                     return found
