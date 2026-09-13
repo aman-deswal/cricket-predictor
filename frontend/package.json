@@ -19,7 +19,7 @@
     "@supabase/supabase-js": "^2.39.0",
     "framer-motion": "^11.0.0",
     "lightweight-charts": "^5.2.1",
-    "next": "^15.5.23",
+    "next": "^15.5.24",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.10.0"
